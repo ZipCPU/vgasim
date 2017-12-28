@@ -67,7 +67,7 @@ public:
 	VGAWIN		m_vga;
 	bool		m_done;
 
-	TESTBENCH(void) : m_vga(1920,1080) {
+	TESTBENCH(void) : m_vga(1280,720) {
 		//
 		m_core->i_hm_width  = m_vga.width();
 		m_core->i_hm_porch  = m_vga.hporch();

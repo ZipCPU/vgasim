@@ -60,7 +60,7 @@ module	llvga(i_pixclk, i_reset, i_test,
 	// input	[3:0]	i_red, i_grn, i_blu;
 	output	reg	o_rd, o_newline, o_newframe;
 	output	reg	o_vsync, o_hsync;
-	output	reg	[3:0]	o_red, o_grn, o_blu;
+	output	reg	[BPC-1:0]	o_red, o_grn, o_blu;
 
 
 	wire	[BPC-1:0]	i_red, i_grn, i_blu;
@@ -162,9 +162,9 @@ module	llvga(i_pixclk, i_reset, i_test,
 			o_grn <= (i_test) ? tst_grn : i_grn;
 			o_blu <= (i_test) ? tst_blu : i_blu;
 		end else begin
-			o_red <= 4'h0;
-			o_grn <= 4'h0;
-			o_blu <= 4'h0;
+			o_red <= 0;
+			o_grn <= 0;
+			o_blu <= 0;
 		end
 
 //

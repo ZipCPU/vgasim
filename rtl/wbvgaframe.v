@@ -54,7 +54,7 @@ module	wbvgaframe(i_clk, i_pixclk,
 	parameter	ADDRESS_WIDTH=24,
 			BUS_DATA_WIDTH=64;
 	localparam	AW=ADDRESS_WIDTH;
-	parameter	BITS_PER_COLOR = 4;
+	parameter	BITS_PER_COLOR = 8;
 	localparam	BPC = BITS_PER_COLOR,
 			DW=BUS_DATA_WIDTH;
 	input	wire		i_clk, i_pixclk, i_reset;
@@ -103,7 +103,7 @@ module	wbvgaframe(i_clk, i_pixclk,
 
 	// Actually control the VGA hardware, produce the sync's, and output
 	// the color data given
-	llvga		vgahw(i_pixclk, (i_reset), i_test,
+	llvga	#(BPC)	vgahw(i_pixclk, (i_reset), i_test,
 				pixel[(3*BPC-1):0],
 				i_hm_width, i_hm_porch, i_hm_synch, i_hm_raw,
 				i_vm_height, i_vm_porch, i_vm_synch, i_vm_raw,

@@ -51,7 +51,7 @@
 #include "image.cpp"
 
 const	int	VGASIM::CLOCKS_PER_PIXEL = 1,
-		VGASIM::BITS_PER_COLOR=4;
+		VGASIM::BITS_PER_COLOR=8;
 const	bool	VGASIM::m_debug = false;
 
 void	VGASIM::on_realize() {
