@@ -220,23 +220,23 @@ module	llvga(i_pixclk, i_reset, i_test,
 	end
 
 	always @(posedge i_pixclk)
-	if ((f_past_valid)&&(!i_reset)&&(f_stable_mode)
-			&&($past(f_stable_mode)))
+	if ((f_past_valid)&&(!$past(i_reset))&&(!i_reset)
+			&&(f_stable_mode)&&($past(f_stable_mode)))
 	begin
 
 		// The horizontal position counter should increment
 		if ($past(hpos >= i_hm_raw-1'b1))
 			assert(hpos == 0);
 		else
-			assert(hpos = $past(hpos+1'b1));
+			assert(hpos == $past(hpos)+1'b1);
 
 		// The vertical position counter should increment
-		if (o_newline)
+		if (hpos == i_hm_porch)
 		begin
 			if ($past(vpos >= i_vm_raw-1'b1))
 				assert(vpos == 0);
 			else
-				assert(vpos = $past(vpos)+1'b1);
+				assert(vpos == $past(vpos)+1'b1);
 		end else
 			assert(vpos == $past(vpos));
 
