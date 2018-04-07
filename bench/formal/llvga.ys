@@ -1,5 +1,5 @@
 read_verilog -D LLVGA -formal ../../rtl/llvga.v
-read_verilog -D LLVGA -formal ../../rtl/vgatest.v
+read_verilog -D LLVGA -formal ../../rtl/vgatestsrc.v
 prep -top llvga
 opt -share_all
 write_smt2 -wires llvga.smt2
