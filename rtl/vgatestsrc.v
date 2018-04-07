@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vgatest.v
+// Filename: 	vgatestsrc.v
 //
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -37,7 +37,7 @@
 //
 `default_nettype	none
 //
-module	vgatest(i_pixclk, i_reset,
+module	vgatestsrc(i_pixclk, i_reset,
 		// External connections
 		i_width, i_height,
 		i_rd, i_newline, i_newframe,
