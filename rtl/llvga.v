@@ -204,32 +204,57 @@ module	llvga(i_pixclk, i_reset, i_test,
 
 	reg	f_stable_mode;
 	always @(*)
-		f_stable_mode <= (f_last_vmode == f_vmode)&&(f_last_hmode == f_hmode);
+		f_stable_mode = (f_last_vmode == f_vmode)&&(f_last_hmode == f_hmode);
 
 	always @(*)
 		if (!i_reset)
 			assume(f_stable_mode);
 
 	always @(posedge i_pixclk)
-	if ((f_past_valid)&&(!i_reset)&&(f_stable_mode)
-			&&($past(f_stable_mode))
-			&&($past(f_past_valid,2))&&($past(f_stable_mode,2))
-			&&($past(f_past_valid,3))&&($past(f_stable_mode,3))
-			)
+	if ((!f_past_valid)||($past(i_reset)))
 	begin
-		if ($past(i_reset))
-		begin
-			assert(hpos == 0);
-			assert(vpos == 0);
-		end else begin
-			assert(hpos < i_hm_raw);
-			assert(vpos < i_vm_raw);
-		end
+		assert(hpos == 0);
+		assert(vpos == 0);
+	end
 
+	always @(posedge i_pixclk)
+	if ((f_past_valid)&&(!i_reset)&&(f_stable_mode)
+			&&($past(f_stable_mode)))
+	begin
+
+		// The horizontal position counter should increment
+		if ($past(hpos >= i_hm_raw-1'b1))
+			assert(hpos == 0);
+		else
+			assert(hpos = $past(hpos+1'b1));
+
+		// The vertical position counter should increment
+		if (o_newline)
+		begin
+			if ($past(vpos >= i_vm_raw-1'b1))
+				assert(vpos == 0);
+			else
+				assert(vpos = $past(vpos)+1'b1);
+		end else
+			assert(vpos == $past(vpos));
+
+		// For induction purposes, we need to insist that both
+		// horizontal and vertical counters stay within their
+		// required ranges
+		assert(hpos < i_hm_raw);
+		assert(vpos < i_vm_raw);
+
+		// If we are less than the data width for both horizontal
+		// and vertical, then we should be asserting we are in a
+		// valid data cycle
 		if ((hpos < i_hm_width)&&(vpos < i_vm_height)
 				&&(!first_frame))
 			assert(o_rd);
 
+		//
+		// The horizontal sync should only be valid between positions
+		// i_hm_porch <= hpos < i_hm_sync, invalid at all other times
+		//
 		if (hpos < i_hm_porch)
 			assert(!o_hsync);
 		else if (hpos < i_hm_synch)
@@ -237,6 +262,7 @@ module	llvga(i_pixclk, i_reset, i_test,
 		else
 			assert(!o_hsync);
 
+		// Same thing for vertical
 		if (vpos < i_vm_porch)
 			assert(!o_vsync);
 		else if (vpos < i_vm_synch)
@@ -244,11 +270,15 @@ module	llvga(i_pixclk, i_reset, i_test,
 		else
 			assert(!o_vsync);
 
+		// At the end of every horizontal line cycle, we assert
+		// a new line
 		if (hpos == i_hm_width-1'b1)
 			assert(o_newline);
 		else
 			assert(!o_newline);
 
+		// At the end of every vertical frame cycle, we assert
+		// a new frame, but only on the newline measure
 		if ((vpos == i_vm_height-1'b1)&&(o_newline))
 			assert(o_newframe);
 		else
