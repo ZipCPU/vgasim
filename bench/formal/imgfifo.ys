@@ -1,0 +1,7 @@
+read_verilog -D IMGFIFO            -formal ../../rtl/transferstb.v
+read_verilog -D IMGFIFO            -formal ../../rtl/imgfifo.v
+read_verilog -D IMGFIFO -DABSTRACT -formal ../../rtl/atxfifo.v
+read_verilog -D IMGFIFO -formal fwb_master.v
+prep -top imgfifo
+clk2fflogic
+write_smt2 -wires imgfifo.smt2

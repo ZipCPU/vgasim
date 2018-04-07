@@ -15,7 +15,7 @@
 ##
 ################################################################################
 ##
-## Copyright (C) 2017, Gisselquist Technology, LLC
+## Copyright (C) 2017-2018, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -38,7 +38,7 @@
 ################################################################################
 ##
 ##
-TESTS := llvga
+TESTS := llvga imgfifo
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -53,12 +53,16 @@ BMCARGS := --presat $(SOLVER) --unroll
 INDARGS := $(SOLVER) -i
 
 LLVGA	 := llvga
+IFIFO	 := imgfifo
 
-MASTER := $(RTL)/aux/fwb_master.v
-SLAVE  := $(RTL)/aux/fwb_slave.v
+MASTER   := fwb_master.v
+# SLAVE  := $(RTL)/ex/fwb_slave.v
 
 $(LLVGA).smt2: $(RTL)/$(LLVGA).v $(LLVGA).ys
 	yosys -ql $(LLVGA).yslog -s $(LLVGA).ys
+
+$(IFIFO).smt2: $(RTL)/$(IFIFO).v $(IFIFO).ys
+	yosys -ql $(IFIFO).yslog -s $(IFIFO).ys
 
 $(LLVGA) : $(LLVGA).check
 $(LLVGA).check: $(LLVGA).smt2
@@ -68,7 +72,15 @@ $(LLVGA).check: $(LLVGA).smt2
 	$(SMTBMC) -g $(BMCARGS) -t 60 --dump-vcd $(LLVGA).vcd $(LLVGA).smt2
 	touch $@
 
+$(IFIFO) : $(IFIFO).check
+$(IFIFO).check: $(IFIFO).smt2
+	@rm -f $(IFIFO).check
+	$(SMTBMC)    $(BMCARGS) -t 20 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
+	$(SMTBMC)    $(INDARGS) -t 58 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
+	touch $@
+
 .PHONY: clean
 clean:
 	rm -f $(LLVGA).smt2   $(LLVGA)*.vcd   $(LLVGA).yslog
+	rm -f $(IFIFO).smt2   $(IFIFO)*.vcd   $(IFIFO).yslog
 	rm -f *.check

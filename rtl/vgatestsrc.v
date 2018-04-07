@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2017, Gisselquist Technology, LLC
+// Copyright (C) 2017-2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -43,13 +43,16 @@ module	vgatestsrc(i_pixclk, i_reset,
 		i_rd, i_newline, i_newframe,
 		// VGA connections
 		o_pixel);
-	parameter	BITS_PER_COLOR = 4;
+	parameter	BITS_PER_COLOR = 4,
+			HW=12, VW=12;
+		//HW=13,VW=11;
 	localparam	BPC = BITS_PER_COLOR,
 			BITS_PER_PIXEL = 3 * BPC,
 			BPP = BITS_PER_PIXEL;
 	//
-	input	wire		i_pixclk, i_reset;
-	input	wire	[11:0]	i_width, i_height;
+	input	wire			i_pixclk, i_reset;
+	input	wire	[HW-1:0]	i_width;
+	input	wire	[VW-1:0]	i_height;
 	//
 	input	wire		i_rd, i_newline, i_newframe;
 	//
@@ -85,8 +88,9 @@ module	vgatestsrc(i_pixclk, i_reset,
 	assign	mid_cyan    = { mid_off, midv,    midv    };
 	assign	mid_magenta = { midv,    mid_off, midv    };
 
-	reg	[11:0]	ypos, hpos, yedge, hedge;
-	reg	[3:0]	yline, hbar;
+	reg	[HW-1:0]	hpos, hedge;
+	reg	[VW-1:0]	ypos, yedge;
+	reg	[3:0]		yline, hbar;
 	//
 	//
 	// 1 Border
@@ -109,14 +113,14 @@ module	vgatestsrc(i_pixclk, i_reset,
 	begin
 		ypos  <= 0;
 		yline <= 0;
-		yedge <= { 4'h0, i_height[11:4] };
+		yedge <= { 4'h0, i_height[(VW-1):4] };
 	end else if (i_newline)
 	begin
-		ypos <= ypos + { 11'h0, dline };
+		ypos <= ypos + { {(VW-1){1'h0}}, dline };
 		if (ypos >= yedge)
 		begin
 			yline <= yline + 1'b1;
-			yedge <= yedge + { 4'h0, i_height[11:4] };
+			yedge <= yedge + { 4'h0, i_height[(VW-1):4] };
 		end
 	end
 
@@ -125,14 +129,14 @@ module	vgatestsrc(i_pixclk, i_reset,
 	begin
 		hpos <= 0;
 		hbar <= 0;
-		hedge <= { 4'h0, i_width[11:4] };
+		hedge <= { 4'h0, i_width[(HW-1):4] };
 	end else if (i_rd)
 	begin
 		hpos <= hpos + 1'b1;
 		if (hpos >= hedge)
 		begin
 			hbar <= hbar + 1'b1;
-			hedge <= hedge + { 4'h0, i_width[11:4] };
+			hedge <= hedge + { 4'h0, i_width[(HW-1):4] };
 		end
 	end
 
@@ -197,12 +201,14 @@ module	vgatestsrc(i_pixclk, i_reset,
 	4'hf: fatbar <= black;
 	endcase
 
-	reg	[11:0]	last_width;
+	reg	[(HW-1):0]	last_width;
 	always @(posedge i_pixclk)
 		last_width <= i_width;
 
 	// Attempt to discover 1/i_width in h_step
-	reg	[15:0]	hfrac, h_step;
+	localparam	FRACB=16;
+	//
+	reg	[(FRACB-1):0]	hfrac, h_step;
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_newline))
 		hfrac <= 0;
@@ -214,32 +220,32 @@ module	vgatestsrc(i_pixclk, i_reset,
 		h_step <= 1;
 	else if ((i_newline)&&(hfrac > 0))
 	begin
-		if (hfrac < 16'hffff - { 4'h0, i_width })
+		if (hfrac < {(FRACB){1'b1}} - { {(FRACB-HW){1'b0}}, i_width })
 			h_step <= h_step + 1'b1;
-		else if (hfrac < { 4'h0, i_width })
+		else if (hfrac < { {(FRACB-HW){1'b0}}, i_width })
 			h_step <= h_step - 1'b1;
 	end
 
 	always @(posedge i_pixclk)
-	case(hfrac[15:12])
+	case(hfrac[FRACB-1:FRACB-4])
 	4'h0: gradient <= black;
 	// Red
-	4'h1: gradient <= { 1'b0, hfrac[11:(13-BPC)], {(2){mid_off}} };
-	4'h2: gradient <= { 1'b1, hfrac[11:(13-BPC)], {(2){mid_off}} };
+	4'h1: gradient <= { 1'b0, hfrac[(FRACB-5):(FRACB-3-BPC)], {(2){mid_off}} };
+	4'h2: gradient <= { 1'b1, hfrac[(FRACB-5):(FRACB-3-BPC)], {(2){mid_off}} };
 	4'h3: gradient <= black;
 	// Green
-	4'h4: gradient <= { mid_off, 1'b0, hfrac[11:(13-BPC)], mid_off };
-	4'h5: gradient <= { mid_off, 1'b1, hfrac[11:(13-BPC)], mid_off };
+	4'h4: gradient <= { mid_off, 1'b0, hfrac[(FRACB-5):(FRACB-3-BPC)], mid_off };
+	4'h5: gradient <= { mid_off, 1'b1, hfrac[(FRACB-5):(FRACB-3-BPC)], mid_off };
 	4'h6: gradient <= black;
 	// Blue
-	4'h7: gradient <= { {(2){mid_off}}, 1'b0, hfrac[11:(13-BPC)] };
-	4'h8: gradient <= { {(2){mid_off}}, 1'b1, hfrac[11:(13-BPC)] };
+	4'h7: gradient <= { {(2){mid_off}}, 1'b0, hfrac[(FRACB-5):(FRACB-3-BPC)] };
+	4'h8: gradient <= { {(2){mid_off}}, 1'b1, hfrac[(FRACB-5):(FRACB-3-BPC)] };
 	4'h9: gradient <= black;
 	// Gray
-	4'ha: gradient <= {(3){ 2'b00, hfrac[11:(14-BPC)] }};
-	4'hb: gradient <= {(3){ 2'b01, hfrac[11:(14-BPC)] }};
-	4'hc: gradient <= {(3){ 2'b10, hfrac[11:(14-BPC)] }};
-	4'hd: gradient <= {(3){ 2'b11, hfrac[11:(14-BPC)] }};
+	4'ha: gradient <= {(3){ 2'b00, hfrac[(FRACB-5):(FRACB-2-BPC)] }};
+	4'hb: gradient <= {(3){ 2'b01, hfrac[(FRACB-5):(FRACB-2-BPC)] }};
+	4'hc: gradient <= {(3){ 2'b10, hfrac[(FRACB-5):(FRACB-2-BPC)] }};
+	4'hd: gradient <= {(3){ 2'b11, hfrac[(FRACB-5):(FRACB-2-BPC)] }};
 	4'he: gradient <= black;
 	//
 	4'hf: gradient <= black;

@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2017, Gisselquist Technology, LLC
+// Copyright (C) 2017-2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -46,20 +46,21 @@ module	llvga(i_pixclk, i_reset, i_test,
 		o_rd, o_newline, o_newframe,
 		// VGA connections
 		o_vsync, o_hsync, o_red, o_grn, o_blu);
-	parameter	BITS_PER_COLOR = 4;
+	parameter	BITS_PER_COLOR = 4,
+			HW=12,VW=12;
 	localparam	BPC = BITS_PER_COLOR,
 			BITS_PER_PIXEL = 3 * BPC,
 			BPP = BITS_PER_PIXEL;
 	input	wire			i_pixclk, i_reset, i_test;
 	input	wire	[BPP-1:0]	i_rgb_pix;
 	//
-	input	wire	[11:0]		i_hm_width, i_hm_porch,
-					i_hm_synch, i_hm_raw;
-	input	wire	[11:0]		i_vm_height, i_vm_porch,
-					i_vm_synch, i_vm_raw;
+	input	wire	[HW-1:0]		i_hm_width, i_hm_porch,
+						i_hm_synch, i_hm_raw;
+	input	wire	[VW-1:0]		i_vm_height, i_vm_porch,
+						i_vm_synch, i_vm_raw;
 	// input	[3:0]	i_red, i_grn, i_blu;
-	output	reg	o_rd, o_newline, o_newframe;
-	output	reg	o_vsync, o_hsync;
+	output	reg			o_rd, o_newline, o_newframe;
+	output	reg			o_vsync, o_hsync;
 	output	reg	[BPC-1:0]	o_red, o_grn, o_blu;
 
 
@@ -68,46 +69,47 @@ module	llvga(i_pixclk, i_reset, i_test,
 	assign	i_grn = i_rgb_pix[2*BPC-1:  BPC];
 	assign	i_blu = i_rgb_pix[  BPC-1:0];
 
-	reg	[11:0]	hpos, vpos;
+	reg	[HW-1:0]	hpos;
+	reg	[VW-1:0]	vpos;
 	reg		hrd, vrd;
 
-	initial	hpos       = 12'h0;
+	initial	hpos       = 0;
 	initial	o_newline  = 0;
 	initial	o_hsync = 0;
 	initial	hrd = 1;
 	always @(posedge i_pixclk)
 		if (i_reset)
 		begin
-			hpos <= 12'h0;
+			hpos <= 0;
 			o_newline <= 1'b0;
 			o_hsync <= 1'b0;
 			hrd <= 1;
 		end else
 		begin
-			hrd <= (hpos < i_hm_width-12'd2)
-					||(hpos >= i_hm_raw-12'd2);
+			hrd <= (hpos < i_hm_width-2)
+					||(hpos >= i_hm_raw-2);
 			if (hpos < i_hm_raw-1'b1)
 				hpos <= hpos + 1'b1;
 			else
 				hpos <= 0;
-			o_newline <= (hpos == i_hm_width-12'd2);
+			o_newline <= (hpos == i_hm_width-2);
 			o_hsync <= (hpos >= i_hm_porch-1'b1)&&(hpos<i_hm_synch-1'b1);
 		end
 
 	always @(posedge i_pixclk)
 	if (i_reset)
 		o_newframe <= 1'b0;
-	else if ((hpos == i_hm_width - 12'd2)&&(vpos == i_vm_height-12'd1))
+	else if ((hpos == i_hm_width - 2)&&(vpos == i_vm_height-1))
 		o_newframe <= 1'b1;
 	else
 		o_newframe <= 1'b0;
 
-	initial	vpos = 12'h0;
+	initial	vpos = 0;
 	initial	o_vsync = 1'b0;
 	always @(posedge i_pixclk)
 		if (i_reset)
 		begin
-			vpos <= 12'h0;
+			vpos <= 0;
 			o_vsync <= 1'b0;
 		end else if (hpos == i_hm_porch-1'b1)
 		begin
@@ -143,7 +145,7 @@ module	llvga(i_pixclk, i_reset, i_test,
 
 	wire	[(BPC-1):0]	tst_red, tst_grn, tst_blu;
 
-	vgatest	#(BPC)	vgatsrc(i_pixclk, i_reset,
+	vgatestsrc	#(BPC,.HW(HW),.VW(VW))	vgatsrc(i_pixclk, i_reset,
 				i_hm_width, i_vm_height,
 				o_rd, o_newline, o_newframe,
 				{ tst_red, tst_grn, tst_blu });
@@ -283,8 +285,6 @@ module	llvga(i_pixclk, i_reset, i_test,
 			assert(o_newframe);
 		else
 			assert(!o_newframe);
-
-
 	end
 `endif
 endmodule
