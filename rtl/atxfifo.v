@@ -357,7 +357,7 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 			`ASSERT($stable(o_wfull)||(!i_wrst_n));
 		end
 
-		if (!$rose(i_rclk))
+		if ((!$rose(i_rclk))&&($stable(i_rrst_n)))
 		begin
 			`ASSUME($stable(i_rd));
 			`ASSERT((o_rempty)||($stable(o_rdata)));
@@ -495,6 +495,10 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	// clock domains
 	assign	f_w2r_fill = wbin - f_w2r_rbin;
 	assign	f_r2w_fill = f_r2w_wbin - rbin;
+
+always @(posedge i_wclk)
+if ((f_past_valid_wr)&&(wbin==5)&&(i_wrst_n))
+assert(o_wfill_level == $past(f_w2r_fill));
 
 	// And assert that the fill is always less than or equal to full.
 	// This catches underrun as well as overflow, since underrun will

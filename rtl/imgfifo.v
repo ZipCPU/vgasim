@@ -77,33 +77,36 @@ module	imgfifo(i_clk, i_pixclk,
 	reg	[LW-1:0]	vpos;
 	wire	[FAW:0]	fifo_availability, fifo_fill;
 
-	reg	wb_reset;
-	wire	wb_newframe;
-	wire	pix_reset, pix_wbreset;
+	reg	[2:0]	wb_reset_pipe;
+	wire	wb_reset, pix_reset;
 
-	initial	wb_reset = 1'b1;
-	always @(posedge i_clk)
-		wb_reset <= (wb_newframe)||(i_reset);
+	initial	wb_reset_pipe = -1;
+	always @(posedge i_clk or posedge i_reset or posedge i_newframe)
+	if (i_reset)
+		wb_reset_pipe <= -1;
+	else if (i_newframe)
+		wb_reset_pipe <= -1;
+	else
+		wb_reset_pipe <= { wb_reset_pipe[1:0], 1'b0 };
+	assign	wb_reset = wb_reset_pipe[2];
 
-
-	transferstb wbreset(i_clk, i_pixclk, i_reset, pix_wbreset);
-
-	reg	[1:0]	pix_reset_pipe;
-	initial	pix_reset_pipe = 2'h3;
-	always @(posedge i_pixclk)
-		if ((pix_wbreset)||(i_newframe))
-			pix_reset_pipe <= 2'h3;
+	reg	[2:0]	pix_reset_pipe;
+	initial	pix_reset_pipe = -1;
+	always @(posedge i_pixclk or posedge i_reset)
+		if (i_reset)
+			pix_reset_pipe <= -1;
+		else if (i_newframe)
+			pix_reset_pipe <= -1;
 		else
-			pix_reset_pipe <= { pix_reset_pipe[0], 1'b0 };
-	assign	pix_reset = pix_reset_pipe[1];
+			pix_reset_pipe <= { pix_reset_pipe[1:0], 1'b0 };
+	assign	pix_reset = pix_reset_pipe[2];
 
-	transferstb newframe(i_pixclk, i_clk, i_newframe, wb_newframe);
 
 	initial	o_wb_cyc  = 1'b0;
 	initial	o_wb_stb  = 1'b0;
 	initial	o_wb_addr = 0;
 	always @(posedge  i_clk)
-	if ((i_reset)||(i_wb_err)||(wb_newframe))
+	if ((wb_reset)||(i_wb_err))
 	begin
 		o_wb_cyc <= 1'b0;
 		o_wb_stb <= 1'b0;
@@ -127,14 +130,14 @@ module	imgfifo(i_clk, i_pixclk,
 	reg	[(FAW-1):0]	stb_count;
 	initial	stb_count= 0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe)||(!o_wb_cyc))
+	if ((wb_reset)||(!o_wb_cyc))
 		stb_count <= 0;
 	else if ((o_wb_stb)&&(!i_wb_stall))
 		stb_count <= stb_count + 1'b1;
 
 	initial	last_stb = 1'b0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe)||(!o_wb_cyc))
+	if ((wb_reset)||(!o_wb_cyc))
 		last_stb <= 1'b0;
 	else if ((o_wb_stb)&&(!i_wb_stall))
 		last_stb <= ({ 2'b0, stb_count } >= { 1'b0, i_linewords}- 2);
@@ -161,14 +164,14 @@ end
 
 	initial	ack_count= 0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe)||(!o_wb_cyc))
+	if ((wb_reset)||(!o_wb_cyc))
 		ack_count <= 0;
 	else if (i_wb_ack)
 		ack_count <= ack_count + 1'b1;
 
 	initial	last_ack = 1'b0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe)||(!o_wb_cyc))
+	if ((wb_reset)||(!o_wb_cyc))
 		last_ack <= 1'b0;
 	else if (i_wb_ack)
 		last_ack <= ({2'b00, ack_count} >= {1'b0, i_linewords} - 2);
@@ -188,7 +191,7 @@ end
 	initial	vpos = 0;
 	initial	end_of_frame = 0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe))
+	if ((wb_reset))
 	begin
 		vpos <= 0;
 		end_of_frame <= (i_nlines == 0);
@@ -210,13 +213,13 @@ end
 
 	initial	room_for_another_line_in_fifo = 1'b0;
 	always @(posedge i_clk)
-	if ((i_reset)||(wb_newframe))
+	if ((wb_reset))
 		room_for_another_line_in_fifo <= 1'b0;
 	else if (o_wb_cyc)
 		room_for_another_line_in_fifo <= 1'b0;
 	else if (!end_of_frame)
 		room_for_another_line_in_fifo
-			<= (fifo_availability > i_linewords);
+			<= (fifo_availability > i_linewords + 1);
 
 	wire	fifo_empty, fifo_full;
 	wire	wb_reset_n  = !wb_reset;
@@ -319,7 +322,7 @@ assume property(i_nlines    == 1080);
 	if ((!f_past_valid_gbl)||(!$rose(i_pixclk)))
 	begin
 		assume($stable(i_rd));
-		assume((!$past(o_valid))||($stable(o_word))||(i_rd));
+		assume($stable(i_newframe));
 	end
 
 	always @(posedge i_clk)
@@ -386,8 +389,28 @@ assume property(i_nlines    == 1080);
 		assert(f_nacks == ack_count);
 
 	always @(*)
-	if (!end_of_frame)
+	if ((!end_of_frame)||(o_wb_cyc))
 		assume(!i_newframe);
+
+	//
+	//
+	// Let's prove that we'll never overflow our FIFO
+	always @(*)
+	if ((o_wb_cyc)&&(i_wb_ack))
+		assert(!fifo_full);
+
+	// This is going to depend upon some other assertions just to make
+	// sure we are always in a state that will never eventually overflow
+	reg	[FAW:0]	f_remaining;
+	always @(posedge i_clk)
+	if (!o_wb_cyc)
+		f_remaining <= i_linewords;
+	else
+		f_remaining <= i_linewords-ack_count;
+				/// - (((o_wb_stb)&&(!i_wb_stall))?1:0);
+	always @(posedge i_clk)
+	if (o_wb_cyc)
+		assert({ 1'b0, fifo_availability} > {1'b0,f_remaining});
 
 `endif
 endmodule

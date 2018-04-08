@@ -61,7 +61,8 @@ MASTER   := fwb_master.v
 $(LLVGA).smt2: $(RTL)/$(LLVGA).v $(LLVGA).ys
 	yosys -ql $(LLVGA).yslog -s $(LLVGA).ys
 
-$(IFIFO).smt2: $(RTL)/$(IFIFO).v $(IFIFO).ys
+$(IFIFO).smt2: $(RTL)/$(IFIFO).v $(RTL)/atxfifo.v $(RTL)/transferstb.v
+$(IFIFO).smt2: $(MASTER) $(IFIFO).ys
 	yosys -ql $(IFIFO).yslog -s $(IFIFO).ys
 
 $(LLVGA) : $(LLVGA).check
@@ -75,8 +76,8 @@ $(LLVGA).check: $(LLVGA).smt2
 $(IFIFO) : $(IFIFO).check
 $(IFIFO).check: $(IFIFO).smt2
 	@rm -f $(IFIFO).check
-	$(SMTBMC)    $(BMCARGS) -t 20 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
-	$(SMTBMC)    $(INDARGS) -t 58 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
+	$(SMTBMC)    $(BMCARGS) -t 80 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
+	$(SMTBMC)    $(INDARGS) -t 80 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
 	touch $@
 
 .PHONY: clean
