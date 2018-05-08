@@ -48,6 +48,8 @@ module	memdev(i_clk, i_reset,
 		i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
 		o_wb_ack, o_wb_stall, o_wb_data);
 	parameter	LGMEMSZ=15, DW=32, EXTRACLOCK= 1;
+	parameter	HEXFILE="";
+	parameter [0:0]	OPT_ROM = 1'b0;
 	localparam	AW = LGMEMSZ - 2;
 	input	wire			i_clk, i_reset;
 	input	wire			i_wb_cyc, i_wb_stb, i_wb_we;
@@ -62,6 +64,15 @@ module	memdev(i_clk, i_reset,
 	wire	[(DW-1):0]	w_data;
 	wire	[(AW-1):0]	w_addr;
 	wire	[(DW/8-1):0]	w_sel;
+
+	reg	[(DW-1):0]	mem	[0:((1<<AW)-1)];
+
+	generate if (HEXFILE != 0)
+	begin : PRELOAD_MEMORY
+
+		initial	$readmemh(HEXFILE, mem);
+
+	end endgenerate
 
 	generate
 	if (EXTRACLOCK == 0)
@@ -103,21 +114,33 @@ module	memdev(i_clk, i_reset,
 		assign	w_sel  = last_sel;
 	end endgenerate
 
-	reg	[(DW-1):0]	mem	[0:((1<<AW)-1)];
-
 	always @(posedge i_clk)
 		o_wb_data <= mem[w_addr];
-	always @(posedge i_clk)
-	begin
-		if ((w_wstb)&&(w_sel[3]))
-			mem[w_addr][31:24] <= w_data[31:24];
-		if ((w_wstb)&&(w_sel[2]))
-			mem[w_addr][23:16] <= w_data[23:16];
-		if ((w_wstb)&&(w_sel[1]))
-			mem[w_addr][15: 8] <= w_data[15:8];
-		if ((w_wstb)&&(w_sel[0]))
-			mem[w_addr][ 7: 0] <= w_data[7:0];
-	end
+
+	generate if (!OPT_ROM)
+	begin : WRITE_TO_MEMORY
+
+		always @(posedge i_clk)
+		begin
+			if ((w_wstb)&&(w_sel[3]))
+				mem[w_addr][31:24] <= w_data[31:24];
+			if ((w_wstb)&&(w_sel[2]))
+				mem[w_addr][23:16] <= w_data[23:16];
+			if ((w_wstb)&&(w_sel[1]))
+				mem[w_addr][15: 8] <= w_data[15:8];
+			if ((w_wstb)&&(w_sel[0]))
+				mem[w_addr][ 7: 0] <= w_data[7:0];
+		end
+`ifdef	VERILATOR
+	end else begin : VERILATOR_ROM
+
+		// Make Verilator happy
+		// Verilator lint_off UNUSED
+		wire	[DW+DW/8:0]	rom_unused;
+		assign	rom_unused = { w_wstb, w_data, w_sel };
+		// Verilator lint_on  UNUSED
+`endif
+	end endgenerate
 
 	initial	o_wb_ack = 1'b0;
 	always @(posedge i_clk)
@@ -166,18 +189,24 @@ module	memdev(i_clk, i_reset,
 	initial	f_value = 0;
 
 	initial	assume(mem[f_addr] == 0);
-	always @(posedge i_clk)
-	if ((w_wstb)&&(f_addr == w_addr))
-	begin
-		if (w_sel[3])
-			f_value[31:24] <= w_data[31:24];
-		if (w_sel[2])
-			f_value[23:16] <= w_data[23:16];
-		if (w_sel[1])
-			f_value[15: 8] <= w_data[15: 8];
-		if (w_sel[0])
-			f_value[ 7: 0] <= w_data[ 7: 0];
-	end
+
+	generate if (!OPT_ROM)
+	begin : F_MATCH_WRITES
+
+		always @(posedge i_clk)
+		if ((w_wstb)&&(f_addr == w_addr))
+		begin
+			if (w_sel[3])
+				f_value[31:24] <= w_data[31:24];
+			if (w_sel[2])
+				f_value[23:16] <= w_data[23:16];
+			if (w_sel[1])
+				f_value[15: 8] <= w_data[15: 8];
+			if (w_sel[0])
+				f_value[ 7: 0] <= w_data[ 7: 0];
+		end
+
+	end endgenerate
 
 	generate if (EXTRACLOCK == 0)
 	begin

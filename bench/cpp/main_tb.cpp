@@ -42,7 +42,7 @@
 #include <ctype.h>
 
 #include "verilated.h"
-#include "Vwbvgaframe.h"
+#include "Vdemo.h"
 
 #include "testb.h"
 // #include "twoc.h"
@@ -54,20 +54,17 @@
 #define	VVAR(A)	v__DOT_ ## A
 #endif
 
-// #define	wb_err		VVAR(_wb_err)
-//
-//
-#define	wbubus_ack	VVAR(___Vcellinp__genbus____pinNumber9)
-#define	wbubus_stall	VVAR(___Vcellinp__genbus____pinNumber10)
 
 // No particular "parameters" need definition or redefinition here.
-class	TESTBENCH : public TESTB<Vwbvgaframe> {
+class	TESTBENCH : public TESTB<Vdemo> {
 public:
 	unsigned long	m_tx_busy_count;
 	VGAWIN		m_vga;
 	bool		m_done;
 
-	TESTBENCH(void) : m_vga(1280,720) {
+	TESTBENCH(void) : m_vga(1280, 1024)
+			// m_vga(1280,720)
+			{
 		//
 		m_core->i_hm_width  = m_vga.width();
 		m_core->i_hm_porch  = m_vga.hporch();
@@ -79,7 +76,7 @@ public:
 		m_core->i_vm_synch  = m_vga.vsync();
 		m_core->i_vm_raw    = m_vga.raw_height();
 		//
-		m_core->i_test      = 1;
+		m_core->i_test      = 0;
 		//
 		m_done = false;
 
@@ -117,7 +114,7 @@ public:
 			m_core->o_vga_grn,
 			m_core->o_vga_blu);
 
-		TESTB<Vwbvgaframe>::tick();
+		TESTB<Vdemo>::tick();
 	}
 
 	bool	on_tick(void) {

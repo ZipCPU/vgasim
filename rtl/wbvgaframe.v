@@ -84,14 +84,14 @@ module	wbvgaframe(i_clk, i_pixclk,
 	wire	[(3*BPC-1):0]	pixel;
 
 	generate if (WB_SOURCE)
-	begin
+	begin : VIDEO_MEM
 		wire	[31:0]	fifo_word;
 		wire		fifo_err, fifo_valid;
 
 		imgfifo #(.ADDRESS_WIDTH(AW),
 			.BUSW(DW), .LGFLEN(LGF), .LW(LW))
 			readmem(i_clk, i_pixclk,
-				(i_reset)||(i_en)||(i_test),(vga_newframe),
+				(i_reset)||(!i_en)||(i_test),(vga_newframe),
 					i_base_addr, i_line_words[LGF:0], i_vm_height[LW-1:0],
 					o_wb_cyc, o_wb_stb, o_wb_addr,
 						i_wb_ack, i_wb_err, i_wb_stall, i_wb_data,
@@ -103,7 +103,7 @@ module	wbvgaframe(i_clk, i_pixclk,
 		assign	unused_wbfifo = { fifo_word[(DW-1):(3*BPC)],
 					vga_newline, fifo_err, fifo_valid };
 		// verilator lint_on  UNUSED
-	end else begin
+	end else begin : NO_VIDEO_MEM
 
 		assign	pixel = 0;
 

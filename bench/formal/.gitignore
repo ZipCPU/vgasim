@@ -1,3 +1,4 @@
 *.yslog
 *.smt2
 *.check
+imgfifo

@@ -1,9 +1,46 @@
+################################################################################
+##
+## Filename:	bench/cpp/Makefile
+##
+## Project:	vgasim, a Verilator based VGA simulator demonstration
+##
+## Purpose:	To direct the Verilator build of the VGA simulation sources.
+##
+##
+## Creator:	Dan Gisselquist, Ph.D.
+##		Gisselquist Technology, LLC
+##
+################################################################################
+##
+## Copyright (C) 2017-2018, Gisselquist Technology, LLC
+##
+## This program is free software (firmware): you can redistribute it and/or
+## modify it under the terms of  the GNU General Public License as published
+## by the Free Software Foundation, either version 3 of the License, or (at
+## your option) any later version.
+##
+## This program is distributed in the hope that it will be useful, but WITHOUT
+## ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+## FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+## for more details.
+##
+## You should have received a copy of the GNU General Public License along
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+## target there if the PDF file isn't present.)  If not, see
+## <http://www.gnu.org/licenses/> for a copy.
+##
+## License:	GPL, v3, as defined and found on www.gnu.org,
+##		http://www.gnu.org/licenses/gpl.html
+##
+################################################################################
+##
+##
 .PHONY: all
 # Make certain the "all" target is the first and therefore the default target
 all:
 CXX	:= g++
 OBJDIR	:= obj-pc
-RTLD	:= ../../rtl
+RTLD	:= ../rtl
 YYMMDD  := `date +%Y%m%d`
 VOBJDR	:= $(RTLD)/obj_dir
 ifneq ($(VERILATOR_ROOT),)
@@ -45,8 +82,8 @@ $(OBJDIR)/%.o: $(VINCD)/%.cpp
 
 
 MAINOBJS := $(OBJDIR)/main_tb.o
-main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vwbvgaframe__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vwbvgaframe__ALL.a $(GFXLIBS) -o $@
+main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -o $@
 
 .PHONY: clean
 clean:

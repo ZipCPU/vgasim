@@ -54,7 +54,9 @@ module	imgfifo(i_clk, i_pixclk,
 			FAW = FIFO_ADDRESS_WIDTH;
 	input	wire			i_clk, i_pixclk;
 	input	wire			i_reset;
+	// verilator lint_off SYNCASYNCNET
 	input	wire			i_newframe;
+	// verilator lint_on SYNCASYNCNET
 	input	wire [(AW-1):0]		i_baseaddr;
 	input	wire [LGFLEN:0]		i_linewords;
 	input	wire [(LW-1):0]		i_nlines;
