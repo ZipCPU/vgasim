@@ -36,6 +36,7 @@
 //
 //
 module	transferstb(i_src_clk, i_dest_clk, i_stb, o_stb);
+	parameter	NFF=2;
 	input	wire	i_src_clk, i_dest_clk, i_stb;
 	output	reg	o_stb;
 
@@ -49,21 +50,58 @@ module	transferstb(i_src_clk, i_dest_clk, i_stb, o_stb);
 			lcl_stb <= 1'b0;
 
 	// Transfer this sticky flip-flop
-	reg	[2:0]	tfr_stb;
-	initial	tfr_stb = 3'h0;
+	reg	[NFF:0]	tfr_stb;
+	initial	tfr_stb = 0;
 	always @(posedge i_dest_clk)
-		tfr_stb <= { tfr_stb[1:0], lcl_stb };
+		tfr_stb <= { tfr_stb[(NFF-1):0], lcl_stb };
 
+	initial	o_stb = 1'b0;
 	always @(posedge i_dest_clk)
-		o_stb <= (!tfr_stb[2])&&(tfr_stb[1]);
+		o_stb <= (!tfr_stb[NFF])&&(tfr_stb[(NFF-1)]);
 
 	// Create an acknowledgement for the return trip
-	reg	[1:0]	tfr_ack;
-	initial	tfr_ack = 2'h0;
+	reg	[(NFF-2):0]	tfr_ack;
+	initial	{ lcl_ack, tfr_ack } = 0;
 	always @(posedge i_src_clk)
-		tfr_ack <= { tfr_ack[0], (tfr_stb[2]) };
-	initial	lcl_ack = 1'b0;
-	always @(posedge i_src_clk)
-		lcl_ack <= tfr_ack[1];
+		{ lcl_ack, tfr_ack } <= { tfr_ack[(NFF-2):0], (tfr_stb[NFF]) };
 
+`ifdef	FORMAL
+	reg	f_past_valid_src, f_past_valid_gbl;
+	initial	f_past_valid_gbl = 1'b0;
+	always @(posedge i_src_clk)
+		f_past_valid_gbl <= 1'b1;
+
+	initial	f_past_valid_src = 1'b0;
+	always @(posedge i_src_clk)
+		f_past_valid_src <= 1'b1;
+
+	always @(*)
+	if (!f_past_valid_gbl)
+	begin
+		assert(lcl_stb == 0);
+		assert(tfr_stb == 0);
+		assert(tfr_ack == 0);
+		assert(lcl_ack == 0);
+		assert(o_stb   == 0);
+	end
+
+	always @(*)
+	if ((lcl_stb)&&(lcl_ack))
+		assert((&tfr_stb[NFF-1:0])&&(&tfr_ack));
+	always @(*)
+	if (o_stb)
+		assert(&tfr_stb);
+
+	always @(*)
+	if ((|tfr_stb)&&(!tfr_stb[0]))
+		assert(&tfr_ack);
+
+	always @(*)
+	if ((|tfr_ack)&&(!lcl_ack))
+		assert(&tfr_stb);
+
+	always @($global_clock)
+	if ((f_past_valid_gbl)&&((tfr_stb!=0)||(tfr_ack != 0)))
+		assume(!$rose(i_stb));
+`endif
 endmodule
