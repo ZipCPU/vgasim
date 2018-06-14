@@ -172,8 +172,8 @@ void	VGASIM::operator()(const int vsync, const int hsync, const int r, const int
 			if (m_hsync_count < m_mode.sync_pixels() - 1)
 				m_hsync_count++;
 			else {
-				// Too mnay pixels with m_mode.sync_pixels() low, and
-				// we are out of synch.
+				// Too many pixels with m_mode.sync_pixels()
+				// low, and we are out of synch.
 				m_hsync_count = m_mode.sync_pixels() - 1;
 				if (!m_out_of_sync) {
 					m_vsync_count = 0;

@@ -6,6 +6,18 @@
 ##
 ## Purpose:	To direct the Verilator build of the VGA simulation sources.
 ##
+## Targets:
+##
+##	main_tb
+##		This demo program shows the utility of the VGA simulator, by
+##		using the VGA outputs of a Verilator based test bench to drive
+##		a window on your screen.
+##
+##	simcheck
+##		This demo doesn't use verilator at all, but rather feeds the
+##		result of the VGASOURCE directly into the VGASIM, providing
+##		some confidence that both VGASOURCE and VGASIM components are
+##		working.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
@@ -67,7 +79,7 @@ all:	main_tb archive
 SOURCES := main_tb.cpp vgasim.cpp
 HEADERS := image.h testb.h vgasim.h videomode.h image.cpp
 #
-PROGRAMS := main_tb
+PROGRAMS := main_tb simcheck
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -80,6 +92,8 @@ $(OBJDIR)/%.o: $(VINCD)/%.cpp
 	$(mk-objdir)
 	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
 
+simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
 main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a

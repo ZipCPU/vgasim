@@ -10,12 +10,18 @@ This capability is fully demonstrated via the [Verilator based](http://zipcpu.co
 
 ## Simulation
 
-This repository also contains a basic [video simulator](bench/cpp/vgasim.cpp).
-It takes video inputs from a Verilated [design module](bench/rtl/demo.v),
-and draws them to the screen.  All [video modes](bench/cpp/videomode.h)
+This repository also contains two basic [video simulator](bench/cpp/vgasim.cpp)
+components.  The [first](bench/cpp/vgasim.cpp) takes video outputs from a
+Verilated [design module](bench/rtl/demo.v) and displays them on your screen
+as though it were the monitor the design was displaying to, and the
+[second](bench/cpp/vgasource.cpp) takes a piece of your screen and creates a
+VGA source signal with it.
+
+All [video modes](bench/cpp/videomode.h)
 are supported by simply creating the [simulator object](bench/cpp/vgasim.cpp)
 with the appropriate mode lines, although the [memory initialization
-file](bench/cpp/slide.hex) is specifically formatted for a 1280x1024 screen.
+file](bench/cpp/slide.hex) for the [outgoing demo](bench/rtl/demo.v) is
+specifically formatted for a 1280x1024 screen.
 The [simulator](bench/cpp/vgasim.cpp) will then create a window of that size
 on any GTK enabled screen (i.e. Linux), displaying whatever image [your
 design](rtl/wbvgaframe.v) is producing.
@@ -27,15 +33,14 @@ centered around a [wishbone enabled memory driver](rtl/imgfifo.v).  This
 second capability will draw a more arbitrary image on the display.
 
 References to VGA within this module could just as easily refer to any display.
-Be careful that you match the proper polarity of the synch pulses.
+Be careful that you match the proper polarity of the sync pulses.
 
 ## Building
 
 There is a [master Makefile](Makefile) in this directory.  Hence, to build
 this project you should be able to just clone it,
 `git clone https://github.com/ZipCPU/vgasim`, run `make` in the main
-directory, and then run `main_tb` from within the
-`bench/cpp` directory.
+directory, and then run `main_tb` from within the `bench/cpp` directory.
 
 The project does depend upon having both Verilator and gtkmm-3.0 installed.
 

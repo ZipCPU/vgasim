@@ -52,10 +52,10 @@ public:
 
 	static	const	bool	m_debug;
 
-	CAIROIMG			m_pix;
-	CAIROGC				m_gc;
+	CAIROIMG		m_pix;
+	CAIROGC			m_gc;
 	IMAGE<unsigned>		*m_data;
-	VIDEOMODE			m_mode;
+	VIDEOMODE		m_mode;
 	int	m_vsync_count, m_hsync_count;
 	bool	m_out_of_sync;
 
@@ -65,6 +65,9 @@ public:
 	void	initialize(void) {
 		m_data = new IMAGE<unsigned>(m_mode.height(), m_mode.width());
 		m_data->zeroize();
+
+		m_vsync_count = 0;
+		m_hsync_count = 0;
 
 		set_has_window(true);
 		Widget::set_can_focus(false);
