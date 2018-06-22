@@ -1,0 +1,22 @@
+[options]
+mode prove
+multiclock on
+depth 80
+
+[engines]
+smtbmc yices
+
+[script]
+read_verilog -D IMGFIFO            -formal transferstb.v
+read_verilog -D IMGFIFO            -formal imgfifo.v
+read_verilog -D IMGFIFO -DABSTRACT -formal atxfifo.v
+read_verilog -D IMGFIFO -formal fwb_master.v
+prep -top imgfifo
+clk2fflogic
+write_smt2 -wires imgfifo.smt2
+
+[files]
+../../rtl/transferstb.v
+../../rtl/imgfifo.v
+../../rtl/atxfifo.v
+fwb_master.v
