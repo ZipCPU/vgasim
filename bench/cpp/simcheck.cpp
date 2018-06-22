@@ -44,6 +44,8 @@
 #include <time.h>
 #include <ctype.h>
 
+#include <verilated.h>
+
 #include "testb.h"
 // #include "twoc.h"
 #include "vgasim.h"
