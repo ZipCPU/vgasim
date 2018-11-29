@@ -68,6 +68,10 @@ public:
 
 		m_vsync_count = 0;
 		m_hsync_count = 0;
+		m_out_of_sync = true;
+
+		m_last_hsync = 1;
+		m_last_vsync = 1;
 
 		set_has_window(true);
 		Widget::set_can_focus(false);

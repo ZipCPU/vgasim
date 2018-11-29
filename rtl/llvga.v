@@ -75,14 +75,14 @@ module	llvga(i_pixclk, i_reset, i_test,
 
 	initial	hpos       = 0;
 	initial	o_newline  = 0;
-	initial	o_hsync = 0;
+	initial	o_hsync = 1;
 	initial	hrd = 1;
 	always @(posedge i_pixclk)
 		if (i_reset)
 		begin
 			hpos <= 0;
 			o_newline <= 1'b0;
-			o_hsync <= 1'b0;
+			o_hsync <= 1'b1;
 			hrd <= 1;
 		end else
 		begin
@@ -93,7 +93,7 @@ module	llvga(i_pixclk, i_reset, i_test,
 			else
 				hpos <= 0;
 			o_newline <= (hpos == i_hm_width-2);
-			o_hsync <= (hpos >= i_hm_porch-1'b1)&&(hpos<i_hm_synch-1'b1);
+			o_hsync <= (hpos < i_hm_porch-1'b1)||(hpos>=i_hm_synch-1'b1);
 		end
 
 	always @(posedge i_pixclk)
@@ -105,12 +105,12 @@ module	llvga(i_pixclk, i_reset, i_test,
 		o_newframe <= 1'b0;
 
 	initial	vpos = 0;
-	initial	o_vsync = 1'b0;
+	initial	o_vsync = 1'b1;
 	always @(posedge i_pixclk)
 		if (i_reset)
 		begin
 			vpos <= 0;
-			o_vsync <= 1'b0;
+			o_vsync <= 1'b1;
 		end else if (hpos == i_hm_porch-1'b1)
 		begin
 			if (vpos < i_vm_raw-1'b1)
@@ -124,7 +124,7 @@ module	llvga(i_pixclk, i_reset, i_test,
 			// porches, together with the synch pulse width time,
 			// to prepare to actually draw on this new frame before
 			// the first pixel clock is valid.
-			o_vsync <= (vpos >= i_vm_porch-1'b1)&&(vpos<i_vm_synch-1'b1);
+			o_vsync <= (vpos < i_vm_porch-1'b1)||(vpos>=i_vm_synch-1'b1);
 		end
 
 	initial	vrd = 1'b1;
@@ -258,19 +258,19 @@ module	llvga(i_pixclk, i_reset, i_test,
 		// i_hm_porch <= hpos < i_hm_sync, invalid at all other times
 		//
 		if (hpos < i_hm_porch)
-			assert(!o_hsync);
-		else if (hpos < i_hm_synch)
 			assert(o_hsync);
-		else
+		else if (hpos < i_hm_synch)
 			assert(!o_hsync);
+		else
+			assert(o_hsync);
 
 		// Same thing for vertical
 		if (vpos < i_vm_porch)
-			assert(!o_vsync);
-		else if (vpos < i_vm_synch)
 			assert(o_vsync);
-		else
+		else if (vpos < i_vm_synch)
 			assert(!o_vsync);
+		else
+			assert(o_vsync);
 
 		// At the end of every horizontal line cycle, we assert
 		// a new line

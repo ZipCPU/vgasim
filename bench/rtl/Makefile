@@ -50,7 +50,7 @@ VERILATOR := verilator
 else
 VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
-VFLAGS := -Wall -MMD --trace -y ../../rtl -cc
+VFLAGS := -Wall --MMD --trace -y ../../rtl -cc
 
 $(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.h
 $(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.cpp
@@ -72,6 +72,8 @@ clean:
 # can
 DEPS := $(wildcard $(VDIRFB)/*.d)
 
+ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(DEPS),)
 include $(DEPS)
+endif
 endif

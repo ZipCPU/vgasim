@@ -199,7 +199,8 @@ void	VGASIM::operator()(const int vsync, const int hsync, const int r, const int
 		if ((xv >= 0)&&(yv >= 0) // only if in range
 				&&(xv < m_mode.width())&&(yv < m_mode.height())
 				&&(!m_out_of_sync)) {
-			int	clr, msk = (1<<BITS_PER_COLOR)-1;
+			unsigned	clr, msk = (1<<BITS_PER_COLOR)-1;
+
 			clr = ((r&msk)<<(24-BITS_PER_COLOR))
 					|((g&msk)<<(16-BITS_PER_COLOR))
 					|((b & msk)<<(8-BITS_PER_COLOR));

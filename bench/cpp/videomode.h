@@ -215,6 +215,10 @@ public:
 	int	vporch(void) const {
 		return m_v.m_front;
 	}
+
+	int	err(void) const {
+		return m_err;
+	}
 };
 
 #endif // VIDEOMODE_H
