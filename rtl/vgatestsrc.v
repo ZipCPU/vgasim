@@ -126,7 +126,7 @@ module	vgatestsrc(i_pixclk, i_reset,
 
 	initial	hpos  = 0;
 	initial	hbar  = 0;
-	initial	hedge = { 4'h0, i_width[(HW-1):4];
+	initial	hedge = { 4'h0, i_width[(HW-1):4] };
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_newline))
 	begin
