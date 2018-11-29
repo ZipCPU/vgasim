@@ -1,0 +1,16 @@
+[options]
+mode  prove
+depth 10
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -D LLVGA -formal llvga.v
+read_verilog -D LLVGA -formal vgatestsrc.v
+prep -top llvga
+opt -share_all
+
+[files]
+../../rtl/llvga.v
+../../rtl/vgatestsrc.v

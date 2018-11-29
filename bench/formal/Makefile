@@ -58,30 +58,21 @@ IFIFO	 := imgfifo
 MASTER   := fwb_master.v
 # SLAVE  := $(RTL)/ex/fwb_slave.v
 
-$(LLVGA).smt2: $(RTL)/$(LLVGA).v $(LLVGA).ys
-	yosys -ql $(LLVGA).yslog -s $(LLVGA).ys
-
 $(IFIFO).smt2: $(RTL)/$(IFIFO).v $(RTL)/atxfifo.v $(RTL)/transferstb.v
 $(IFIFO).smt2: $(MASTER) $(IFIFO).ys
 	yosys -ql $(IFIFO).yslog -s $(IFIFO).ys
 
-$(LLVGA) : $(LLVGA).check
-$(LLVGA).check: $(LLVGA).smt2
-	@rm -f $(LLVGA).check
-	$(SMTBMC)    $(BMCARGS) -t 20 --dump-vcd $(LLVGA).vcd $(LLVGA).smt2
-	$(SMTBMC)    $(INDARGS) -t 58 --dump-vcd $(LLVGA).vcd $(LLVGA).smt2
-	$(SMTBMC) -g $(BMCARGS) -t 60 --dump-vcd $(LLVGA).vcd $(LLVGA).smt2
-	touch $@
+.PHONY: $(LLVGA)
+$(LLVGA) : $(LLVGA)/PASS
+$(LLVGA)/PASS: $(LLVGA).sby ../../rtl/llvga.v ../../rtl/vgatestsrc.v
+	sby -f $(LLVGA).sby
 
-$(IFIFO) : $(IFIFO).check
-$(IFIFO).check: $(IFIFO).smt2
-	@rm -f $(IFIFO).check
-	$(SMTBMC)    $(BMCARGS) -t 80 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
-	$(SMTBMC)    $(INDARGS) -t 80 --dump-vcd $(IFIFO).vcd $(IFIFO).smt2
-	touch $@
+.PHONY: $(IFIFO)
+$(IFIFO) : $(IFIFO)/PASS
+$(IFIFO)/PASS: $(IFIFO).sby $(RTL)/imgfifo.v $(RTL)/transferstb.v
+$(IFIFO)/PASS: $(RTL)/atxfifo.v $(MASTER)
+	sby -f $(IFIFO).sby
 
 .PHONY: clean
 clean:
-	rm -f $(LLVGA).smt2   $(LLVGA)*.vcd   $(LLVGA).yslog
-	rm -f $(IFIFO).smt2   $(IFIFO)*.vcd   $(IFIFO).yslog
-	rm -f *.check
+	rm -rf $(LLVGA)/ $(IFIFO)/

@@ -4,7 +4,8 @@ multiclock on
 depth 80
 
 [engines]
-smtbmc yices
+smtbmc boolector # Takes 23 minutes with boolector v3
+# smtbmc yices # Takes 2 hrs
 
 [script]
 read_verilog -D IMGFIFO            -formal transferstb.v

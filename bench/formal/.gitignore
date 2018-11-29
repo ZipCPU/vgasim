@@ -2,3 +2,4 @@
 *.smt2
 *.check
 imgfifo
+llvga
