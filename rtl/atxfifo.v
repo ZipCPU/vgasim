@@ -225,9 +225,11 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		assume($stable(o_rdata));
 `else
 	assign	o_rdata = mem[raddr];
+`ifdef	FORMAL
 	always @($global_clock)
 	if ((!o_rempty)&&(!$rose(i_rclk)))
 		assert($stable(o_rdata));
+`endif
 `endif
 
 
