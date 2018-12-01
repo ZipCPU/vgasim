@@ -1,0 +1,16 @@
+[options]
+mode prove
+multiclock on
+depth 80
+
+[engines]
+abc pdr	# 54 seconds
+# smtbmc boolector # 24:39
+# smtbmc yices # 37:27
+
+[script]
+read_verilog -D ATXFIFO -formal atxfifo.v
+prep -top atxfifo
+
+[files]
+../../rtl/atxfifo.v

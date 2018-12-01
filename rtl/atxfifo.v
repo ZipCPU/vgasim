@@ -67,11 +67,11 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 			AW = ASIZE;
 	input	wire			i_wclk, i_wrst_n, i_wr;
 	input	wire	[DW-1:0]	i_wdata;
-	output	wire			o_wfull;
-	output	wire	[AW:0]		o_wfill_level;
+	output	reg			o_wfull;
+	output	reg	[AW:0]		o_wfill_level;
 	input	wire			i_rclk, i_rrst_n, i_rd;
 	output	wire	[DW-1:0]	o_rdata;
-	output	wire			o_rempty;
+	output	reg			o_rempty;
 
 	wire	[AW-1:0]	waddr, raddr;
 	wire			wfull_next, rempty_next;
@@ -138,7 +138,7 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	//
 	// We'll allow this to be a clock or two out of date, allowing the
 	// feeding circuit to set a threshold to stop with.
-	wire	[AW:0]	wq2_rbin;
+	reg	[AW:0]	wq2_rbin;
 	integer	g2b;
 	always @(*)
 	begin
@@ -221,10 +221,13 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 `ifdef	ABSTRACT
 	assign	o_rdata = $anyseq;
 	always @($global_clock)
-	if ((!o_rempty)&&(!$rose(i_rclk))&&(!i_rd))
+	if ((!o_rempty)&&(!$rose(i_rclk)))
 		assume($stable(o_rdata));
 `else
 	assign	o_rdata = mem[raddr];
+	always @($global_clock)
+	if ((!o_rempty)&&(!$rose(i_rclk)))
+		assert($stable(o_rdata));
 `endif
 
 
@@ -234,7 +237,7 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 `define	ASSERT	assert
 `else
 `define	ASSUME	assert
-`define	ASSERT	assume
+`define	ASSERT	assert
 `endif
 	//
 	// Set up the f_past_valid registers.  We'll need one for each of
@@ -386,6 +389,17 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		`ASSERT(wq2_rgray == 0);
 		`ASSERT(rq1_wgray == 0);
 		`ASSERT(rq2_wgray == 0);
+		//
+		// Given that the reset is pulled all at one time,
+		// and given that a read cannot proceed until there's
+		// at least one element in the FIFO, then as long as we
+		// are in the write reset--all pointers must remain at
+		// zero.
+		//
+		`ASSERT(f_fill == 0);
+		`ASSERT(rbin   == 0);
+		`ASSERT({ f_w2r_rbin, f_w1r_rbin } == 0);
+		`ASSERT({ f_r2w_wbin, f_r2w_wbin } == 0);
 	end
 
 	always @(*)
@@ -496,9 +510,9 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	assign	f_w2r_fill = wbin - f_w2r_rbin;
 	assign	f_r2w_fill = f_r2w_wbin - rbin;
 
-always @(posedge i_wclk)
-if ((f_past_valid_wr)&&(wbin==5)&&(i_wrst_n))
-assert(o_wfill_level == $past(f_w2r_fill));
+// always @(posedge i_wclk)
+// if ((f_past_valid_wr)&&(wbin==5)&&(i_wrst_n))
+// assert(o_wfill_level == $past(f_w2r_fill));
 
 	// And assert that the fill is always less than or equal to full.
 	// This catches underrun as well as overflow, since underrun will

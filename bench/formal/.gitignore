@@ -1,5 +1,8 @@
 *.yslog
 *.smt2
 *.check
-imgfifo
+imgfifo_ab
+imgfifo_bl
+imgfifo_ys
 llvga
+atxfifo

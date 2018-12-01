@@ -101,7 +101,7 @@ module	imgfifo(i_clk, i_pixclk,
 			pix_reset_pipe <= -1;
 		else
 			pix_reset_pipe <= { pix_reset_pipe[1:0], 1'b0 };
-	assign	pix_reset = pix_reset_pipe[2];
+	assign	pix_reset = (pix_reset_pipe[2]) || (i_newframe);
 
 
 	initial	o_wb_cyc  = 1'b0;
@@ -305,7 +305,6 @@ assume property(i_nlines    == 1080);
 	if ((f_past_valid_gbl)&&(!$rose(i_clk)))
 	begin
 		assume($stable(i_reset));
-		assume($stable(i_newframe));
 		assume($stable(i_baseaddr));
 		assume((i_reset)||($stable(i_linewords)));
 		assume((i_reset)||($stable(i_nlines)));
@@ -392,6 +391,10 @@ assume property(i_nlines    == 1080);
 
 	always @(*)
 	if ((!end_of_frame)||(o_wb_cyc))
+		assume(!i_newframe);
+
+	always @(posedge i_pixclk)
+	if (($past(i_newframe))||($past(i_newframe,2)))
 		assume(!i_newframe);
 
 	//

@@ -1,11 +1,17 @@
+[tasks]
+bl
+# yc
+# ab
+
 [options]
 mode prove
 multiclock on
 depth 80
 
 [engines]
-smtbmc boolector # Takes 23 minutes with boolector v3
-# smtbmc yices # Takes 2 hrs
+bl: smtbmc boolector # Takes 2:02:30 with boolector v3
+# yc: smtbmc yices # Takes (over 38) hrs (still running)
+# ab: abc pdr	# Test hasn't finished
 
 [script]
 read_verilog -D IMGFIFO            -formal transferstb.v
@@ -13,8 +19,6 @@ read_verilog -D IMGFIFO            -formal imgfifo.v
 read_verilog -D IMGFIFO -DABSTRACT -formal atxfifo.v
 read_verilog -D IMGFIFO -formal fwb_master.v
 prep -top imgfifo
-clk2fflogic
-write_smt2 -wires imgfifo.smt2
 
 [files]
 ../../rtl/transferstb.v
