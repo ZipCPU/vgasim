@@ -2,6 +2,8 @@
 bl
 # yc
 # ab
+# cv
+# z3
 
 [options]
 mode prove
@@ -9,9 +11,11 @@ multiclock on
 depth 80
 
 [engines]
-bl: smtbmc boolector # Takes 2:02:30 with boolector v3
-# yc: smtbmc yices # Takes (over 38) hrs (still running)
-# ab: abc pdr	# Test hasn't finished
+bl: smtbmc boolector	# Takes 2:02:30 with boolector v3
+yc: smtbmc yices	# Takes (over 44) hrs (still running)
+ab: abc pdr		# Test killed after 52+ hours, never finished
+cv: smtbmc cvc4	# First ten steps take ~100x longer than boolector
+z3: smtbmc z3
 
 [script]
 read_verilog -D IMGFIFO            -formal transferstb.v
