@@ -74,7 +74,7 @@ SIMSOURCES:= vgasim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
-all:	main_tb archive
+all:	main_tb
 
 SOURCES := main_tb.cpp vgasim.cpp
 HEADERS := image.h testb.h vgasim.h videomode.h image.cpp
