@@ -66,7 +66,7 @@ VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD)
 VDEFS   := $(shell ./vversion.sh)
-FLAGS	:= -Wall -Og -g $(VDEFS)
+FLAGS	:= -Wall -Og -g -std=c++11 $(VDEFS)
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
 CFLAGS  :=  $(GFXFLAGS)
