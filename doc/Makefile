@@ -2,7 +2,7 @@
 ##
 ## Filename: 	Makefile
 ##
-## Project:	WBPMIC, wishbone control of a MEMs PMod MIC
+## Project:	vgasim, a Verilator based VGA simulator demonstration
 ##
 ## Purpose:	To coordinate the build of documentation PDFs from their
 ##		LaTeX sources.
@@ -18,7 +18,7 @@
 ##
 ################################################################################
 ##
-## Copyright (C) 2015-2017, Gisselquist Technology, LLC
+## Copyright (C) 2015-2020, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
