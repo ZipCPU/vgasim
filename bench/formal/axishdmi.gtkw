@@ -1,0 +1,48 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Mon Jun  8 12:23:57 2020
+[*]
+[dumpfile] "/home/dan/jericho/work/rnd/opencores/vgasim/trunk/bench/formal/axishdmi_prf/engine_0/trace_induct.vcd"
+[dumpfile_mtime] "Mon Jun  8 12:15:37 2020"
+[dumpfile_size] 18385
+[savefile] "/home/dan/jericho/work/rnd/opencores/vgasim/trunk/bench/formal/axishdmi.gtkw"
+[timestart] 93
+[size] 1902 600
+[pos] -1 -1
+*-4.124164 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 270
+[signals_width] 200
+[sst_expanded] 1
+[sst_vpaned_height] 143
+@29
+axishdmi.i_pixclk
+@28
+axishdmi.i_reset
+axishdmi.pix_reset
+@22
+axishdmi.i_hm_width[11:0]
+axishdmi.i_hm_porch[11:0]
+axishdmi.i_hm_synch[11:0]
+axishdmi.i_hm_raw[11:0]
+@200
+-
+@22
+axishdmi.i_vm_height[11:0]
+axishdmi.i_vm_porch[11:0]
+axishdmi.i_vm_synch[11:0]
+axishdmi.i_vm_raw[11:0]
+@200
+-
+@22
+axishdmi.hpos[11:0]
+axishdmi.vpos[11:0]
+@28
+axishdmi.w_rd
+axishdmi.lost_sync
+axishdmi.first_frame
+axishdmi.r_newframe
+axishdmi.r_newline
+axishdmi.i_valid
+axishdmi.o_ready
+[pattern_trace] 1
+[pattern_trace] 0

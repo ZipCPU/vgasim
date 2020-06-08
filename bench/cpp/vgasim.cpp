@@ -186,17 +186,32 @@ void	VGASIM::operator()(const int vsync, const int hsync, const int r, const int
 			// from the first synch pixel
 			m_hsync_count++;
 
-		assert((m_vsync_count <   m_mode.sync_lines() * m_mode.raw_width())||(vsync));
-		assert( m_vsync_count <   m_mode.raw_height()*m_mode.raw_width());
-		assert((m_hsync_count <   m_mode.sync_pixels())||(hsync));
-		assert( m_hsync_count <   m_mode.raw_width());
+		bool	error = false;
+		if (!vsync && (m_vsync_count >=  m_mode.sync_lines() * m_mode.raw_width()))
+			error = true;
+		if (m_vsync_count >=  m_mode.raw_height()*m_mode.raw_width())
+			error = true;
+		if (!hsync && (m_hsync_count >=  m_mode.sync_pixels()))
+			error = true;
+		if (m_hsync_count >=  m_mode.raw_width())
+			error = true;
 
+		if (error) {
+			printf("OUT OF BOUNDS! %4d, %4d, S*W=%d, R*R=%d, S=%d, RX=%d\n",
+				m_hsync_count, m_vsync_count,
+				m_mode.sync_lines() * m_mode.raw_width(),
+				m_mode.raw_height() * m_mode.raw_width(),
+				m_mode.sync_pixels(), m_mode.raw_width());
+			m_pixel_clock_count = 0;
+			m_out_of_sync = true;
+			m_hsync_count = 0;
+			m_vsync_count = 0;
+		}
 
 		yv = (m_vsync_count-m_hsync_count)/m_mode.raw_width();
 		yv -= m_mode.vback_porch() + m_mode.sync_lines();
 		xv = (m_hsync_count) -(m_mode.sync_pixels() + m_mode.hback_porch());
-
-		if ((xv >= 0)&&(yv >= 0) // only if in range
+		if (!error && (xv >= 0)&&(yv >= 0) // only if in range
 				&&(xv < m_mode.width())&&(yv < m_mode.height())
 				&&(!m_out_of_sync)) {
 			unsigned	clr, msk = (1<<BITS_PER_COLOR)-1;

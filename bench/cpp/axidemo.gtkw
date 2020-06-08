@@ -1,0 +1,155 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Sun Jun  7 03:34:25 2020
+[*]
+[size] 1920 1021
+[pos] -1 -1
+*-26.000000 153202069 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.axidemo.
+[treeopen] TOP.axidemo.video.
+[treeopen] TOP.axidemo.video.videodma.
+[sst_width] 270
+[signals_width] 270
+[sst_expanded] 1
+[sst_vpaned_height] 290
+@28
+TOP.i_clk
+TOP.i_pixclk
+TOP.i_reset
+@c00200
+-AXI-Lite Control
+@28
+TOP.S_AXI_AWVALID
+TOP.S_AXI_AWREADY
+@22
+TOP.S_AXI_AWADDR[10:0]
+@28
+TOP.S_AXI_AWPROT[2:0]
+@200
+-
+@28
+TOP.S_AXI_WVALID
+TOP.S_AXI_WREADY
+@22
+TOP.S_AXI_WDATA[31:0]
+TOP.S_AXI_WSTRB[3:0]
+@200
+-
+@28
+TOP.S_AXI_BVALID
+TOP.S_AXI_BREADY
+TOP.S_AXI_BRESP[1:0]
+@200
+-
+@28
+TOP.S_AXI_ARVALID
+TOP.S_AXI_ARREADY
+@22
+TOP.S_AXI_ARADDR[10:0]
+@28
+TOP.S_AXI_ARPROT[2:0]
+@200
+-
+@28
+TOP.S_AXI_RVALID
+TOP.S_AXI_RREADY
+@22
+TOP.S_AXI_RDATA[31:0]
+@28
+TOP.S_AXI_RRESP[1:0]
+@1401200
+-AXI-Lite Control
+@800200
+-AXI BUS
+@28
+TOP.axidemo.video.M_AXI_ARVALID
+TOP.axidemo.video.M_AXI_ARREADY
+@22
+TOP.axidemo.video.M_AXI_ARADDR[25:0]
+TOP.axidemo.video.M_AXI_ARLEN[7:0]
+@200
+-
+@28
+TOP.axidemo.video.M_AXI_RVALID
+TOP.axidemo.video.M_AXI_RREADY
+@22
+TOP.axidemo.video.M_AXI_RDATA[31:0]
+@28
+TOP.axidemo.video.M_AXI_RLAST
+@1000200
+-AXI BUS
+@c00200
+-Video DMA Config
+@28
+TOP.axidemo.video.videodma.cfg_active
+TOP.axidemo.video.videodma.cfg_dirty
+@22
+TOP.axidemo.video.videodma.cfg_frame_addr[25:0]
+TOP.axidemo.video.videodma.cfg_frame_lines[15:0]
+TOP.axidemo.video.videodma.cfg_line_step[15:0]
+TOP.axidemo.video.videodma.cfg_line_words[13:0]
+@28
+TOP.axidemo.video.videodma.cfg_zero_length
+@1401200
+-Video DMA Config
+@28
+TOP.axidemo.video.genvga.i_reset
+@22
+TOP.axidemo.video.genvga.hpos[11:0]
+TOP.axidemo.video.genvga.vpos[11:0]
+@29
+TOP.axidemo.video.genvga.lost_sync
+@800200
+-VGA
+@28
+TOP.o_vga_hsync
+TOP.o_vga_vsync
+@22
+TOP.o_vga_blu[7:0]
+TOP.o_vga_grn[7:0]
+TOP.o_vga_red[7:0]
+@1000200
+-VGA
+@28
+TOP.axidemo.video.wskd_valid
+TOP.axidemo.video.awskd_valid
+TOP.axidemo.video.arskd_valid
+@22
+TOP.axidemo.video.awskd_addr[8:0]
+TOP.axidemo.video.wskd_data[31:0]
+TOP.axidemo.video.wskd_strb[3:0]
+@28
+TOP.axidemo.video.new_image_dimension[1:0]
+TOP.axidemo.video.axil_write_ready
+@200
+-
+@22
+TOP.axidemo.video.hm_width[11:0]
+TOP.axidemo.video.hm_porch[11:0]
+TOP.axidemo.video.hm_synch[11:0]
+TOP.axidemo.video.hm_raw[11:0]
+@200
+-
+@22
+TOP.axidemo.video.vm_height[11:0]
+TOP.axidemo.video.vm_porch[11:0]
+TOP.axidemo.video.vm_synch[11:0]
+TOP.axidemo.video.vm_raw[11:0]
+@200
+-
+@22
+TOP.axidemo.video.words_per_line[11:0]
+@28
+TOP.axidemo.video.cmap_mode[2:0]
+@200
+-
+@28
+TOP.axidemo.video.new_image_dimension[1:0]
+@22
+TOP.axidemo.video.new_image_porch[31:0]
+TOP.axidemo.video.new_image_raw[31:0]
+TOP.axidemo.video.new_image_size[31:0]
+TOP.axidemo.video.new_image_synch[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

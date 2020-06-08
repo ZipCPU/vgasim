@@ -19,6 +19,10 @@
 ##		some confidence that both VGASOURCE and VGASIM components are
 ##		working.
 ##
+##	axi_tb
+##		An AXI demonstrator.  This demo configures an AXI Video source,
+##		and then feeds the result into the VGA (or HDMI) simulator.
+##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
@@ -70,16 +74,16 @@ FLAGS	:= -Wall -Og -g -std=c++11 $(VDEFS)
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
 CFLAGS  :=  $(GFXFLAGS)
-SIMSOURCES:= vgasim.cpp
+SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 all:	main_tb
 
-SOURCES := main_tb.cpp vgasim.cpp
-HEADERS := image.h testb.h vgasim.h videomode.h image.cpp
+SOURCES := main_tb.cpp vgasim.cpp hdmisim.cpp
+HEADERS := image.h testb.h vgasim.h hdmisim.h videomode.h image.cpp
 #
-PROGRAMS := main_tb simcheck
+PROGRAMS := main_tb simcheck axi_tb hdmi_tb
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -92,12 +96,24 @@ $(OBJDIR)/%.o: $(VINCD)/%.cpp
 	$(mk-objdir)
 	$(CXX) $(FLAGS) $(INCS) -c $< -o $@
 
+$(OBJDIR)/hdmi_tb.o: axi_tb.cpp
+	$(mk-objdir)
+	$(CXX) -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
+
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
 	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
 main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a
 	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -o $@
+
+AXIOBJS := $(OBJDIR)/axi_tb.o
+axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+
+HDMIOBJS := $(OBJDIR)/hdmi_tb.o
+hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
 
 .PHONY: clean
 clean:

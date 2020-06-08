@@ -2,7 +2,7 @@
 //
 // Filename: 	transferstb.v
 //
-// Project:	VideoZip, a ZipCPU SoC supporting video functionality
+// Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	
 //

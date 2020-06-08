@@ -1,0 +1,18 @@
+[tasks]
+prf
+
+[options]
+prf: mode  prove
+depth 20
+
+[engines]
+smtbmc
+
+[script]
+read -formal axishdmi.v
+read -formal tmdsencode.v
+prep -top axishdmi
+
+[files]
+../../rtl/axishdmi.v
+../../rtl/hdmi/tmdsencode.v

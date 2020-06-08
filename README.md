@@ -1,21 +1,28 @@
 ## Controller
 
-This repository contains a [Video Controller](rtl/wbvgaframe.v).  This
-controller includes not only the [low-level framer](rtl/llvga.v), but also
+This repository contains a couple of [Video Controller](rtl/wbvgaframe.v).
+
+The original [Video Controller](rtl/wbvgaframe.v)
+includes not only the [low-level framer](rtl/llvga.v), but also
 a [bus controller](rtl/imgfifo.v) to read values from memory to then be
 displayed on the screen.  This is the basis of a frame buffer approach to
-video.
+video.  This capability is fully demonstrated via the [Verilator
+based](http://zipcpu.com/blog/2017/06/21/looking-at-verilator.html) simulator.
 
-This capability is fully demonstrated via the [Verilator based](http://zipcpu.com/blog/2017/06/21/looking-at-verilator.html) simulator.
+There is now also an [AXI-based Video Controller](rtl/axivideo.v) that can
+produce either VGA or HDMI signals.  This controller is demonstrated via
+a [slightly different simulator](bench/cpp/axi_tb.cpp), including simulations
+for both [VGA](bench/cpp/vgasim.cpp) and [HDMI](bench/cpp/hdmisim.cpp).
 
 ## Simulation
 
 This repository also contains two basic [video simulator](bench/cpp/vgasim.cpp)
-components.  The [first](bench/cpp/vgasim.cpp) takes video outputs from a
+components.  The first, either [VGASIM](bench/cpp/vgasim.cpp)
+or [HDMISIM](bench/cpp/hdmisim.cpp) takes video outputs from a
 Verilated [design module](bench/rtl/demo.v) and displays them on your screen
 as though it were the monitor the design was displaying to, and the
 [second](bench/cpp/vgasource.cpp) takes a piece of your screen and creates a
-VGA source signal with it.
+VGA source signal with it.  (There's no simulated HDMI source presently.)
 
 All [video modes](bench/cpp/videomode.h)
 are supported by simply creating the [simulator object](bench/cpp/vgasim.cpp)
@@ -42,7 +49,7 @@ this project you should be able to just clone it,
 `git clone https://github.com/ZipCPU/vgasim`, run `make` in the main
 directory, and then run `main_tb` from within the `bench/cpp` directory.
 
-The project does depend upon having both Verilator and gtkmm-3.0 installed.
+The project depends upon having both Verilator and gtkmm-3.0 installed.
 
 ## License
 
