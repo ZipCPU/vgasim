@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axivdma
+// Filename: 	axivdisplay
 //
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -59,7 +59,7 @@
 //
 //		At present, this core can only handle a number of bytes aligned
 //		with the word size of the bus.
-//		
+//
 //   6:	FBUF_NUMLINES
 //		The number of lines of active video data in a frame.  This
 //		number must be greater than zero in order to activate and
@@ -115,7 +115,7 @@
 //
 `default_nettype none
 //
-module	axivdma #(
+module	axivdisplay #(
 		// {{{
 		parameter	C_AXI_ADDR_WIDTH = 32,
 		parameter	C_AXI_DATA_WIDTH = 32,
@@ -667,7 +667,7 @@ module	axivdma #(
 		assign	M_AXIS_TLAST = vlast && hlast;
 		assign	M_AXIS_TUSER = hlast;
 		assign	M_AXIS_TDATA = M_AXI_RDATA;
-		
+
 		assign no_fifo_space_available = (ar_bursts_outstanding >= 3);
 		// }}}
 	end endgenerate
@@ -1042,7 +1042,7 @@ module	axivdma #(
 		axi_araddr[ADDRLSB-1:0] <= 0;
 	end
 	// }}}
-	
+
 	// Set the constant M_AXI_* signals
 	// {{{
 	assign	M_AXI_ARVALID= axi_arvalid;

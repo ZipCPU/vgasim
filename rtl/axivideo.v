@@ -20,7 +20,7 @@
 //	018:	(Reserved)
 //	01c:	(Reserved)
 //	020:	Horizontal image size (pixel width)
-//	022:	Vertical   image size (pixel width)
+//	022:	Vertical   image size (pixel height)
 //	024:	Horizontal porch duration (Distance from pixels to sync)
 //	026:	Vertical   porch duration
 //	028:	Horizontal sync duration
@@ -668,7 +668,7 @@ module	axivideo #(
 	// AXIVDMA
 	// {{{
 	// Read pixel/frame data from the AXI (memory) bus
-	axivdma #(
+	axivdisplay #(
 		// {{{
 		.C_AXI_ADDR_WIDTH(C_AXI_ADDR_WIDTH),
 		.C_AXI_DATA_WIDTH(C_AXI_DATA_WIDTH),
