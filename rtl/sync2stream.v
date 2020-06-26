@@ -14,7 +14,7 @@
 // Copyright (C) 2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -47,11 +47,11 @@ module	sync2stream #(
 		input	wire				i_pix_valid,
 		input	wire				i_hsync,
 		input	wire				i_vsync,
-		input	wire	[23-1:0]		i_pixel,
+		input	wire	[24-1:0]		i_pixel,
 		//
 		output	reg				M_AXIS_TVALID,
 		input	wire				M_AXIS_TREADY,
-		output	reg	[23-1:0]		M_AXIS_TDATA,	// Color
+		output	reg	[24-1:0]		M_AXIS_TDATA,	// Color
 		output	reg				M_AXIS_TLAST,	// Vsync
 		output	reg				M_AXIS_TUSER,	// Hsync
 		//

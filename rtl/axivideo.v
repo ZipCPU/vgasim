@@ -730,7 +730,6 @@ module	axivideo #(
 		// }}}
 	);
 	// }}}
-	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Asynchronous FIFO
@@ -754,7 +753,6 @@ module	axivideo #(
 
 	assign	mem_tready = !afifo_full;
 	// }}}
-	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	// vidstream2pix
@@ -786,7 +784,6 @@ module	axivideo #(
 			.i_cmap_wdata(dma_wdata[23:0]), .i_cmap_wstrb(dma_wstrb[2:0])
 	);
 	// }}}
-	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Actual video logic generation
@@ -856,6 +853,8 @@ module	axivideo #(
 `endif
 	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, S_AXIL_AWPROT, S_AXIL_ARPROT, clk_stb,
@@ -866,15 +865,14 @@ module	axivideo #(
 			dma_awready, dma_wready, dma_bvalid, dma_arready };
 	// Verilator lint_on  UNUSED
 	// }}}
-
 `ifdef	FORMAL
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Formal properties used in verfiying (portions of) this core
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 	reg	f_past_valid;
 	initial	f_past_valid = 0;
 	always @(posedge S_AXI_ACLK)
@@ -970,7 +968,6 @@ module	axivideo #(
 	// set above, you'll probably still want to cover something
 	// application specific here
 
-	// }}}
 	// }}}
 	// }}}
 `endif

@@ -16,7 +16,7 @@
 // Copyright (C) 2020, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -40,8 +40,8 @@
 `default_nettype	none
 //
 module	pix2stream #(
-		parameter	HMODE_WIDTH = 12,
-		parameter [0:0]	OPT_MSB_FIRST = 1'b1,
+		parameter	HMODE_WIDTH    = 12,
+		parameter [0:0]	OPT_MSB_FIRST  = 1'b1,
 		parameter 	BUS_DATA_WIDTH = 32
 	) (
 		input	wire	i_clk,
@@ -49,7 +49,7 @@ module	pix2stream #(
 		//
 		input	wire				S_AXIS_TVALID,
 		output	wire				S_AXIS_TREADY,
-		input	wire [23-1:0]	S_AXIS_TDATA,
+		input	wire [24-1:0]			S_AXIS_TDATA,
 		input	wire 				S_AXIS_TLAST, // Hsync
 		input	wire 				S_AXIS_TUSER, // Vsync
 		//
@@ -59,16 +59,8 @@ module	pix2stream #(
 		output	wire				M_AXIS_TLAST,	// Hsync
 		output	wire				M_AXIS_TUSER,	// Vsync
 		//
-		input	wire	[2:0]			i_mode,
-		input	wire [HMODE_WIDTH-1:0]		i_pixels_per_line,
-		//
-		input	wire				i_cmap_rd,
-		input	wire	[7:0]			i_cmap_raddr,
-		output	reg	[23:0]			o_cmap_rdata,
-		input	wire				i_cmap_we,
-		input	wire	[7:0]			i_cmap_waddr,
-		input	wire	[23:0]			i_cmap_wdata,
-		input	wire	[2:0]			i_cmap_wstrb
+		input	wire	[1:0]			i_mode
+		// , input	wire [HMODE_WIDTH-1:0]	i_pixels_per_line
 	);
 	
 	localparam	[1:0]		MODE_UNUSED	= 2'b00,
@@ -82,16 +74,25 @@ module	pix2stream #(
 	//	z_	Masked data input (shifted to low order)
 	//	c_	Outgoing data
 
-	wire				skd_valid, skd_last, skd_user;
-	wire	[BUS_DATA_WIDTH-1:0]	skd_data;
+	wire			skd_valid, skd_last, skd_user;
+	reg			skd_ready;
+	wire	[24-1:0]	skd_data;
+	wire			z_step, c_step;
 
-	reg	[23:0]			mem_data;
-	reg	[HMODE_WIDTH-1:0]	mem_count;
+	reg	[BUS_DATA_WIDTH-1:0]	clr8_word, clr8_zmask,
+					clr16_word, clr16_zmask,
+					clr_word, clr_zmask;
+
+	reg	[$clog2(BUS_DATA_WIDTH):0]	clr8_valid,  clr8_zvalid,
+						clr16_valid, clr16_zvalid,
+						clr_valid,   clr_zvalid;
+	reg				clr8_zfull, clr16_zfull, clr_zfull;
+	reg				clr_user,    clr_zuser;
+	reg				clr_last,    clr_zlast;
+	reg				z_valid, next_zvalid;
+
+	reg	[BUS_DATA_WIDTH-1:0]	mem_data;
 	reg				mem_user, mem_last, mem_valid;
-
-
-	integer		k;
-
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -102,7 +103,7 @@ module	pix2stream #(
 	//
 	skidbuffer #(
 		.OPT_OUTREG(1),
-		.DW(BUS_DATA_WIDTH+2)
+		.DW(24+2)
 	) tskd (
 		.i_clk(i_clk),
 		.i_reset(i_reset),
@@ -132,7 +133,7 @@ module	pix2stream #(
 	initial	clr8_valid = 0;
 	always @(posedge i_clk)
 	begin
-		case({ skd_valid && skd_ready, z_step)
+		case({ skd_valid && skd_ready, z_step })
 		2'b01: clr8_valid <= clr8_valid - BUS_DATA_WIDTH;
 		2'b10: clr8_valid <= clr8_valid + 8;
 		2'b11: clr8_valid <= clr8_valid + 8 - BUS_DATA_WIDTH;
@@ -150,7 +151,7 @@ module	pix2stream #(
 
 	always @(posedge i_clk)
 	if (skd_valid && skd_ready)
-		clr8_word <= { skd_data[23:20], skd_data[15:13], skd_data[7:6],
+		clr8_word <= { skd_data[23:21], skd_data[15:13], skd_data[7:6],
 					clr8_word[BUS_DATA_WIDTH-1:8] };
 
 	always @(posedge i_clk)
@@ -170,7 +171,7 @@ module	pix2stream #(
 	initial	clr16_valid = 0;
 	always @(posedge i_clk)
 	begin
-		case({ skd_valid && skd_ready, z_step)
+		case({ skd_valid && skd_ready, z_step })
 		2'b01: clr16_valid <= clr16_valid - BUS_DATA_WIDTH;
 		2'b10: clr16_valid <= clr16_valid + 16;
 		2'b11: clr16_valid <= clr16_valid + 16 - BUS_DATA_WIDTH;
@@ -207,10 +208,10 @@ module	pix2stream #(
 	initial	clr_valid = 0;
 	always @(posedge i_clk)
 	begin
-		case({ skd_valid && skd_ready, z_step)
-		2'b01: clr_valid <= clr16_valid - BUS_DATA_WIDTH;
-		2'b10: clr_valid <= clr16_valid + 32;
-		2'b11: clr_valid <= clr16_valid + 32 - BUS_DATA_WIDTH;
+		case({ skd_valid && skd_ready, z_step })
+		2'b01: clr_valid <= clr_valid - BUS_DATA_WIDTH;
+		2'b10: clr_valid <= clr_valid + 32;
+		2'b11: clr_valid <= clr_valid + 32 - BUS_DATA_WIDTH;
 		default: begin end
 		endcase
 
@@ -257,10 +258,10 @@ module	pix2stream #(
 	begin
 		next_zvalid = clr_last;
 		case(i_mode)
-		MODE_UNKNOWN:	if (clr8_valid[ LGDATA_WIDTH]) next_zvalid = 1;
-		MODE_CLR8:	if (clr8_valid[ LGDATA_WIDTH]) next_zvalid = 1;
-		MODE_CLR16:	if (clr16_valid[LGDATA_WIDTH]) next_zvalid = 1;
-		MODE_DIRECT:	if (clr_valid[  LGDATA_WIDTH]) next_zvalid = 1;
+		MODE_UNUSED:	if (clr8_zfull)  next_zvalid = 1;
+		MODE_CLR8:	if (clr8_zfull)  next_zvalid = 1;
+		MODE_CLR16:	if (clr16_zfull) next_zvalid = 1;
+		MODE_DIRECT:	if (clr_zfull)   next_zvalid = 1;
 		endcase
 	end
 
@@ -271,12 +272,12 @@ module	pix2stream #(
 		begin
 			clr_zlast  <= clr_last;
 			clr_zuser  <= clr_user;
-			clr_zvalid <= next_zvalid;
+			z_valid <= next_zvalid;
 		end else if (c_step)
-			clr_zvalid <= 0;
+			z_valid <= 0;
 
 		if (i_reset)
-			clr_zvalid <= 0;
+			z_valid <= 0;
 	end
 
 	////////////////////////////////////////////////////////////////////////
@@ -289,15 +290,18 @@ module	pix2stream #(
 	always @(posedge i_clk)
 	if (c_step)
 	case(i_mode)
-	MODE_UNKNOWN:	mem_data <= clr8_zmask;
+	MODE_UNUSED:	mem_data <= clr8_zmask;
 	MODE_CLR8:	mem_data <= clr8_zmask;
 	MODE_CLR16:	mem_data <= clr16_zmask;
 	MODE_DIRECT:	mem_data <= clr_zmask;
 	endcase
 
+	initial	mem_valid = 0;
 	always @(posedge i_clk)
-	if (c_step)
-		mem_valid <= clr_zvalid;
+	if (i_reset)
+		mem_valid <= 0;
+	else if (c_step)
+		mem_valid <= z_valid;
 	else if (M_AXIS_TREADY)
 		mem_valid <= 0;
 
@@ -320,7 +324,6 @@ module	pix2stream #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	assign	s_step = !c_valid || c_step;
 	assign	z_step = (next_zvalid && c_step);
 	assign	c_step = (!M_AXIS_TVALID || M_AXIS_TREADY);
 	assign	M_AXIS_TVALID = mem_valid;
