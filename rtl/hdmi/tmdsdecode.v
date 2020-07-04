@@ -41,7 +41,7 @@ module	tmdsdecode(i_clk, i_word, o_ctl, o_aux, o_pix);
 	input	wire		i_clk;
 	input	wire	[9:0]	i_word;
 	output	wire	[1:0]	o_ctl;
-	output	wire	[3:0]	o_aux;
+	output	wire	[5:0]	o_aux;
 	output	wire	[7:0]	o_pix;
 
 	reg	[7:0]	r_pix;
@@ -116,6 +116,7 @@ module	tmdsdecode(i_clk, i_word, o_ctl, o_aux, o_pix);
 		// Guard band characters
 		//10'h2cc:r_aux<= 8'h38; // done above
 		10'h133: begin r_aux <= 6'h21; r_ctl <= 2'h0; end
+		default: begin end
 		endcase
 	end
 

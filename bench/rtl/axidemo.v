@@ -107,6 +107,14 @@ module	axidemo #(
 	wire	[1:0]	mem_rresp, mem_bresp;
 	wire [DW-1:0]	mem_rdata;
 
+	wire			ram_we, ram_rd;
+	reg	[AWW-1:0]	ram_waddr, ram_raddr;
+	reg	[DW-1:0]	ram_wdata, ram_rdata;
+	reg	[DW/8-1:0]	ram_wstrb;
+	reg	[DW-1:0]	ram	[0:(1<<AWW)-1];
+	integer			rk;
+
+
 	demofull #(
 		.C_S_AXI_ID_WIDTH(AXI_ID_WIDTH),
 		.C_S_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
@@ -167,13 +175,6 @@ module	axidemo #(
 	);
 
 	localparam	AWW = AW-$clog2(DW/8);
-
-	wire			ram_we, ram_rd;
-	reg	[AWW-1:0]	ram_waddr, ram_raddr;
-	reg	[DW-1:0]	ram_wdata, ram_rdata;
-	reg	[DW/8-1:0]	ram_wstrb;
-	reg	[DW-1:0]	ram	[0:(1<<AWW)-1];
-	integer			rk;
 
 	// initial	$readmemh("slide.hex", ram);
 	initial	$readmemh("clr4.hex", ram);

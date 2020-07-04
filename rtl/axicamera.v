@@ -186,6 +186,7 @@ module	axicamera #(
 	output	wire				M_AXI_RREADY,
 	input	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_RID,
 	input	wire [C_AXI_DATA_WIDTH-1:0]	M_AXI_RDATA,
+	input	wire 				M_AXI_RLAST,
 	input	wire	[1:0]			M_AXI_RRESP
 	// }}}
 	// }}}
@@ -692,7 +693,8 @@ module	axicamera #(
 		dmactl_bvalid_ignored,
 		dmactl_arready_ignored, dmactl_rvalid_ignored,
 		dmactl_bresp_ignored,   dmactl_rresp_ignored,
-		M_AXI_ARREADY, M_AXI_RVALID, M_AXI_RID, M_AXI_RDATA,M_AXI_RRESP,
+		M_AXI_ARREADY, M_AXI_RVALID, M_AXI_RID, M_AXI_RDATA,
+			M_AXI_RLAST, M_AXI_RRESP,
 		pix_ready, 1'b0 };
 	// Verilator lint_on  UNUSED
 	// }}}
