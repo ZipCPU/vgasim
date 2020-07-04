@@ -43,15 +43,6 @@
 #include "videomode.h"
 #include "simwin.h"
 
-#define	VIDEO_GUARD	0
-#define	VIDEO_DATA	1
-#define	CTL_PERIOD	2
-#define	DATA_GUARD	3
-#define	DATA_ISLAND	4
-#define	HDMI_LOST	5
-
-extern	int	gbl_nframes;
-
 class	HDMISIM : public Gtk::DrawingArea {
 public:
 	// Type definitions ... just to make using these types easier and
@@ -84,7 +75,7 @@ public:
 		Widget::set_can_focus(false);
 		set_size_request(m_mode.width(), m_mode.height());
 
-		m_state = CTL_PERIOD;
+		m_state = 2; // CTL_PERIOD;
 		m_state_counter = 0;
 
 		m_out_of_sync = true;

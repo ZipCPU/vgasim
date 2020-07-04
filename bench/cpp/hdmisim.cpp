@@ -50,6 +50,13 @@
 #include "hdmisim.h"
 #include "image.cpp"
 
+const int VIDEO_GUARD = 0,
+	VIDEO_DATA  = 1,
+	CTL_PERIOD  = 2,
+	DATA_GUARD  = 3,
+	DATA_ISLAND = 4,
+	HDMI_LOST   = 5;
+
 int	gbl_nframes = 0;
 const	int	HDMISIM::CLOCKS_PER_PIXEL = 1,
 		HDMISIM::BITS_PER_COLOR=8;
@@ -174,6 +181,10 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 	// bool	video_preamble, data_preamble;
 
 	video_guard = ((isguard(brblu))&&(isguard(brgrn))&&(isguard(brred)));
+	if (brblu != brred)
+		video_guard = false;
+	else if (brblu == brgrn)
+		video_guard = false;
 
 	/*
 	video_preamble = ((ctldata(brblu)==0)
@@ -339,16 +350,16 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 			// On the first hsync pulse, we start counting pixels.
 			// There should be exactly raw_width() pixels per line.
 			if ((m_hsync_count != m_mode.raw_width()-1)&&(!m_out_of_sync)) {
-				m_hsync_count = 0;
 				printf("H-RESYNC\n");
 				printf("\n%30s (%d,%d)\n","H-RESYNC (Wrong #)", m_hsync_count, m_mode.raw_width());
+				m_hsync_count = 0;
 				m_out_of_sync = true;
 			}
 
 			m_hsync_count = 0;
 		} else if (hsync) {
-			// During the horizontal sync, we expect m_mode.sync_pixels()
-			// pixels with the hsync low.
+			// During the horizontal sync, we expect
+			// m_mode.sync_pixels() pixels with the hsync low.
 			if (m_hsync_count < m_mode.sync_pixels() - 1)
 				m_hsync_count++;
 			else {

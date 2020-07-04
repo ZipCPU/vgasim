@@ -19,6 +19,9 @@
 ##		some confidence that both VGASOURCE and VGASIM components are
 ##		working.
 ##
+##	hdmicheck
+##		The same as simcheck, but using an HDMI source and display.
+##
 ##	axi_tb
 ##		An AXI demonstrator.  This demo configures an AXI Video source,
 ##		and then feeds the result into the VGA (or HDMI) simulator.
@@ -80,10 +83,10 @@ SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 all:	main_tb
 
-SOURCES := main_tb.cpp vgasim.cpp hdmisim.cpp
-HEADERS := image.h testb.h vgasim.h hdmisim.h videomode.h image.cpp
+SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
+HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp
 #
-PROGRAMS := main_tb simcheck axi_tb hdmi_tb
+PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb # hdmicam_tb
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -101,6 +104,9 @@ $(OBJDIR)/hdmi_tb.o: axi_tb.cpp
 	$(CXX) -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
 
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
+
+hdmicheck: $(OBJDIR)/hdmicheck.o $(OBJDIR)/hdmisim.o $(OBJDIR)/hdmisource.o
 	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
