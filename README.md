@@ -1,6 +1,6 @@
 ## Controller
 
-This repository contains a couple of [Video Controller](rtl/wbvgaframe.v).
+This repository contains a couple of [Video Controller](rtl/wbvgaframe.v)s.
 
 The original [Video Controller](rtl/wbvgaframe.v)
 includes not only the [low-level framer](rtl/llvga.v), but also
@@ -33,9 +33,9 @@ The [simulator](bench/cpp/vgasim.cpp) will then create a window of that size
 on any GTK enabled screen (i.e. Linux), displaying whatever image [your
 design](rtl/wbvgaframe.v) is producing.
 
-The repository also contains a [test pattern generator](rtl/vgatest.v) modeled
-roughly after a standard VGA pattern, although not quite the same.  As mentioned
-above, there's also a frame buffered approach to drawing on the window
+The repository also contains a [test pattern generator](rtl/vgatestsrc.v)
+modeled roughly after a standard VGA pattern, although not quite the same.  As
+mentioned above, there's also a frame buffered approach to drawing on the window
 centered around a [wishbone enabled memory driver](rtl/imgfifo.v).  This
 second capability will draw a more arbitrary image on the display.
 
