@@ -39,8 +39,8 @@
 //
 `default_nettype	none
 //
-module	hdmi2vga #(
-	) (
+module	hdmi2vga // #()	// No parameters (yet)
+	(
 		input	wire	i_clk,
 		input	wire	[9:0]	i_hdmi_blu,
 		input	wire	[9:0]	i_hdmi_grn,
@@ -53,8 +53,14 @@ module	hdmi2vga #(
 	);
 
 	wire	[1:0]	blu_ctl, grn_ctl, red_ctl;
-	wire	[5:0]	blu_aux, grn_aux, red_aux;
+	wire	[6:0]	blu_aux, grn_aux, red_aux;
 	wire	[7:0]	blu_pix, grn_pix, red_pix;
+
+	wire		video_guard, data_guard, control_sync;
+	reg	[7:0]	video_preamble_sreg, data_preamble_sreg;
+	reg	[1:0]	video_guard_sreg, data_guard_sreg;
+	reg	[11:0]	control_sync_sreg;
+
 
 	tmdsdecode
 	decblu(i_clk, i_hdmi_blu, blu_ctl, blu_aux, blu_pix);
@@ -69,15 +75,83 @@ module	hdmi2vga #(
 	// assign	grn_guard = grn_aux[5];
 	// assign	red_guard = red_aux[5];
 
+	reg	[7:0]	video_guard, data_guard;
 	always @(posedge i_clk)
 	begin
-		o_pix_valid <= (blu_aux[5:4] == 2'b00)
+		// GUARD periods are 8-clocks long, and consist of only
+		// control characters.
+
+		// The specification says that the HSYNC & VSYNC signals can
+		// do anything during the guard period.  Nominally, this would
+		// affect the HDMI_BLUE channel.  However, there are no video
+		// modes that would leave HSYNC or VSYNC active immeidately
+		// prior to video, so we insist those two be inactive for
+		// our purposes here.
+		video_preamble_sreg[6:1] <=  video_preamble_sreg[5:0];
+		video_preamble_sreg[7]   <= &video_preamble_sreg[6:0];
+		video_preamble_sreg[0] <= (blu_aux[4])
+			&&(grn_aux[4] && grn_ctl == 2'b10)
+			&&(red_aux[4] && red_ctl == 2'b00);
+
+
+		video_guard_sreg[1] <= video_guard_sreg[0];
+		video_guard_sreg[0] <= (blu_aux[5] && !blu_aux[0])
+				&&(grn_aux[6] &&  grn_aux[0])
+				&&(red_aux[6] && !red_aux[0]);
+
+		non_video_data <= (blu_aux[4])&&(grn_aux[4]) &&(red_aux[4]);
+
+		data_preamble_sreg[6:1] <=  data_preamble_sreg[5:0];
+		data_preamble_sreg[7]   <= &data_preamble_sreg[6:0];
+		data_preamble_sreg[0] <= (blu_aux[4])
+			&&(grn_aux[4] && grn_ctl == 2'b10)
+			&&(red_aux[4] && red_ctl == 2'b10);
+
+		data_guard_sreg[1] <= data_guard_sreg[0];
+		data_guard_sreg[0] <=  (grn_aux[6] &&  grn_aux[0])
+				&&(red_aux[6] && red_aux[0]);
+
+		control_sync_sreg[10:1] <=  control_sync_sreg[ 9:0];
+		control_sync_sreg[11]   <= &control_sync_sreg[10:0];
+		control_sync_sreg <= blu_aux[5] && grn_aux[5] && red_aux[5];
+	end
+
+	assign	video_guard = video_preamble_sreg[ 7] && video_preamble_sreg[0]
+				&& (&video_guard_sreg);
+	assign	data_guard  = data_preamble_sreg[  7] && data_preamble_sreg[ 0]
+				&& (&data_guard_sreg);
+	assign	control_sync= control_sync_reg[11] && control_sync_sreg[0];
+
+	always @(posedge i_clk)
+	begin
+		video_start <= video_preamble_sreg[7] && video_preamble_sreg[0]
+				&& (&video_guard);
+		data_start <= data_preamble_sreg[7] && data_preamble_sreg[0]
+				&& (&data_guard);
+		data_end <= data_period && (&data_guard);
+		if (control_sync)
+		begin
+			data_period <= 0;
+			video_period <= 0;
+		end else begin
+			if (video_start)
+				video_period <= 1;
+			else if (non_video_data)
+				video_period <= 0;
+
+			if (data_start)
+				data_period <= 1;
+			else if (data_end)
+				data_period <= 0;
+		end
+
+		r_pix_valid <= (blu_aux[5:4] == 2'b00)
 				&&(grn_aux[5:4] == 2'b00)
 				&&(red_aux[5:4] == 2'b00);
 
-		o_vga_red   <= red_pix;
-		o_vga_green <= grn_pix;
-		o_vga_blue  <= blu_pix;
+		r_vga_red   <= red_pix;
+		r_vga_green <= grn_pix;
+		r_vga_blue  <= blu_pix;
 
 		if (blu_aux[5:4] == 2'b01)
 		begin

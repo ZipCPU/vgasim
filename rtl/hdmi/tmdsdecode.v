@@ -41,13 +41,13 @@ module	tmdsdecode(i_clk, i_word, o_ctl, o_aux, o_pix);
 	input	wire		i_clk;
 	input	wire	[9:0]	i_word;
 	output	wire	[1:0]	o_ctl;
-	output	wire	[5:0]	o_aux;
+	output	wire	[6:0]	o_aux;
 	output	wire	[7:0]	o_pix;
 
 	reg	[7:0]	r_pix;
 	wire	[9:0]	first_midp;
 	wire	[9:0]	brev_word;
-	reg	[5:0]	r_aux;
+	reg	[6:0]	r_aux;
 	reg	[1:0]	r_ctl;
 	genvar		k;
 
@@ -85,37 +85,37 @@ module	tmdsdecode(i_clk, i_word, o_ctl, o_aux, o_pix);
 
 	always @(posedge i_clk)
 	begin
-		r_aux   <= 6'h0;
+		r_aux <= 6'h0;
 		r_ctl <= 2'b00;
 		//
 		case(brev_word)
 		// 2-bit control period coding
-		10'h354: begin r_aux <= 6'h00; r_ctl <= 2'h0; end
-		10'h0ab: begin r_aux <= 6'h01; r_ctl <= 2'h1; end
-		10'h154: begin r_aux <= 6'h02; r_ctl <= 2'h2; end
-		10'h2ab: begin r_aux <= 6'h03; r_ctl <= 2'h3; end
+		10'h354: begin r_aux <= 7'h10; r_ctl <= 2'h0; end
+		10'h0ab: begin r_aux <= 7'h11; r_ctl <= 2'h1; end
+		10'h154: begin r_aux <= 7'h12; r_ctl <= 2'h2; end
+		10'h2ab: begin r_aux <= 7'h13; r_ctl <= 2'h3; end
 		// TERC4 coding
-		10'h29c: begin r_aux <= 6'h10; r_ctl <= 2'h0; end
-		10'h263: begin r_aux <= 6'h11; r_ctl <= 2'h1; end
-		10'h2e4: begin r_aux <= 6'h12; r_ctl <= 2'h2; end
-		10'h2e2: begin r_aux <= 6'h13; r_ctl <= 2'h3; end
-		10'h171: begin r_aux <= 6'h14; r_ctl <= 2'h0; end
-		10'h11e: begin r_aux <= 6'h15; r_ctl <= 2'h1; end
-		10'h18e: begin r_aux <= 6'h16; r_ctl <= 2'h2; end
-		10'h13c: begin r_aux <= 6'h17; r_ctl <= 2'h3; end
+		10'h29c: begin r_aux <= 7'h20; r_ctl <= 2'h0; end
+		10'h263: begin r_aux <= 7'h21; r_ctl <= 2'h1; end
+		10'h2e4: begin r_aux <= 7'h22; r_ctl <= 2'h2; end
+		10'h2e2: begin r_aux <= 7'h23; r_ctl <= 2'h3; end
+		10'h171: begin r_aux <= 7'h24; r_ctl <= 2'h0; end
+		10'h11e: begin r_aux <= 7'h25; r_ctl <= 2'h1; end
+		10'h18e: begin r_aux <= 7'h26; r_ctl <= 2'h2; end
+		10'h13c: begin r_aux <= 7'h27; r_ctl <= 2'h3; end
 		// This next pixel is also a guard pixel
-		10'h2cc: begin r_aux <= 6'h38; r_ctl <= 2'h0; end
+		10'h2cc: begin r_aux <= 7'h68; r_ctl <= 2'h0; end
 		//
-		10'h139: begin r_aux <= 6'h19; r_ctl <= 2'h1; end
-		10'h19c: begin r_aux <= 6'h1a; r_ctl <= 2'h2; end
-		10'h2c6: begin r_aux <= 6'h1b; r_ctl <= 2'h3; end
-		10'h28e: begin r_aux <= 6'h1c; r_ctl <= 2'h0; end
-		10'h271: begin r_aux <= 6'h1d; r_ctl <= 2'h1; end
-		10'h163: begin r_aux <= 6'h1e; r_ctl <= 2'h2; end
-		10'h2c3: begin r_aux <= 6'h1f; r_ctl <= 2'h3; end
+		10'h139: begin r_aux <= 7'h29; r_ctl <= 2'h1; end
+		10'h19c: begin r_aux <= 7'h2a; r_ctl <= 2'h2; end
+		10'h2c6: begin r_aux <= 7'h2b; r_ctl <= 2'h3; end
+		10'h28e: begin r_aux <= 7'h2c; r_ctl <= 2'h0; end
+		10'h271: begin r_aux <= 7'h2d; r_ctl <= 2'h1; end
+		10'h163: begin r_aux <= 7'h2e; r_ctl <= 2'h2; end
+		10'h2c3: begin r_aux <= 7'h2f; r_ctl <= 2'h3; end
 		// Guard band characters
 		//10'h2cc:r_aux<= 8'h38; // done above
-		10'h133: begin r_aux <= 6'h21; r_ctl <= 2'h0; end
+		10'h133: begin r_aux <= 7'h41; r_ctl <= 2'h0; end
 		default: begin end
 		endcase
 	end

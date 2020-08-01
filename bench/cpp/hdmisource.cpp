@@ -251,7 +251,8 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 			vsync = SYNC_ACTIVE;
 		}
 
-#define	PREPIXEL_GUARD	3
+#define	PREPIXEL_GUARD	2	// From the HDMI spec, must be 2 pixels
+#define	PREPIXEL_PREAMBLE	8+PREPIXEL_GUARD // 8 pixels before the guard
 
 		if ((m_xpos >= m_mode.raw_width()-PREPIXEL_GUARD)
 			&&((m_ypos < m_mode.height()-1)
@@ -259,6 +260,12 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 			blu = tmdsblu.guard();
 			grn = tmdsgrn.guard();
 			red = tmdsred.guard();
+		else if ((m_xpos >= m_mode.raw_width()-PREPIXEL_PREAMBLE)
+			&&((m_ypos < m_mode.height()-1)
+				||(m_ypos == m_mode.raw_height() - 1))) {
+			blu = tmdsblu.ctldata(0);
+			grn = tmdsgrn.ctldata(2);
+			red = tmdsred.ctldata(2);
 		} else {
 			int	control = (vsync << 1) | hsync;
 

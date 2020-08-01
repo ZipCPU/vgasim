@@ -240,7 +240,7 @@ module	axishdmi #(
 			hdmi_type <= VIDEO_DATA;
 		else if (hpos < i_hm_width - 1)
 			hdmi_type <= VIDEO_DATA;
-		else if (hpos > i_hm_raw - 4)
+		else if (hpos > i_hm_raw - 9)
 			hdmi_type <= GUARD;
 		else
 			hdmi_type <= CTL_PERIOD;
