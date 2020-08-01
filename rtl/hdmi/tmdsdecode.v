@@ -85,7 +85,7 @@ module	tmdsdecode(i_clk, i_word, o_ctl, o_aux, o_pix);
 
 	always @(posedge i_clk)
 	begin
-		r_aux <= 6'h0;
+		r_aux <= 7'h0;
 		r_ctl <= 2'b00;
 		//
 		case(brev_word)
