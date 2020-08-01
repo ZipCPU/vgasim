@@ -78,10 +78,10 @@ $(VDIRFB)/V%.cpp: $(FBDIR)/%.v
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	$(SUBMAKE) V$*.mk
 
-$(VDIRFB)/Vaxidemo.cpp: axidemo.v demofull.v $(RTL)/axivdma.v
+$(VDIRFB)/Vaxidemo.cpp: axidemo.v demofull.v $(RTL)/axivdisplay.v
 	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/hdmi -cc axidemo.v
 
-$(VDIRFB)/Vaxihdmi.cpp: axidemo.v demofull.v $(RTL)/axivdma.v $(RTL)/axishdmi.v
+$(VDIRFB)/Vaxihdmi.cpp: axidemo.v demofull.v $(RTL)/axivdisplay.v $(RTL)/axishdmi.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi --prefix Vaxihdmi -cc axidemo.v
 
 .PHONY: clean
