@@ -260,7 +260,7 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 			blu = tmdsblu.guard();
 			grn = tmdsgrn.guard();
 			red = tmdsred.guard();
-		else if ((m_xpos >= m_mode.raw_width()-PREPIXEL_PREAMBLE)
+		} else if ((m_xpos >= m_mode.raw_width()-PREPIXEL_PREAMBLE)
 			&&((m_ypos < m_mode.height()-1)
 				||(m_ypos == m_mode.raw_height() - 1))) {
 			blu = tmdsblu.ctldata(0);
