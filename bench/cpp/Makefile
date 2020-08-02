@@ -119,7 +119,11 @@ axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
 
 HDMIOBJS := $(OBJDIR)/hdmi_tb.o
 hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxihdmi__ALL.a $(GFXLIBS) -o $@
+
+REPEATEROBJS := $(OBJDIR)/axirepeater_tb.o $(OBJDIR)/hdmisource.o
+axirepeater_tb: $(REPEATEROBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxirepeater__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxirepeater__ALL.a $(GFXLIBS) -o $@
 
 .PHONY: clean
 clean:

@@ -26,7 +26,7 @@
 //	028:	Horizontal sync duration
 //	02a:	Vertical   sync duration
 //	02c:	Horizontal pixel clocks per image line
-//	02e:	Vertical   pixel clocks per image line
+//	02e:	Vertical   lines per frame
 //	030:	(Reserved, may be mapped onto other addresses)
 //	-3fc
 //	400:	Color table begins

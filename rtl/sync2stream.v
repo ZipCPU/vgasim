@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	sync2stream.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// }}}
 // Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -36,11 +36,14 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	sync2stream #(
-		parameter [0:0]	OPT_INVERT_HSYNC = 1,
-		parameter [0:0]	OPT_INVERT_VSYNC = 1
+		// {{{
+		parameter [0:0]	OPT_INVERT_HSYNC = 0,
+		parameter [0:0]	OPT_INVERT_VSYNC = 0
+		// }}}
 	) (
+		// {{{
 		input	wire				i_clk,
 		input	wire				i_reset,
 		//
@@ -66,8 +69,11 @@ module	sync2stream #(
 		output	reg	[15:0]			o_raw_height,
 		//
 		output	reg				o_locked
+		// }}}
 	);
 
+	// Register/wire declarations
+	// {{{
 	wire		new_data_row, hsync, vsync;
 	reg	[16:0]	hcount_pix, hcount_shelf, hcount_sync, hcount_tot;
 	reg		hin_shelf, last_pv, hlocked;
@@ -77,10 +83,14 @@ module	sync2stream #(
 
 	reg	[16:0]	vcount_lines, vcount_shelf, vcount_sync, vcount_tot;
 	reg		vin_shelf, vlost_lock, vlocked;
+	reg		empty_row;
+	// }}}
 
-
+	// Adjust for sync inversion (if necessary)
+	// {{{
 	assign	hsync = OPT_INVERT_HSYNC ^ i_hsync;
 	assign	vsync = OPT_INVERT_VSYNC ^ i_vsync;
+	// }}}
 
 	initial	last_pv = 0;
 	always @(posedge i_clk)
@@ -88,20 +98,31 @@ module	sync2stream #(
 
 	assign	new_data_row = (!last_pv)&&(i_pix_valid);
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Horizontal mode line
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	// hcount* _pix, _shelf, _sync, _tot
+	// {{{
 	initial	hcount_pix   = 0;
 	initial	hcount_shelf = 0;
 	initial	hcount_sync  = 0;
 	initial	hcount_tot   = 0;
-	initial	hin_shelf     = 1'b1;
+	initial	hin_shelf    = 1'b1;
+	initial	empty_row    = 1;
 	always @(posedge i_clk)
 	if (new_data_row)
 	begin
-		hcount_pix   <= 0;
+		hcount_pix   <= 1;
 		hcount_shelf <= 0;
 		hcount_sync  <= 0;
-		hcount_tot   <= 0;
-		hin_shelf    <= 1'b1;
+		hcount_tot   <= 1;
+		hin_shelf    <= 0;
+		empty_row    <= 0;
 	end else begin
 		if (!hcount_tot[16])
 			hcount_tot <= hcount_tot + 1'b1;
@@ -109,32 +130,37 @@ module	sync2stream #(
 			hcount_pix <= hcount_pix + 1'b1;
 		if ((!hcount_sync[16])&&(hsync))
 			hcount_sync <= hcount_sync + 1'b1;
+		if ((!hcount_sync[16])&&(hsync && !last_hs) && hcount_sync != 0)
+			empty_row <= 1;
 		if ((!hcount_shelf[16])&&(!i_pix_valid)
 				&&(!hsync)&&(hin_shelf))
 			hcount_shelf <= hcount_shelf + 1'b1;
 		if (hsync)
 			hin_shelf <= 1'b0;
 	end
+	// }}}
 
-	always @(posedge i_clk)
-		M_AXIS_TUSER <= !i_reset && i_pix_valid && (hcount_pix == o_width-1);
-
+	// o_width, o_raw_width, o_hfront, o_hsync
+	// {{{
 	initial	o_width     = 0;
 	initial	o_raw_width = 0;
 	initial	o_hfront    = 0;
 	initial	o_hsync     = 0;
 	always @(posedge i_clk)
-	if (new_data_row)
+	if (new_data_row && !empty_row)
 	begin
 		o_width     <= hcount_pix[15:0]; // -16'd10;
 		o_raw_width <= hcount_tot[15:0]; // +16'd1;
 		o_hfront    <= hcount_pix[15:0] + hcount_shelf[15:0]; // + 16'd11;
 		o_hsync     <= hcount_pix[15:0] + hcount_shelf[15:0] + hcount_sync[15:0];
 	end
+	// }}}
 
+	// hlocked
+	// {{{
 	always @(posedge i_clk)
 	begin
-		if (new_data_row)
+		if (new_data_row && !empty_row)
 		begin
 			hlocked <= 1;
 			if ({ 1'b0, o_width } != hcount_pix)
@@ -146,12 +172,26 @@ module	sync2stream #(
 		if (i_reset)
 			hlocked <= 0;
 	end
+	// }}}
 
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Vertical mode line
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	// last_hs
+	// {{{
 	initial	last_hs = 1'b0;
 	always @(posedge i_clk)
 		last_hs <= hsync;
+	// }}}
 
+	// linestart, has_pixels, has_vsync, newframe
+	// {{{
 	initial	linestart  = 1'b0;
 	initial	has_pixels = 1'b0;
 	initial	has_vsync  = 1'b0;
@@ -174,24 +214,32 @@ module	sync2stream #(
 		if (vsync)
 			has_vsync  <= 1'b1;
 	end
+	// }}}
 
-	initial	vcount_lines = 0;
+	// vcount* _lines, _shelf, _sync, _tot, _lock
+	// {{{
+	initial	vcount_lines = 1;
 	initial	vcount_shelf = 0;
 	initial	vcount_sync  = 0;
-	initial	vcount_tot   = 0;
+	initial	vcount_tot   = 1;
 	initial	vlost_lock   = 1;
 	always @(posedge i_clk)
 	if (linestart)
 	begin
 		if (newframe)
 		begin
-			vcount_lines <= 0;
+			// We'll get here *after* the first line of a new frame
+			// {{{
+			vcount_lines <= 1;
 			vcount_shelf <= 0;
 			vcount_sync  <= 0;
-			vcount_tot   <= 0;
+			vcount_tot   <= 1;
 			vin_shelf    <= 1'b1;
 			vlost_lock   <= !hlocked;
+			// }}}
 		end else begin
+			// Count up
+			// {{{
 			if (!vcount_tot[16])
 				vcount_tot <= vcount_tot + 1'b1;
 			if ((!vcount_lines[16])&&(this_line_had_pixels))
@@ -205,14 +253,13 @@ module	sync2stream #(
 				vin_shelf <= 1'b0;
 			if (!hlocked)
 				vlost_lock <= 1;
+			// }}}
 		end
 	end
+	// }}}
 
-	always @(posedge i_clk)
-		M_AXIS_TLAST <= !i_reset && i_pix_valid
-			&& (hcount_pix == o_width-1)
-			&& (vcount_lines == o_height-1);
-
+	// o_height, o_raw_height, o_vfront, o_vsync
+	// {{{
 	initial	o_height    = 0;
 	initial	o_raw_height= 0;
 	initial	o_vfront    = 0;
@@ -220,21 +267,25 @@ module	sync2stream #(
 	always @(posedge i_clk)
 	if (newframe)
 	begin
-		o_height     <= vcount_lines[15:0] + 1'b1;
-		o_raw_height <= vcount_tot[15:0] + 1'b1;
+		o_height     <= vcount_lines[15:0];
+		o_raw_height <= vcount_tot[15:0];
 		o_vfront     <= vcount_shelf[15:0] + vcount_lines[15:0];
-		o_vsync      <= vcount_sync[15:0] + vcount_shelf[15:0] + vcount_lines[15:0];
+		o_vsync      <= vcount_sync[15:0] + vcount_shelf[15:0]
+					+ vcount_lines[15:0] - 1;
 	end
+	// }}}
 
+	// vlocked, o_locked
+	// {{{
 	initial	vlocked = 0;
 	always @(posedge i_clk)
 	begin
 		if (newframe)
 		begin
 			vlocked <= !vlost_lock && !vcount_tot[16];
-			if ({ 1'b0, o_height } != vcount_lines + 1)
+			if ({ 1'b0, o_height } != vcount_lines)
 				vlocked <= 0;
-			if ({ 1'b0, o_raw_height } != vcount_tot + 1)
+			if ({ 1'b0, o_raw_height } != vcount_tot)
 				vlocked <= 0;
 		end
 
@@ -246,12 +297,41 @@ module	sync2stream #(
 
 	always @(*)
 		o_locked = vlocked;
+	// }}}
 
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Pixel stream outputs
+	// {{{
+
+	// M_AXIS_TVALID
+	// {{{
 	always @(posedge i_clk)
 		M_AXIS_TVALID <= i_pix_valid;
+	// }}}
 
+	// M_AXIS_TDATA
+	// {{{
 	always @(posedge i_clk)
 		M_AXIS_TDATA <= i_pixel;
+	// }}}
+
+	// M_AXIS_TUSER -- last data in line signal
+	// {{{
+	always @(posedge i_clk)
+		M_AXIS_TUSER <= !i_reset && i_pix_valid && (hcount_pix == o_width-1);
+	// }}}
+
+	// M_AXIS_TLAST -- last data in frame signal
+	// {{{
+	always @(posedge i_clk)
+		M_AXIS_TLAST <= !i_reset && i_pix_valid
+			&& (hcount_pix == o_width-1)
+			&& (vcount_lines == o_height-1);
+	// }}}
+
+	// }}}
 
 	// Verilator lint_off UNUSED
 	wire	unused;

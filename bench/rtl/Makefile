@@ -43,10 +43,11 @@ RTL   := ../../rtl
 .DELETE_ON_ERROR:
 
 .PHONY: demo
-test: demo axidemo axihdmi
-demo:    $(VDIRFB)/Vdemo__ALL.a
-axidemo: $(VDIRFB)/Vaxidemo__ALL.a
-axihdmi: $(VDIRFB)/Vaxihdmi__ALL.a
+test: demo axidemo axihdmi axirepeater
+demo:        $(VDIRFB)/Vdemo__ALL.a
+axidemo:     $(VDIRFB)/Vaxidemo__ALL.a
+axihdmi:     $(VDIRFB)/Vaxihdmi__ALL.a
+axirepeater: $(VDIRFB)/Vaxirepeater__ALL.a
 
 VOBJ := obj_dir
 SUBMAKE := $(MAKE) --no-print-directory --directory=$(VOBJ) -f
@@ -55,7 +56,7 @@ VERILATOR := verilator
 else
 VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
-VFLAGS := -Wall --MMD -Og --trace -y ../../rtl -cc
+VFLAGS := -Wall --MMD -O3 --trace -y ../../rtl -cc
 
 $(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.h
 $(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.cpp
@@ -83,6 +84,9 @@ $(VDIRFB)/Vaxidemo.cpp: axidemo.v demofull.v $(RTL)/axivdisplay.v
 
 $(VDIRFB)/Vaxihdmi.cpp: axidemo.v demofull.v $(RTL)/axivdisplay.v $(RTL)/axishdmi.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi --prefix Vaxihdmi -cc axidemo.v
+
+$(VDIRFB)/Vaxirepeater.cpp: axirepeater.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
+	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc axirepeater.v
 
 .PHONY: clean
 clean:

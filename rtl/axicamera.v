@@ -101,6 +101,7 @@ module	axicamera #(
 		parameter [0:0]	OPT_LOWPOWER = 1'b0
 		// }}}
 		// }}}
+		// }}}
 	) (
 	// {{{
 	input	wire				S_AXI_ACLK,
@@ -192,6 +193,8 @@ module	axicamera #(
 	// }}}
 	);
 
+	// Register declarations
+	// {{{
 	// Verilator lint_off SYNCASYNCNET
 	reg		video_reset;
 	// Verilator lint_on  SYNCASYNCNET
@@ -243,6 +246,7 @@ module	axicamera #(
 	reg	[1:0]			dma_waddr;
 	reg	[C_AXIL_DATA_WIDTH-1:0]	dma_wdata;
 	reg [C_AXIL_DATA_WIDTH/8-1:0]	dma_wstrb;
+	// }}}
 
 
 	////////////////////////////////////////////////////////////////////////
@@ -528,8 +532,8 @@ module	axicamera #(
 		.S_AXIS_TUSER(pix_vlast),
 		//
 		.M_AXIS_TVALID(pixw_valid), .M_AXIS_TREADY(1'b1),
-		.M_AXIS_TDATA(pixw_data), .M_AXIS_TLAST(pixw_vlast),
-		.M_AXIS_TUSER(pixw_hlast),
+		.M_AXIS_TDATA(pixw_data), .M_AXIS_TLAST(pixw_hlast),
+		.M_AXIS_TUSER(pixw_vlast),
 		//
 		.i_mode(cfg_pixel_mapping)
 	);
@@ -556,12 +560,12 @@ module	axicamera #(
 	afifo #(
 		.LGFIFO(LGAFIFO), .WIDTH(2 + C_AXI_DATA_WIDTH)
 	) pixfifo (
-		.i_wclk(i_pix_clk), .i_wr_reset_n(video_reset),
+		.i_wclk(i_pix_clk), .i_wr_reset_n(!video_reset),
 		.i_wr(pixw_valid),
 		.i_wr_data({ pixw_vlast, pixw_hlast, pixw_data }),
 		.o_wr_full(ign_fifo_full),
 		//
-		.i_rclk(S_AXI_ACLK), .i_rd_reset_n(!S_AXI_ARESETN),
+		.i_rclk(S_AXI_ACLK), .i_rd_reset_n(S_AXI_ARESETN),
 		.i_rd(pixb_valid && pixb_ready),
 		.o_rd_data({ pixb_vlast, pixb_hlast, pixb_data }),
 		.o_rd_empty(pixb_empty)

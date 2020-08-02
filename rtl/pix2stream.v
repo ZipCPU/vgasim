@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	pix2stream.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Converts an AXI-Stream consisting of 24-bit color pixel values
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// }}}
 // Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -33,17 +33,19 @@
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype	none
-//
+// }}}
 module	pix2stream #(
+		// {{{
 		parameter	HMODE_WIDTH    = 12,
 		parameter [0:0]	OPT_MSB_FIRST  = 1'b1,
 		parameter 	BUS_DATA_WIDTH = 32
+		// }}}
 	) (
+		// {{{
 		input	wire	i_clk,
 		input	wire	i_reset,
 		//
@@ -61,12 +63,16 @@ module	pix2stream #(
 		//
 		input	wire	[1:0]			i_mode
 		// , input	wire [HMODE_WIDTH-1:0]	i_pixels_per_line
+		// }}}
 	);
-	
+
 	localparam	[1:0]		MODE_UNUSED	= 2'b00,
 					MODE_CLR8	= 2'b01,
 					MODE_CLR16	= 2'b10,
 					MODE_DIRECT	= 2'b11;
+
+	// Register/net declarations
+	// {{{
 	localparam	LGDATA_WIDTH = $clog2(BUS_DATA_WIDTH);
 	// Steps:
 	//	t_	incoming data
@@ -93,11 +99,11 @@ module	pix2stream #(
 
 	reg	[BUS_DATA_WIDTH-1:0]	mem_data;
 	reg				mem_user, mem_last, mem_valid;
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Skid buffer
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -114,22 +120,31 @@ module	pix2stream #(
 
 	always @(*)
 		skd_ready = !z_valid || z_step;
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Shift register stage
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	always @(posedge i_clk)
-	if (skd_valid && skd_ready)
-		clr_last <= skd_user || skd_last;
+
 
 	always @(posedge i_clk)
 	if (skd_valid && skd_ready)
-		clr_user <= skd_user;
+		clr_last <= skd_user || skd_last;	// HLAST
+	else if (z_step)
+		clr_last <= 1'b0;
 
+	always @(posedge i_clk)
+	if (skd_valid && skd_ready)
+		clr_user <= skd_user;			// VLAST
+	else if (z_step)
+		clr_user <= 1'b0;
+
+	//
+	// 8b color
+	// {{{
 	initial	clr8_valid = 0;
 	always @(posedge i_clk)
 	begin
@@ -166,8 +181,11 @@ module	pix2stream #(
 		clr8_zvalid <= clr8_valid;
 
 	assign	clr8_zfull = clr8_zvalid[LGDATA_WIDTH];
+	// }}}
 
-
+	//
+	// 16b color
+	// {{{
 	initial	clr16_valid = 0;
 	always @(posedge i_clk)
 	begin
@@ -178,7 +196,7 @@ module	pix2stream #(
 		default: begin end
 		endcase
 
-		if (clr_last)
+		if (clr_last)	// HLAST, last in group
 			clr16_valid <= (skd_valid && skd_ready) ? 16: 0;
 
 		if (i_reset)
@@ -204,7 +222,11 @@ module	pix2stream #(
 		clr16_zvalid <= clr16_valid;
 
 	assign	clr16_zfull = clr16_zvalid[LGDATA_WIDTH];
+	// }}}
 
+	//
+	// 32b color
+	// {{{
 	initial	clr_valid = 0;
 	always @(posedge i_clk)
 	begin
@@ -215,7 +237,7 @@ module	pix2stream #(
 		default: begin end
 		endcase
 
-		if (clr_last)
+		if (clr_last)	// HLAST, last in group
 			clr_valid <= (skd_valid && skd_ready) ? 32: 0;
 
 		if (i_reset)
@@ -253,7 +275,11 @@ module	pix2stream #(
 		clr_zvalid <= clr_valid;
 
 	assign	clr_zfull = clr_zvalid[LGDATA_WIDTH];
+	// }}}
 
+	//
+	// Combined channels
+	// {{{
 	always @(*)
 	begin
 		next_zvalid = clr_last;
@@ -270,8 +296,8 @@ module	pix2stream #(
 	begin
 		if (z_step)
 		begin
-			clr_zlast  <= clr_last;
-			clr_zuser  <= clr_user;
+			clr_zlast  <= clr_last;	// HSYNC
+			clr_zuser  <= clr_user;	// VSYNC
 			z_valid <= next_zvalid;
 		end else if (c_step)
 			z_valid <= 0;
@@ -279,11 +305,13 @@ module	pix2stream #(
 		if (i_reset)
 			z_valid <= 0;
 	end
+	// }}}
 
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Selection from among the various color maps
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -316,20 +344,21 @@ module	pix2stream #(
 		mem_user <= clr_zuser;
 	else if (M_AXIS_TREADY)
 		mem_user <= 0;
-
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Output generation
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
-	assign	z_step = (next_zvalid && c_step);
+	assign	z_step = (!next_zvalid || c_step);
 	assign	c_step = (!M_AXIS_TVALID || M_AXIS_TREADY);
 	assign	M_AXIS_TVALID = mem_valid;
 	assign	M_AXIS_TDATA  = mem_data;
 	assign	M_AXIS_TLAST  = mem_last;
 	assign	M_AXIS_TUSER  = mem_user;
+	// }}}
 
 `ifdef	FORMAL
 	reg	f_past_valid;

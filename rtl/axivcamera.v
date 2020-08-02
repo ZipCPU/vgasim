@@ -1246,7 +1246,7 @@ module	axivcamera #(
 			M_AXI_BRESP[0], fifo_empty,
 			S_AXIL_AWADDR[AXILLSB-1:0], S_AXIL_ARADDR[AXILLSB-1:0],
 			new_wideaddr[2*C_AXIL_DATA_WIDTH-1:C_AXI_ADDR_WIDTH],
-			new_control, new_config, fifo_fill
+			new_control, new_config, fifo_fill, next_line_addr
 		};
 	// Verilator lint_on  UNUSED
 	// }}}

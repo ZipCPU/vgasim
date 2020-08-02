@@ -69,7 +69,7 @@ module	hdmi2vga // #()	// No parameters (yet)
 	reg	[9:0]	video_control_blu, video_control_grn, video_control_red;
 	reg	[1:0]	video_guard_blu, video_guard_grn, video_guard_red;
 	reg	[2:0]	video_start_blu, video_start_grn, video_start_red;
-	reg		video_start;
+	reg		video_start, video_period;
 
 	reg	[9:0]	data_control_blu, data_control_grn, data_control_red;
 	reg	[1:0]	data_guard_blu, data_guard_grn, data_guard_red;
@@ -84,19 +84,28 @@ module	hdmi2vga // #()	// No parameters (yet)
 
 	wire	[31:0]	sync_word;
 
+	reg	[7:0]	blu_pixel, grn_pixel, red_pixel;
+
 	reg		r_pix_valid;
 	reg	[7:0]	r_vga_red, r_vga_green, r_vga_blue;
 	// }}}
 
+	////////////////////////////////////////////////////////////////////////
+	//
 	// Bit synchronization: [clr]_word and sync_word generation
 	// {{{
 	hdmibitsync
 	bitsync(i_clk, i_reset, i_hdmi_blu, i_hdmi_grn, i_hdmi_red,
 			blu_word, grn_word, red_word, sync_word);
-	// }}}
 
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
 	// TMDS decoding
 	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	tmdsdecode
 	decblu(i_clk, blu_word, ublu_ctl, ublu_aux, ublu_pix);
 
@@ -106,6 +115,13 @@ module	hdmi2vga // #()	// No parameters (yet)
 	tmdsdecode
 	decred(i_clk, red_word, ured_ctl, ured_aux, ured_pix);
 	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Video data start detection, and channel sync
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	// video_control_blu, video_guard_blu => video_start_blu
 	// {{{
@@ -116,7 +132,7 @@ module	hdmi2vga // #()	// No parameters (yet)
 	initial	video_guard_blu = 0;
 	always @(posedge i_clk)
 		video_guard_blu <= {video_guard_blu[0],
-				ublu_aux[6] && ublu_aux[0] };
+				ublu_aux[6] && !ublu_aux[0] };
 
 	initial	video_start_blu = 0;
 	always @(posedge i_clk)
@@ -206,6 +222,14 @@ module	hdmi2vga // #()	// No parameters (yet)
 			{ sred_ctl, sred_aux, sred_pix } <= lag_data_red;
 	end
 	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Data island start detection, post channel sync
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	// data_control_blu, data_guard_blu => data_start_blu
 	// {{{
@@ -271,6 +295,8 @@ module	hdmi2vga // #()	// No parameters (yet)
 		data_guard = data_start;
 	// }}}
 
+	// }}}
+
 	// non_video_data
 	// {{{
 	always @(posedge i_clk)
@@ -282,8 +308,8 @@ module	hdmi2vga // #()	// No parameters (yet)
 	begin
 		control_sync_sreg[10:1] <=  control_sync_sreg[ 9:0];
 		control_sync_sreg[11]   <= (&control_sync_sreg[10:0]);
-		control_sync_sreg[0]    <= sblu_aux[5] && sgrn_aux[5]
-							&& sred_aux[5];
+		control_sync_sreg[0]    <= sblu_aux[4] && sgrn_aux[4]
+							&& sred_aux[4];
 	end
 	// }}}
 	// control_sync
@@ -294,34 +320,38 @@ module	hdmi2vga // #()	// No parameters (yet)
 
 	always @(posedge i_clk)
 	begin
-		/*
-		data_end <= data_period && data_guard;
+		blu_pixel <= sblu_pix;
+		grn_pixel <= sgrn_pix;
+		red_pixel <= sred_pix;
+	end
+
+	always @(posedge i_clk)
+	begin
+		// data_end <= data_period && data_guard;
 		if (control_sync)
 		begin
-			data_period <= 0;
-			// video_period <= 0;
+			// data_period <= 0;
+			video_period <= 0;
 		end else begin
 			if (video_start)
-				// video_period <= 1;
+				video_period <= 1;
 			else if (non_video_data)
-				// video_period <= 0;
-
+				video_period <= 0;
+			/*
 			if (data_start)
 				data_period <= 1;
 			else if (data_end)
 				data_period <= 0;
+			*/
 		end
-		*/
 
 		// Outgoing pixels
 		// {{{
-		r_pix_valid <= (sblu_aux[5:4] == 2'b00)
-				&&(sgrn_aux[5:4] == 2'b00)
-				&&(sred_aux[5:4] == 2'b00);
+		r_pix_valid <= (video_start)||(video_period && !non_video_data);
 
-		r_vga_red   <= sred_pix;
-		r_vga_green <= sgrn_pix;
-		r_vga_blue  <= sblu_pix;
+		r_vga_red   <= red_pixel;
+		r_vga_green <= grn_pixel;
+		r_vga_blue  <= blu_pixel;
 		// }}}
 
 		// Outgoing sync
@@ -352,7 +382,7 @@ module	hdmi2vga // #()	// No parameters (yet)
 			non_video_data,
 			data_start_red[2], data_start_grn[2], data_start_blu[2],
 			data_control_red[1:0], data_control_grn[1:0], data_control_blu[1:0],
-			sred_aux[6], sgrn_aux[6], sblu_aux[6],
+			sred_aux[6:5], sgrn_aux[6:5], sblu_aux[6:5],
 			data_guard
 			};
 	// Verilator lint_on  UNUSED

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axirepeater.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Reads from an HDMI input and stores the result to memory.  Then
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -38,8 +38,9 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	axirepeater #(
+		// {{{
 		parameter	LGMEMSIZE = 28,
 		localparam	C_AXIL_DATA_WIDTH = 32,
 		localparam	C_AXIL_ADDR_WIDTH = 12,
@@ -53,7 +54,9 @@ module	axirepeater #(
 		localparam	AW = C_AXI_ADDR_WIDTH,
 		localparam	DW = C_AXI_DATA_WIDTH,
 		localparam	IW = C_AXI_ID_WIDTH
+		// }}}
 	) (
+		// {{{
 		input	wire		i_clk,
 		input	wire		i_reset,
 		//
@@ -93,12 +96,14 @@ module	axirepeater #(
 		output	wire	[9:0]	o_hdmi_blu,
 		output	wire	[9:0]	o_hdmi_grn,
 		output	wire	[9:0]	o_hdmi_red
-		//
+		// }}}
 	);
 
+	// Register/net declarations
+	// {{{
 	//
 	// AXI-lite control wires for the incoming HDMI processor
-	//
+	// {{{
 	wire		axil_cam_awvalid;
 	wire		axil_cam_awready;
 	wire [LAW-1:0]	axil_cam_awaddr;
@@ -122,11 +127,11 @@ module	axirepeater #(
 	wire		axil_cam_rready;
 	wire [LDW-1:0]	axil_cam_rdata;
 	wire [1:0]	axil_cam_rresp;
-	//
+	// }}}
 	
 	//
 	// AXI-lite control wires for the outgoing HDMI processor
-	//
+	// {{{
 	wire		axil_hdmi_awvalid;
 	wire		axil_hdmi_awready;
 	wire [LAW-1:0]	axil_hdmi_awaddr;
@@ -150,12 +155,12 @@ module	axirepeater #(
 	wire		axil_hdmi_rready;
 	wire [LDW-1:0]	axil_hdmi_rdata;
 	wire [1:0]	axil_hdmi_rresp;
-	//
+	// }}}
 
 
 	//
 	// AXI memory interface for the incoming HDMI processor
-	//
+	// {{{
 	wire		axi_cam_awvalid;
 	wire		axi_cam_awready;
 	wire [IW-1:0]	axi_cam_awid;
@@ -197,11 +202,11 @@ module	axirepeater #(
 	wire [DW-1:0]	axi_cam_rdata;
 	wire		axi_cam_rlast;
 	wire [1:0]	axi_cam_rresp;
-	//
+	// }}}
 	
 	//
 	// AXI memory interface for the outgoing HDMI display
-	//
+	// {{{
 	wire		axi_hdmi_awvalid;
 	wire		axi_hdmi_awready;
 	wire [IW-1:0]	axi_hdmi_awid;
@@ -243,13 +248,13 @@ module	axirepeater #(
 	wire [DW-1:0]	axi_hdmi_rdata;
 	wire		axi_hdmi_rlast;
 	wire [1:0]	axi_hdmi_rresp;
-	//
+	// }}}
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite crossbar
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -320,11 +325,11 @@ module	axirepeater #(
 		// }}}
 	);
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI memory
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -332,9 +337,10 @@ module	axirepeater #(
 	localparam		AWW = AW-$clog2(DW/8);
 	wire			ram_we, ram_rd;
 	wire	[AWW-1:0]	ram_waddr, ram_raddr;
-	wire	[DW-1:0]	ram_wdata, ram_rdata;
+	wire	[DW-1:0]	ram_wdata;
 	wire	[DW/8-1:0]	ram_wstrb;
-	wire	[DW-1:0]	ram	[0:(1<<AWW)-1];
+	reg	[DW-1:0]	ram_rdata;
+	reg	[DW-1:0]	ram	[0:(1<<AWW)-1];
 	integer			rk;
 
 	//
@@ -412,10 +418,11 @@ module	axirepeater #(
 	if (ram_rd)
 		ram_rdata <= ram[ram_raddr];
 
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// HDMI input (camera) processing
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -427,6 +434,7 @@ module	axirepeater #(
 	hdmi2vga
 	topixels(
 		.i_clk(i_cam_clk),
+		.i_reset(i_reset),
 		.i_hdmi_blu(i_cam_blu), .i_hdmi_grn(i_cam_grn),
 			.i_hdmi_red(i_cam_red),
 		.o_pix_valid(cam_pix_valid),
@@ -522,11 +530,11 @@ module	axirepeater #(
 	assign	axi_cam_rdata   = 0;
 	assign	axi_cam_rlast   = 0;
 	assign	axi_cam_rresp   = 0;
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// HDMI output (display) processing
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -590,7 +598,10 @@ module	axirepeater #(
 		.o_hdmi_grn(  o_hdmi_grn),
 		.o_hdmi_blu(  o_hdmi_blu)
 	);
+	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, 
@@ -644,5 +655,5 @@ module	axirepeater #(
 		//
 		.i_pixclk(    i_hdmi_clk),
 */
-
+	// }}}
 endmodule
