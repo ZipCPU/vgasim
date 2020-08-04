@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axicamera.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Controls video ingest to memory from some form of video source,
@@ -31,9 +31,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// }}}
 // Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -57,7 +57,7 @@
 //
 //
 `default_nettype	none
-//
+// }}}
 module	axicamera #(
 		// {{{
 		localparam	C_AXIL_ADDR_WIDTH = 6,
@@ -103,94 +103,95 @@ module	axicamera #(
 		// }}}
 		// }}}
 	) (
-	// {{{
-	input	wire				S_AXI_ACLK,
-	// Verilator lint_off SYNCASYNCNET
-	input	wire				S_AXI_ARESETN,
-	// Verilator lint_on  SYNCASYNCNET
-	//
-	// The video input port
-	// {{{
-	input	wire				i_pix_clk,
-	input	wire 				i_pix_valid,
-	input	wire [23:0]			i_pixel,
-	input	wire				i_hsync,
-	input	wire				i_vsync,
-	// }}}
-	// The AXI-Lite control port
-	// {{{
-	input	wire				S_AXIL_AWVALID,
-	output	wire				S_AXIL_AWREADY,
-	input	wire [C_AXIL_ADDR_WIDTH-1:0]	S_AXIL_AWADDR,
-	input	wire	[2:0]			S_AXIL_AWPROT,
-	//
-	input	wire				S_AXIL_WVALID,
-	output	wire				S_AXIL_WREADY,
-	input	wire [C_AXIL_DATA_WIDTH-1:0]	S_AXIL_WDATA,
-	input	wire [C_AXIL_DATA_WIDTH/8-1:0]	S_AXIL_WSTRB,
-	//
-	output	reg				S_AXIL_BVALID,
-	input	wire				S_AXIL_BREADY,
-	output	reg	[1:0]			S_AXIL_BRESP,
-	//
-	input	wire				S_AXIL_ARVALID,
-	output	wire				S_AXIL_ARREADY,
-	input	wire [C_AXIL_ADDR_WIDTH-1:0]	S_AXIL_ARADDR,
-	input	wire	[2:0]			S_AXIL_ARPROT,
-	//
-	output	reg				S_AXIL_RVALID,
-	input	wire				S_AXIL_RREADY,
-	output	reg [C_AXIL_DATA_WIDTH-1:0]	S_AXIL_RDATA,
-	output	reg	[1:0]			S_AXIL_RRESP,
-	// }}}
-	// The AXI Master DMA (write) port
-	// {{{
-	output	wire				M_AXI_AWVALID,
-	input	wire				M_AXI_AWREADY,
-	output	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_AWID,
-	output	wire [C_AXI_ADDR_WIDTH-1:0]	M_AXI_AWADDR,
-	output	wire	[7:0]			M_AXI_AWLEN,
-	output	wire	[2:0]			M_AXI_AWSIZE,
-	output	wire	[1:0]			M_AXI_AWBURST,
-	output	wire				M_AXI_AWLOCK,
-	output	wire	[3:0]			M_AXI_AWCACHE,
-	output	wire	[2:0]			M_AXI_AWPROT,
-	output	wire	[3:0]			M_AXI_AWQOS,
-	//
-	output	wire				M_AXI_WVALID,
-	input	wire				M_AXI_WREADY,
-	output	wire [C_AXI_DATA_WIDTH-1:0]	M_AXI_WDATA,
-	output	wire [C_AXI_DATA_WIDTH/8-1:0]	M_AXI_WSTRB,
-	output	wire 				M_AXI_WLAST,
-	//
-	//
-	input	wire				M_AXI_BVALID,
-	output	wire				M_AXI_BREADY,
-	input	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_BID,
-	input	wire	[1:0]			M_AXI_BRESP,
-	// }}}
-	// An unused AXI (master) read port, just to complete the connections
-	// {{{
-	output	wire				M_AXI_ARVALID,
-	input	wire				M_AXI_ARREADY,
-	output	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_ARID,
-	output	wire [C_AXI_ADDR_WIDTH-1:0]	M_AXI_ARADDR,
-	output	wire	[7:0]			M_AXI_ARLEN,
-	output	wire	[2:0]			M_AXI_ARSIZE,
-	output	wire	[1:0]			M_AXI_ARBURST,
-	output	wire				M_AXI_ARLOCK,
-	output	wire	[3:0]			M_AXI_ARCACHE,
-	output	wire	[2:0]			M_AXI_ARPROT,
-	output	wire	[3:0]			M_AXI_ARQOS,
-	//
-	input	wire				M_AXI_RVALID,
-	output	wire				M_AXI_RREADY,
-	input	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_RID,
-	input	wire [C_AXI_DATA_WIDTH-1:0]	M_AXI_RDATA,
-	input	wire 				M_AXI_RLAST,
-	input	wire	[1:0]			M_AXI_RRESP
-	// }}}
-	// }}}
+		// {{{
+		input	wire				S_AXI_ACLK,
+		// Verilator lint_off SYNCASYNCNET
+		input	wire				S_AXI_ARESETN,
+		// Verilator lint_on  SYNCASYNCNET
+		//
+		// The video input port
+		// {{{
+		input	wire				i_pix_clk,
+		input	wire 				i_pix_valid,
+		input	wire [23:0]			i_pixel,
+		input	wire				i_hsync,
+		input	wire				i_vsync,
+		// }}}
+		// The AXI-Lite control port
+		// {{{
+		input	wire				S_AXIL_AWVALID,
+		output	wire				S_AXIL_AWREADY,
+		input	wire [C_AXIL_ADDR_WIDTH-1:0]	S_AXIL_AWADDR,
+		input	wire	[2:0]			S_AXIL_AWPROT,
+		//
+		input	wire				S_AXIL_WVALID,
+		output	wire				S_AXIL_WREADY,
+		input	wire [C_AXIL_DATA_WIDTH-1:0]	S_AXIL_WDATA,
+		input	wire [C_AXIL_DATA_WIDTH/8-1:0]	S_AXIL_WSTRB,
+		//
+		output	reg				S_AXIL_BVALID,
+		input	wire				S_AXIL_BREADY,
+		output	reg	[1:0]			S_AXIL_BRESP,
+		//
+		input	wire				S_AXIL_ARVALID,
+		output	wire				S_AXIL_ARREADY,
+		input	wire [C_AXIL_ADDR_WIDTH-1:0]	S_AXIL_ARADDR,
+		input	wire	[2:0]			S_AXIL_ARPROT,
+		//
+		output	reg				S_AXIL_RVALID,
+		input	wire				S_AXIL_RREADY,
+		output	reg [C_AXIL_DATA_WIDTH-1:0]	S_AXIL_RDATA,
+		output	reg	[1:0]			S_AXIL_RRESP,
+		// }}}
+		// The AXI Master DMA (write) port
+		// {{{
+		output	wire				M_AXI_AWVALID,
+		input	wire				M_AXI_AWREADY,
+		output	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_AWID,
+		output	wire [C_AXI_ADDR_WIDTH-1:0]	M_AXI_AWADDR,
+		output	wire	[7:0]			M_AXI_AWLEN,
+		output	wire	[2:0]			M_AXI_AWSIZE,
+		output	wire	[1:0]			M_AXI_AWBURST,
+		output	wire				M_AXI_AWLOCK,
+		output	wire	[3:0]			M_AXI_AWCACHE,
+		output	wire	[2:0]			M_AXI_AWPROT,
+		output	wire	[3:0]			M_AXI_AWQOS,
+		//
+		output	wire				M_AXI_WVALID,
+		input	wire				M_AXI_WREADY,
+		output	wire [C_AXI_DATA_WIDTH-1:0]	M_AXI_WDATA,
+		output	wire [C_AXI_DATA_WIDTH/8-1:0]	M_AXI_WSTRB,
+		output	wire 				M_AXI_WLAST,
+		//
+		//
+		input	wire				M_AXI_BVALID,
+		output	wire				M_AXI_BREADY,
+		input	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_BID,
+		input	wire	[1:0]			M_AXI_BRESP,
+		// }}}
+		// An unused AXI (master) read port, ...
+		// {{{
+		// just to complete the connections
+		output	wire				M_AXI_ARVALID,
+		input	wire				M_AXI_ARREADY,
+		output	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_ARID,
+		output	wire [C_AXI_ADDR_WIDTH-1:0]	M_AXI_ARADDR,
+		output	wire	[7:0]			M_AXI_ARLEN,
+		output	wire	[2:0]			M_AXI_ARSIZE,
+		output	wire	[1:0]			M_AXI_ARBURST,
+		output	wire				M_AXI_ARLOCK,
+		output	wire	[3:0]			M_AXI_ARCACHE,
+		output	wire	[2:0]			M_AXI_ARPROT,
+		output	wire	[3:0]			M_AXI_ARQOS,
+		//
+		input	wire				M_AXI_RVALID,
+		output	wire				M_AXI_RREADY,
+		input	wire [C_AXI_ID_WIDTH-1:0]	M_AXI_RID,
+		input	wire [C_AXI_DATA_WIDTH-1:0]	M_AXI_RDATA,
+		input	wire 				M_AXI_RLAST,
+		input	wire	[1:0]			M_AXI_RRESP
+		// }}}
+		// }}}
 	);
 
 	// Register declarations
@@ -247,8 +248,6 @@ module	axicamera #(
 	reg	[C_AXIL_DATA_WIDTH-1:0]	dma_wdata;
 	reg [C_AXIL_DATA_WIDTH/8-1:0]	dma_wstrb;
 	// }}}
-
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite Control
@@ -257,7 +256,6 @@ module	axicamera #(
 	//
 	//
 
-	//
 	// Write signaling
 	// {{{
 	wire				awskd_valid;
@@ -302,7 +300,6 @@ module	axicamera #(
 	assign	S_AXIL_BRESP = 2'b00;
 	// }}}
 
-	//
 	// Read signaling
 	// {{{
 	wire				arskd_valid;
@@ -323,7 +320,7 @@ module	axicamera #(
 
 	assign	S_AXIL_RRESP = 2'b00;
 	// }}}
-	//
+
 	// Control register logic
 	// {{{
 
@@ -488,27 +485,40 @@ module	axicamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
+	// _locked, _imwidth, _imheight
+	// {{{
 	tfrvalue #( .NB(1+32)
 	) tfrsz (.i_aclk(i_pix_clk), .i_value({ pix_locked, pix_imwidth, pix_imheight }),
 		.i_bclk(S_AXI_ACLK), .o_value({ bus_locked, bus_imwidth, bus_imheight })
 	);
+	// }}}
 
+	// imwidth_raw, imheight_raw
+	// {{{
 	tfrvalue #(.NB(32)
 	) tfrraw(.i_aclk(i_pix_clk), .i_value(
 				{ pix_imwidth_raw, pix_imheight_raw }),
 		.i_bclk(S_AXI_ACLK), .o_value(
 				{ bus_imwidth_raw, bus_imheight_raw })
 	);
+	// }}}
 
+	// _imhfront, _imvfront
+	// {{{
 	tfrvalue #( .NB(32)
 	) tfrporch (.i_aclk(i_pix_clk), .i_value({ pix_imhfront, pix_imvfront }),
 		.i_bclk(S_AXI_ACLK), .o_value({ bus_imhfront, bus_imvfront })
 	);
+	// }}}
 
+	// _imhsync, _imvsync
+	// {{{
 	tfrvalue #( .NB(32)
 	) tfrsync (.i_aclk(i_pix_clk), .i_value({ pix_imhsync, pix_imvsync }),
 		.i_bclk(S_AXI_ACLK), .o_value({ bus_imhsync, bus_imvsync })
 	);
+	// }}}
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////

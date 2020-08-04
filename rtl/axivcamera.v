@@ -415,10 +415,10 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite controlled logic
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	//
 	// soft_reset,  r_err
@@ -632,14 +632,14 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The data FIFO section
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	// Read/write signaling, lost_sync detection
 	// {{{
-	assign	reset_fifo = ((!cfg_active && r_stopped) || lost_sync);
+	assign	reset_fifo = (!cfg_active || r_stopped || lost_sync);
 
 	assign	write_to_fifo  = S_AXIS_TVALID && !lost_sync && !fifo_full;
 	assign	write_data = S_AXIS_TDATA;
@@ -648,22 +648,18 @@ module	axivcamera #(
 
 	initial	lost_sync = 1;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
-		lost_sync <= 1;
-	else if (S_AXIS_TVALID && S_AXIS_TLAST)
-		// Synchronize on the last pixel of an incoming frame
-		lost_sync <= (!req_hlast || !req_vlast) && cfg_active;
-	// else if ((LGFIFO > 0) && S_AXIS_TVALID && fifo_full)
-	//	lost_sync <= 1;
-	else if (M_AXI_WVALID && M_AXI_WREADY
-			&&((!OPT_IGNORE_TUSER && (wr_hlast != fifo_hlast))
-			|| (!wr_hlast && fifo_vlast)
-			|| (wr_vlast && wr_hlast && !fifo_vlast)))
-		// Here is where we might possibly notice we've lost sync
-		lost_sync <= 1;
-	else if (reset_fifo)
-		// Following a FIFO reset, we need to wait to regain sync again
-		lost_sync <= 1;
+	begin
+		if (!S_AXI_ARESETN || !cfg_active || r_stopped)
+			lost_sync <= 0;
+		else if (M_AXI_WVALID && M_AXI_WREADY
+				&&((!OPT_IGNORE_TUSER&&(wr_hlast != fifo_hlast))
+				|| (!wr_hlast && fifo_vlast)
+				|| (wr_vlast && wr_hlast && !fifo_vlast)))
+			// Here is where we might possibly notice we've lost sync
+			lost_sync <= 1;
+
+		// lost_sync <= 1'b0;
+	end
 	// }}}
 
 	generate if (LGFIFO > 0)
@@ -727,11 +723,10 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Outoing frame address counting
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	// {{{
 	reg	w_frame_needs_alignment, frame_needs_alignment,
 		line_needs_alignment,
 		line_multiple_bursts, req_needs_alignment, req_multiple_bursts;
@@ -900,11 +895,10 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Outgoing sync counting
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	// {{{
 
 	// wr_line_beats, wr_hlast
 	// {{{
@@ -931,6 +925,7 @@ module	axivcamera #(
 	begin
 		assert(wr_pending <= wr_line_beats+1);
 		assert(wr_pending <= cfg_line_words);
+		assert(wr_pending > 0);
 		assert(wr_line_beats <= cfg_line_words-1);
 		if (!phantom_start)
 		begin
@@ -941,7 +936,10 @@ module	axivcamera #(
 				assert(wr_line_beats +1 - wr_pending == req_line_words);
 		end
 	end else if (!r_stopped && !soft_reset)
+	begin
 		assert(req_line_words == wr_line_beats + 1);
+		assert(wr_pending == 0);
+	end
 
 	always @(*)
 	if (M_AXI_AWVALID)
@@ -1008,11 +1006,10 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The outgoing AXI (full) protocol section
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	// {{{
 
 	// Some counters to keep track of our state
 	// {{{
@@ -1055,9 +1052,15 @@ module	axivcamera #(
 	if (i_reset)
 		r_stopped <= 1;
 	else if (r_stopped)
-		r_stopped <= soft_reset || !cfg_active;
-	else if (soft_reset && aw_none_outstanding && !M_AXI_AWVALID && !M_AXI_WVALID)
+	begin
+		// Synchronize on the last pixel of an incoming frame
+		if (cfg_active && S_AXIS_TVALID && S_AXIS_TLAST)
+			r_stopped <= soft_reset;
+	end else if (soft_reset && aw_none_outstanding
+				&& !M_AXI_AWVALID && !M_AXI_WVALID)
 		r_stopped <= 1;
+	else if (lost_sync)
+		r_stopped <= 1'b1;
 	// }}}
 
 	// }}}
@@ -1096,7 +1099,7 @@ module	axivcamera #(
 			start_burst = 0;
 
 		// If the user wants us to stop, then stop
-		if (soft_reset || !cfg_active)
+		if (soft_reset || !cfg_active || r_stopped)
 			start_burst  = 0;
 	end
 	// }}}
@@ -1246,7 +1249,8 @@ module	axivcamera #(
 			M_AXI_BRESP[0], fifo_empty,
 			S_AXIL_AWADDR[AXILLSB-1:0], S_AXIL_ARADDR[AXILLSB-1:0],
 			new_wideaddr[2*C_AXIL_DATA_WIDTH-1:C_AXI_ADDR_WIDTH],
-			new_control, new_config, fifo_fill, next_line_addr
+			new_control, new_config, fifo_fill, next_line_addr,
+			fifo_vlast, fifo_hlast
 		};
 	// Verilator lint_on  UNUSED
 	// }}}
