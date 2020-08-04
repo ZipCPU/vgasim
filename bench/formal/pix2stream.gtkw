@@ -1,0 +1,114 @@
+[*]
+[*] GTKWave Analyzer v3.3.105 (w)1999-2020 BSI
+[*] Mon Aug  3 22:13:25 2020
+[*]
+[timestart] 0
+[size] 1677 600
+[pos] -1 -1
+*-4.656795 40 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 204
+[signals_width] 174
+[sst_expanded] 1
+[sst_vpaned_height] 156
+@28
+pix2stream.i_clk
+pix2stream.i_reset
+pix2stream.i_mode[1:0]
+@200
+-
+@800200
+-Incoming
+@28
+pix2stream.S_AXIS_TVALID
+pix2stream.S_AXIS_TREADY
+@22
+pix2stream.S_AXIS_TDATA[23:0]
+@28
+pix2stream.S_AXIS_TLAST
+pix2stream.S_AXIS_TUSER
+@1000200
+-Incoming
+@28
+pix2stream.clr_last
+pix2stream.clr_user
+@22
+pix2stream.neg_color[31:0]
+@800200
+-8b
+@23
+pix2stream.skd_clr8[7:0]
+@c00022
+pix2stream.clr8_valid[5:0]
+@28
+(0)pix2stream.clr8_valid[5:0]
+(1)pix2stream.clr8_valid[5:0]
+(2)pix2stream.clr8_valid[5:0]
+(3)pix2stream.clr8_valid[5:0]
+(4)pix2stream.clr8_valid[5:0]
+(5)pix2stream.clr8_valid[5:0]
+@1401200
+-group_end
+@22
+pix2stream.clr8_word[31:0]
+pix2stream.clr8_zvalid[5:0]
+@28
+pix2stream.clr8_zfull
+@22
+pix2stream.clr8_zmask[31:0]
+@1000200
+-8b
+@c00200
+-16b
+@22
+pix2stream.skd_clr16[15:0]
+pix2stream.clr16_valid[5:0]
+pix2stream.clr16_word[31:0]
+pix2stream.clr16_zvalid[5:0]
+@28
+pix2stream.clr16_zfull
+@22
+pix2stream.clr16_zmask[31:0]
+@1401200
+-16b
+@c00200
+-32b
+@22
+pix2stream.clr_valid[5:0]
+pix2stream.clr_word[31:0]
+pix2stream.clr_zvalid[5:0]
+@28
+pix2stream.clr_zfull
+@22
+pix2stream.clr_zmask[31:0]
+@1401200
+-32b
+@28
+pix2stream.clr_zlast
+pix2stream.clr_zuser
+pix2stream.next_zvalid
+pix2stream.z_valid
+@800200
+-MEM stage
+@28
+pix2stream.mem_valid
+@22
+pix2stream.mem_data[31:0]
+@28
+pix2stream.mem_last
+pix2stream.mem_user
+@1000200
+-MEM stage
+@800200
+-Outgoing
+@28
+pix2stream.M_AXIS_TVALID
+pix2stream.M_AXIS_TREADY
+@22
+pix2stream.M_AXIS_TDATA[31:0]
+@28
+pix2stream.M_AXIS_TLAST
+pix2stream.M_AXIS_TUSER
+@1000200
+-Outgoing
+[pattern_trace] 1
+[pattern_trace] 0

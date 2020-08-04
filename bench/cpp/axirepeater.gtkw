@@ -1,0 +1,240 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Mon Aug  3 14:28:24 2020
+[*]
+[timestart] 1
+[size] 1912 600
+[pos] -1 -1
+*-36.000000 64510000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.axirepeater.
+[treeopen] TOP.axirepeater.camdma.
+[treeopen] TOP.axirepeater.camdma.p2si.
+[treeopen] TOP.axirepeater.video.
+[treeopen] TOP.axirepeater.video.videodma.
+[sst_width] 196
+[signals_width] 198
+[sst_expanded] 1
+[sst_vpaned_height] 155
+@28
+TOP.i_clk
+TOP.i_hdmi_clk
+TOP.i_cam_clk
+TOP.axirepeater.topixels.bitsync.i_pix_clk
+@22
+TOP.axirepeater.topixels.bitsync.o_sync_word[31:0]
+@28
+TOP.axirepeater.topixels.video_start
+@22
+TOP.axirepeater.topixels.sblu_aux[6:0]
+TOP.axirepeater.topixels.ublu_aux[6:0]
+TOP.axirepeater.topixels.ugrn_aux[6:0]
+TOP.axirepeater.topixels.ured_aux[6:0]
+@28
+TOP.axirepeater.topixels.o_hsync
+TOP.axirepeater.topixels.o_vsync
+TOP.axirepeater.topixels.r_pix_valid
+[color] 2
+TOP.axirepeater.topixels.non_video_data
+TOP.axirepeater.topixels.video_period
+[color] 1
+TOP.axirepeater.topixels.control_sync
+@22
+TOP.axirepeater.camdma.bus_imheight[15:0]
+TOP.axirepeater.camdma.bus_imwidth[15:0]
+@28
+TOP.axirepeater.camdma.i_pix_valid
+TOP.axirepeater.camdma.s2si.new_data_row
+TOP.axirepeater.camdma.s2si.i_pix_valid
+@22
+TOP.axirepeater.camdma.s2si.hcount_pix[16:0]
+@24
+TOP.axirepeater.camdma.s2si.o_width[15:0]
+TOP.axirepeater.camdma.s2si.o_hfront[15:0]
+[color] 2
+TOP.axirepeater.camdma.s2si.o_hsync[15:0]
+TOP.axirepeater.camdma.s2si.o_raw_width[15:0]
+TOP.axirepeater.camdma.s2si.o_height[15:0]
+TOP.axirepeater.camdma.s2si.o_vfront[15:0]
+[color] 2
+TOP.axirepeater.camdma.s2si.o_vsync[15:0]
+TOP.axirepeater.camdma.s2si.o_raw_height[15:0]
+@22
+TOP.axirepeater.camdma.s2si.hcount_sync[16:0]
+@28
+TOP.axirepeater.camdma.s2si.this_line_had_vsync
+TOP.axirepeater.camdma.s2si.newframe
+TOP.axirepeater.camdma.s2si.linestart
+TOP.axirepeater.camdma.s2si.this_line_had_pixels
+@22
+TOP.axirepeater.camdma.s2si.vcount_shelf[16:0]
+TOP.axirepeater.camdma.s2si.vcount_sync[16:0]
+@28
+TOP.axirepeater.camdma.s2si.i_hsync
+TOP.axirepeater.camdma.s2si.i_vsync
+TOP.axirepeater.camdma.s2si.hsync
+TOP.axirepeater.camdma.s2si.vsync
+@22
+TOP.axirepeater.camdma.s2si.vcount_sync[16:0]
+@28
+[color] 1
+TOP.axirepeater.camdma.s2si.o_locked
+TOP.axirepeater.camdma.s2si.has_pixels
+TOP.axirepeater.camdma.s2si.hlocked
+TOP.axirepeater.camdma.s2si.vlocked
+TOP.axirepeater.camdma.s2si.vlost_lock
+TOP.axirepeater.camdma.s2si.new_data_row
+@22
+TOP.axirepeater.camdma.s2si.hcount_pix[16:0]
+TOP.axirepeater.camdma.s2si.hcount_tot[16:0]
+TOP.axirepeater.axi_hdmi_rdata[31:0]
+TOP.axirepeater.axil_cam_wdata[31:0]
+@28
+TOP.axirepeater.axi_hdmi_awvalid
+TOP.axirepeater.axi_hdmi_arvalid
+TOP.axirepeater.axi_hdmi_rvalid
+TOP.axirepeater.axi_cam_awvalid
+@22
+TOP.axirepeater.axil_cam_awaddr[11:0]
+@28
+TOP.axirepeater.axi_cam_wvalid
+TOP.axirepeater.axil_cam_bvalid
+@22
+TOP.axirepeater.video.image_size[31:0]
+TOP.axirepeater.video.image_porch[31:0]
+TOP.axirepeater.video.image_synch[31:0]
+TOP.axirepeater.video.image_raw[31:0]
+@28
+TOP.axirepeater.video.videodma.r_busy
+TOP.axirepeater.video.videodma.axil_write_ready
+TOP.axirepeater.video.videodma.awskd_addr[1:0]
+TOP.axirepeater.video.axil_read_ready
+TOP.axirepeater.video.arskd_valid
+TOP.axirepeater.i_clk
+@22
+TOP.axirepeater.S_AXI_ARADDR[11:0]
+@28
+TOP.axirepeater.S_AXI_ARVALID
+TOP.axirepeater.S_AXI_RREADY
+@c00022
+TOP.axirepeater.S_AXI_RDATA[31:0]
+@28
+(0)TOP.axirepeater.S_AXI_RDATA[31:0]
+(1)TOP.axirepeater.S_AXI_RDATA[31:0]
+(2)TOP.axirepeater.S_AXI_RDATA[31:0]
+(3)TOP.axirepeater.S_AXI_RDATA[31:0]
+(4)TOP.axirepeater.S_AXI_RDATA[31:0]
+(5)TOP.axirepeater.S_AXI_RDATA[31:0]
+(6)TOP.axirepeater.S_AXI_RDATA[31:0]
+(7)TOP.axirepeater.S_AXI_RDATA[31:0]
+(8)TOP.axirepeater.S_AXI_RDATA[31:0]
+(9)TOP.axirepeater.S_AXI_RDATA[31:0]
+(10)TOP.axirepeater.S_AXI_RDATA[31:0]
+(11)TOP.axirepeater.S_AXI_RDATA[31:0]
+(12)TOP.axirepeater.S_AXI_RDATA[31:0]
+(13)TOP.axirepeater.S_AXI_RDATA[31:0]
+(14)TOP.axirepeater.S_AXI_RDATA[31:0]
+(15)TOP.axirepeater.S_AXI_RDATA[31:0]
+(16)TOP.axirepeater.S_AXI_RDATA[31:0]
+(17)TOP.axirepeater.S_AXI_RDATA[31:0]
+(18)TOP.axirepeater.S_AXI_RDATA[31:0]
+(19)TOP.axirepeater.S_AXI_RDATA[31:0]
+(20)TOP.axirepeater.S_AXI_RDATA[31:0]
+(21)TOP.axirepeater.S_AXI_RDATA[31:0]
+(22)TOP.axirepeater.S_AXI_RDATA[31:0]
+(23)TOP.axirepeater.S_AXI_RDATA[31:0]
+(24)TOP.axirepeater.S_AXI_RDATA[31:0]
+(25)TOP.axirepeater.S_AXI_RDATA[31:0]
+(26)TOP.axirepeater.S_AXI_RDATA[31:0]
+(27)TOP.axirepeater.S_AXI_RDATA[31:0]
+(28)TOP.axirepeater.S_AXI_RDATA[31:0]
+(29)TOP.axirepeater.S_AXI_RDATA[31:0]
+(30)TOP.axirepeater.S_AXI_RDATA[31:0]
+(31)TOP.axirepeater.S_AXI_RDATA[31:0]
+@1401200
+-group_end
+@28
+[color] 1
+TOP.axirepeater.camdma.axidma.cfg_active
+TOP.axirepeater.camdma.axidma.r_err
+@800200
+-Pixel
+@28
+TOP.axirepeater.camdma.pix_valid
+TOP.axirepeater.camdma.pix_ready
+@22
+TOP.axirepeater.camdma.pix_data[23:0]
+@28
+TOP.axirepeater.camdma.pix_hlast
+TOP.axirepeater.camdma.pix_vlast
+@1000200
+-Pixel
+@28
+TOP.axirepeater.camdma.p2si.skd_valid
+TOP.axirepeater.camdma.p2si.skd_ready
+TOP.axirepeater.camdma.p2si.clr_last
+TOP.axirepeater.camdma.p2si.z_step
+TOP.axirepeater.camdma.p2si.clr_zlast
+TOP.axirepeater.camdma.p2si.z_valid
+TOP.axirepeater.camdma.p2si.c_step
+[color] 2
+TOP.axirepeater.camdma.p2si.M_AXIS_TVALID
+[color] 2
+TOP.axirepeater.camdma.p2si.M_AXIS_TREADY
+TOP.axirepeater.camdma.p2si.M_AXIS_TUSER
+TOP.axirepeater.camdma.p2si.M_AXIS_TLAST
+@800200
+-Wide pixel
+@28
+TOP.axirepeater.camdma.pixw_valid
+@22
+TOP.axirepeater.camdma.pixw_data[31:0]
+@28
+TOP.axirepeater.camdma.pixw_hlast
+TOP.axirepeater.camdma.pixw_vlast
+@1000200
+-Wide pixel
+@28
+TOP.axirepeater.camdma.pixfifo.i_wclk
+TOP.axirepeater.camdma.pixfifo.i_wr
+@22
+TOP.axirepeater.camdma.pixfifo.i_wr_data[33:0]
+TOP.axirepeater.camdma.pixfifo.wr_addr[5:0]
+TOP.axirepeater.camdma.pixfifo.rd_addr[5:0]
+TOP.axirepeater.camdma.pixfifo.o_rd_data[33:0]
+@28
+TOP.axirepeater.camdma.pixfifo.i_wr_reset_n
+TOP.axirepeater.camdma.pixfifo.i_rd_reset_n
+TOP.axirepeater.camdma.axidma.S_AXI_ACLK
+TOP.axirepeater.camdma.axidma.i_clk
+@800200
+-Bus pixel
+@28
+TOP.axirepeater.camdma.pixb_valid
+TOP.axirepeater.camdma.pixb_ready
+@22
+TOP.axirepeater.camdma.pixb_data[31:0]
+@28
+TOP.axirepeater.camdma.pixb_empty
+TOP.axirepeater.camdma.pixb_hlast
+TOP.axirepeater.camdma.pixb_vlast
+@1000200
+-Bus pixel
+@28
+TOP.axirepeater.camdma.axidma.cfg_active
+TOP.axirepeater.camdma.axidma.write_to_fifo
+TOP.axirepeater.camdma.axidma.lost_sync
+TOP.axirepeater.camdma.axidma.reset_fifo
+TOP.axirepeater.camdma.axidma.r_stopped
+TOP.axirepeater.camdma.axidma.S_AXIS_TVALID
+TOP.axirepeater.camdma.axidma.S_AXIS_TREADY
+@22
+TOP.axirepeater.camdma.axidma.S_AXIS_TDATA[31:0]
+TOP.axirepeater.camdma.axidma.M_AXI_WDATA[31:0]
+@28
+TOP.axirepeater.camdma.axidma.req_hlast
+TOP.axirepeater.camdma.axidma.req_vlast
+@29
+TOP.axirepeater.camdma.axidma.M_AXI_AWVALID
+[pattern_trace] 1
+[pattern_trace] 0

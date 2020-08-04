@@ -242,7 +242,7 @@ public:
 
 #define	R_RECORD	0
 #define	R_RECDMA	(R_RECORD +  0)	// DMA
-#define	R_RECLINWORDS	(R_RECORD +  4)	// DMA
+#define	R_RECFRAMEINFO	(R_RECORD +  4)	// DMA
 #define	R_RECBASE	(R_RECORD +  8)	// DMA
 #define	R_RECBASE_HI	(R_RECORD + 12)	// DMA
 #define	R_RECCLOCK	(R_RECORD + 16)	// PIXEL FREQUENCY
@@ -343,11 +343,15 @@ public:
 			m_state++;
 			} break;
 		case 23: if (m_core->S_AXI_BVALID) {
+			issue_write(R_RECFRAMEINFO, (m_win.height() << 16) | (m_win.width() * 4)); //NLINEs,BYTS/LN
+			m_state++;
+			} break;
+		case 24: if (m_core->S_AXI_BVALID) {
 			printf("Waiting for lock\n");
 			issue_read(R_RECPIX2BIN); // Check if we are locked
 			m_state++;
 			} break;
-		case 24: if (m_core->S_AXI_RVALID) {
+		case 25: if (m_core->S_AXI_RVALID) {
 			if (m_core->S_AXI_RDATA & 0x80000000) {
 				// We are locked,we can now start recording
 				printf("Locked!  Starting to record\n");
@@ -411,7 +415,7 @@ int	main(int argc, char **argv) {
 
 	tb = new TESTBENCH();
 
-	tb->opentrace("repeater.vcd");
+	// tb->opentrace("repeater.vcd");
 	Gtk::Main::run(tb->m_win);
 
 	exit(0);
