@@ -808,7 +808,7 @@ module	axivcamera #(
 	initial	req_addr = 0;
 	initial	req_line_addr = 0;
 	always @(posedge  i_clk)
-	if (i_reset || !cfg_active)
+	if (i_reset || r_stopped)
 	begin
 		req_addr       <= { 1'b0, cfg_frame_addr };
 		req_line_addr  <= { 1'b0, cfg_frame_addr };
@@ -851,7 +851,7 @@ module	axivcamera #(
 	// req_nlines, req_vlast
 	// {{{
 	always @(posedge  i_clk)
-	if (i_reset || !cfg_active)
+	if (i_reset || r_stopped)
 	begin
 		req_nlines <= cfg_frame_lines-1;
 		req_vlast <= (cfg_frame_lines <= 1);
@@ -868,14 +868,15 @@ module	axivcamera #(
 	end
 `ifdef	FORMAL
 	always @(*)
-	if (!r_stopped)
+	if (cfg_active)
 	begin
 		assert(req_vlast == (req_nlines == 0));
 		assert(req_nlines <= cfg_frame_lines -1);
 		// assert(req_addr >= r_frame_addr);
 		// assert(req_line_addr >= r_frame_addr);
 		assert(req_line_addr <= req_addr);
-		assert(req_multiple_bursts == |req_line_words[15-ADDRLSB:LGMAXBURST]);
+		assert(req_multiple_bursts
+				== |req_line_words[15-ADDRLSB:LGMAXBURST]);
 	end
 
 	always @(*)
@@ -1056,11 +1057,9 @@ module	axivcamera #(
 		// Synchronize on the last pixel of an incoming frame
 		if (cfg_active && S_AXIS_TVALID && S_AXIS_TLAST)
 			r_stopped <= soft_reset;
-	end else if (soft_reset && aw_none_outstanding
+	end else if ((soft_reset || lost_sync) && aw_none_outstanding
 				&& !M_AXI_AWVALID && !M_AXI_WVALID)
 		r_stopped <= 1;
-	else if (lost_sync)
-		r_stopped <= 1'b1;
 	// }}}
 
 	// }}}
@@ -1547,7 +1546,7 @@ module	axivcamera #(
 				assert(wr_line_beats +1 == wr_pending);
 			end
 		end
-	end else if (cfg_active)
+	end else if (!r_stopped)
 	begin
 		assert(req_addr   == f_wr_addr);
 		assert(req_line_addr == f_wr_line_addr);
@@ -1814,9 +1813,14 @@ module	axivcamera #(
 			assert($stable(cfg_line_step));
 	end
 
+	// If the FIFO gets reset, then we really don't care about what
+	// gets written to memory.  However, it is possible that a value
+	// on the output might get changed and so violate our protocol checker.
+	// (We don't care.)  So let's just assume it never happens, and check
+	// everything else instead.
 	always @(*)
 	if (M_AXI_WVALID)
-		assume(!lost_sync);
+		assume(!lost_sync && cfg_active);
 	// }}}
 	// }}}
 `endif
