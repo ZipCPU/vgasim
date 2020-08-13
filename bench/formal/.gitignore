@@ -10,5 +10,6 @@ imgfifo_z3
 llvga
 atxfifo
 axishdmi_*/
+axissprite_*/
 axisvga_*/
 pix2stream_*/

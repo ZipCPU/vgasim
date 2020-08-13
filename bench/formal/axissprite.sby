@@ -1,0 +1,22 @@
+[tasks]
+prf opt_skidbuffer
+prfns prf
+
+[options]
+prf: mode  prove
+depth 4
+
+[engines]
+smtbmc
+
+[script]
+read -formal skidbuffer.v
+read -formal axissprite.v
+read -formal faxil_slave.v
+opt_skidbuffer: hierarchy -top axissprite -chparam OPT_SKIDBUFFER 1
+prep -top axissprite
+
+[files]
+../../rtl/skidbuffer.v
+../../rtl/axissprite.v
+faxil_slave.v
