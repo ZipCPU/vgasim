@@ -323,35 +323,19 @@ public:
 			m_state++;
 			} break;
 		case 18: if (m_core->S_AXI_BVALID) {
-			issue_write(R_RECSIZE, 0x1e00280); // Image size
-			m_state++;
-			} break;
-		case 19: if (m_core->S_AXI_BVALID) {
-			issue_write(R_RECPORCH, 0x1ea0290); // Image front porch
-			m_state++;
-			} break;
-		case 20: if (m_core->S_AXI_BVALID) {
-			issue_write(R_RECSYNC, 0x1ec02f0); // Image  sync
-			m_state++;
-			} break;
-		case 21: if (m_core->S_AXI_BVALID) {
-			issue_write(R_RECRAW, 0x2090320); // Raw pix size
-			m_state++;
-			} break;
-		case 22: if (m_core->S_AXI_BVALID) {
 			issue_write(R_RECPIX2BIN, 3); // Pixel record type
 			m_state++;
 			} break;
-		case 23: if (m_core->S_AXI_BVALID) {
+		case 19: if (m_core->S_AXI_BVALID) {
 			issue_write(R_RECFRAMEINFO, (m_win.height() << 16) | (m_win.width() * 4)); //NLINEs,BYTS/LN
 			m_state++;
 			} break;
-		case 24: if (m_core->S_AXI_BVALID) {
+		case 20: if (m_core->S_AXI_BVALID) {
 			printf("Waiting for lock\n");
 			issue_read(R_RECPIX2BIN); // Check if we are locked
 			m_state++;
 			} break;
-		case 25: if (m_core->S_AXI_RVALID) {
+		case 21: if (m_core->S_AXI_RVALID) {
 			if (m_core->S_AXI_RDATA & 0x80000000) {
 				// We are locked,we can now start recording
 				printf("Locked!  Starting to record\n");

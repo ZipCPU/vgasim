@@ -1,18 +1,21 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axidemo.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
-// Purpose:	
+// Purpose:	Demonstrates using the modules within the design to read a frame
+//		buffer from (block RAM) memory, and send it to a (possibly HDMI)
+//	display.  Uses AXI and AXI-stream throughout, control is handled via
+//	an AXI-lite interface to the external world.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
+// }}}
 // Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -37,8 +40,9 @@
 //
 `default_nettype	none
 // `define	HDMI
-//
+// }}}
 module	axidemo #(
+		// {{{
 		parameter AXI_ADDR_WIDTH = 26,
 		parameter AXI_DATA_WIDTH = 32,
 		parameter AXI_ID_WIDTH = 1,
@@ -50,11 +54,14 @@ module	axidemo #(
 		parameter C_AXIL_DATA_WIDTH = 32,
 		parameter AWL = C_AXIL_ADDR_WIDTH,
 		parameter DWL = C_AXIL_ADDR_WIDTH
+		// }}}
 	) (
+		// {{{
 		input	wire	i_clk,
 		input	wire	i_pixclk,
 		input	wire	i_reset,
-		//
+		// Pixel/video outputs
+		// {{{
 `ifdef	HDMI
 		output	wire	[9:0]	o_hdmi_red,
 		output	wire	[9:0]	o_hdmi_grn,
@@ -65,6 +72,9 @@ module	axidemo #(
 		output	wire	[7:0]	o_vga_grn,
 		output	wire	[7:0]	o_vga_blu,
 `endif
+		// }}}
+		// AXI-lite control interface
+		// {{{
 		input	wire					S_AXI_AWVALID,
 		output	wire					S_AXI_AWREADY,
 		input	wire	[C_AXIL_ADDR_WIDTH-1:0]		S_AXI_AWADDR,
@@ -89,9 +99,13 @@ module	axidemo #(
 		output	wire	[C_AXIL_DATA_WIDTH-1:0]		S_AXI_RDATA,
 		output	wire	[1:0]				S_AXI_RRESP
 		// }}}
-		//
-		);
 
+		// }}}
+	);
+
+	// Register/net declarations
+	// {{{
+	// Internal AXI interface
 	wire		mem_awready, mem_arready, mem_wready, mem_rready,
 			mem_arvalid, mem_bvalid, mem_rvalid, mem_rlast;
 	wire [IW-1:0]	mem_arid, mem_bid, mem_rid;
@@ -107,6 +121,7 @@ module	axidemo #(
 	wire	[1:0]	mem_rresp, mem_bresp;
 	wire [DW-1:0]	mem_rdata;
 
+	// RAM interface
 	wire			ram_we, ram_rd;
 	reg	[AWW-1:0]	ram_waddr, ram_raddr;
 	reg	[DW-1:0]	ram_wdata, ram_rdata;
@@ -114,7 +129,20 @@ module	axidemo #(
 	reg	[DW-1:0]	ram	[0:(1<<AWW)-1];
 	integer			rk;
 
+	// (Unused) clock output generator
+	wire	[7:0]	genclk_word;
+	// }}}
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// The AXI block RAM controller
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	// Decode the AXI bus to generate RAM access commands
+	// {{{
 	demofull #(
 		.C_S_AXI_ID_WIDTH(AXI_ID_WIDTH),
 		.C_S_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
@@ -122,6 +150,7 @@ module	axidemo #(
 	) memcontrol (
 		.S_AXI_ACLK(i_clk),
 		.S_AXI_ARESETN(!i_reset),
+		// AXI interface
 		// {{{
 		.S_AXI_AWVALID(1'b0),
 		.S_AXI_AWREADY(mem_awready),
@@ -164,7 +193,9 @@ module	axidemo #(
 		.S_AXI_RLAST(mem_rlast),
 		.S_AXI_RID(mem_rid),
 		.S_AXI_RRESP(mem_rresp),
-		//
+		// }}}
+		// Raw/decoded (external) memory interface
+		// {{{
 		.o_we(ram_we),
 		.o_waddr(ram_waddr),
 		.o_wdata(ram_wdata),
@@ -172,13 +203,17 @@ module	axidemo #(
 		.o_rd(ram_rd),
 		.o_raddr(ram_raddr),
 		.i_rdata(ram_rdata)
+		// }}}
 	);
+	// }}}
 
+	// Issue those commands to the RAM
+	// {{{
 	localparam	AWW = AW-$clog2(DW/8);
 
 	// initial	$readmemh("slide.hex", ram);
 	initial	$readmemh("clr4.hex", ram);
-	
+
 	always @(posedge i_clk)
 	for(rk=0; rk<DW/8; rk=rk+1)
 	if(ram_we && ram_wstrb[rk])
@@ -187,7 +222,16 @@ module	axidemo #(
 	always @(posedge i_clk)
 	if(ram_rd)
 		ram_rdata <= ram[ram_raddr];
+	// }}}
 
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// The AXI Video controller
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	axivideo #(
 		.C_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
 		.C_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
@@ -195,6 +239,7 @@ module	axidemo #(
 	) video (
 		.S_AXI_ACLK(i_clk),
 		.S_AXI_ARESETN(!i_reset),
+		// AXI-lite control interface
 		// {{{
 		.S_AXIL_AWVALID(S_AXI_AWVALID),
 		.S_AXIL_AWREADY(S_AXI_AWREADY),
@@ -220,7 +265,7 @@ module	axidemo #(
 		.S_AXIL_RDATA(S_AXI_RDATA),
 		.S_AXIL_RRESP(S_AXI_RRESP),
 		// }}}
-		//
+		// AXI data interface
 		// {{{
 		.M_AXI_ARVALID(mem_arvalid),
 		.M_AXI_ARREADY(mem_arready),
@@ -241,27 +286,33 @@ module	axidemo #(
 		.M_AXI_RID(mem_rid),
 		.M_AXI_RRESP(mem_rresp),
 		// }}}
-		//
+		// Pixel output interface(s)
+		// {{{
 		.i_pixclk(i_pixclk),
 		.o_clock_word(genclk_word),
 `ifdef	HDMI
+		// HDMI output words
 		.o_hdmi_red(o_hdmi_red),
 		.o_hdmi_grn(o_hdmi_grn),
 		.o_hdmi_blu(o_hdmi_blu)
 `else
+		// Equivalent VGA output
 		.o_vga_vsync(o_vga_vsync),
 		.o_vga_hsync(o_vga_hsync),
 		.o_vga_red(o_vga_red),
 		.o_vga_grn(o_vga_grn),
 		.o_vga_blu(o_vga_blu)
 `endif
+		// }}}
 	);
+	// }}}
 
-	wire	[7:0]	genclk_word;
-
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, mem_bvalid, mem_awready, mem_wready,
 				mem_bid, mem_bresp, genclk_word };
 	// verilator lint_on  UNUSED
+	// }}}
 endmodule

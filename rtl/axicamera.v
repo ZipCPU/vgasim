@@ -8,14 +8,21 @@
 //		either a "camera" or something else.
 //
 // Registers:
+//	Addr(hex) Register at that address (RO = read only)
+//	------	-----------------------------
 //	000:	(DMA) Control, color mapping, lock status
 //
 //	004:	DMA line words		(Must match to stay in sync)
 //	006:	DMA Number of lines	(Must match to stay in sync)
 //	008:	Frame base address	(May not wrap across memory)
-//	00c:	(Frame base address, upper word)
-//	010:	Pixel clock status
-//	014:	Pixel to bitmap mapping
+//	00c:	(Frame base address, upper word--not used in this sim)
+//	010:RO	Measured pixel clock frequency
+//	014:	Pixel to bitmap mapping, and do we know the dims of our img
+//		bit 31: Video dimensions appear to have stabilized, and two
+//			frames in a row have calculated the same dimensions
+//		bits 1-0: Control how pixels are encoded into memory, whether
+//			24-bits per color, 16-bits per color, or 8-bits per
+//			color.
 //	015:	(Reserved)
 //	018:	(Reserved)
 //	01c:RO	Current frame rate
