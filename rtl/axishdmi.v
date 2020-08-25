@@ -40,6 +40,7 @@
 `default_nettype	none
 //
 module	axishdmi #(
+		// {{{
 		parameter	HW=12,
 				VW=12,
 		// HDMI *only* works with 24-bit color, using 8-bits per color
@@ -47,20 +48,25 @@ module	axishdmi #(
 		localparam	BPC = BITS_PER_COLOR,
 				BITS_PER_PIXEL = 3 * BPC,
 				BPP = BITS_PER_PIXEL
+		// }}}
 	) (
+		// {{{
 		input	wire	i_pixclk,
 		// Verilator lint_off SYNCASYNCNET
 		input	wire			i_reset,
 		// Verilator lint_on SYNCASYNCNET
 		//
 		// AXI Stream interface
+		// {{{
 		input	wire		i_valid,
 		output	reg		o_ready,
 		input	wire		i_hlast,
 		input	wire		i_vlast,
 		input	wire [BPP-1:0]	i_rgb_pix,
+		// }}}
 		//
 		// Video mode information
+		// {{{
 		input	wire [HW-1:0]	i_hm_width,
 		input	wire [HW-1:0]	i_hm_porch,
 		input	wire [HW-1:0]	i_hm_synch,
@@ -70,13 +76,19 @@ module	axishdmi #(
 		input	wire [VW-1:0]	i_vm_porch,
 		input	wire [VW-1:0]	i_vm_synch,
 		input	wire [VW-1:0]	i_vm_raw,
+		// }}}
 		//
 		// HDMI outputs
+		// {{{
 		output	wire	[9:0]	o_red,
 		output	wire	[9:0]	o_grn,
 		output	wire	[9:0]	o_blu
+		// }}}
+		// }}}
 	);
 
+	// Register declarations
+	// {{{
 	reg		r_newline, r_newframe, lost_sync;
 	reg		vsync, hsync;
 	reg	[1:0]	hdmi_type;
@@ -100,6 +112,14 @@ module	axishdmi #(
 `ifdef	FORMAL
 	wire	[47:0]		f_vmode, f_hmode;
 `endif
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Synchronize the reset release
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	initial	{ pix_reset, pix_reset_pipe } = -1;
 	always @(posedge i_pixclk, posedge i_reset)
@@ -107,7 +127,17 @@ module	axishdmi #(
 		{ pix_reset, pix_reset_pipe } <= -1;
 	else
 		{ pix_reset, pix_reset_pipe } <= { pix_reset_pipe, 1'b0 };
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Horizontal line counting
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	// hpos, r_newline, hsync, hrd
+	// {{{
 	initial	hpos       = 0;
 	initial	r_newline  = 0;
 	initial	hsync = 0;
@@ -129,7 +159,10 @@ module	axishdmi #(
 		r_newline <= (hpos == i_hm_width-3);
 		hsync <= (hpos >= i_hm_porch-1'b1)&&(hpos<i_hm_synch-1'b1);
 	end
+	// }}}
 
+	// lost_sync detection
+	// {{{
 	initial	lost_sync = 1;
 	always @(posedge i_pixclk)
 	if (pix_reset)
@@ -147,7 +180,18 @@ module	axishdmi #(
 				lost_sync <= 1;
 		end
 	end
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Vertical line counting
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	// r_newframe
+	// {{{
 	initial	r_newframe = 0;
 	always @(posedge i_pixclk)
 	if (pix_reset)
@@ -156,7 +200,10 @@ module	axishdmi #(
 		r_newframe <= 1'b1;
 	else
 		r_newframe <= 1'b0;
+	// }}}
 
+	// vpos, vsync
+	// {{{
 	initial	vpos = 0;
 	initial	vsync = 1'b0;
 	always @(posedge i_pixclk)
@@ -179,26 +226,60 @@ module	axishdmi #(
 		// the first pixel clock is valid.
 		vsync <= (vpos >= i_vm_porch-1'b1)&&(vpos<i_vm_synch-1'b1);
 	end
+	// }}}
 
+	// vrd
+	// {{{
 	initial	vrd = 1'b1;
 	always @(posedge i_pixclk)
 		vrd <= (vpos < i_vm_height)&&(!pix_reset);
+	// }}}
 
+	// first_frame
+	// {{{
 	initial	first_frame = 1'b1;
 	always @(posedge i_pixclk)
 	if (pix_reset)
 		first_frame <= 1'b1;
 	else if (r_newframe)
 		first_frame <= 1'b0;
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// AXI-stream Ready generation
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+
+	// w_rd
+	// {{{
 	assign	w_rd = (hrd)&&(vrd)&&(!first_frame);
+	// }}}
 
+	// o_ready
+	// {{{
 	always @(*)
 	if (lost_sync)
 		o_ready = (!i_vlast || !i_hlast) || (r_newframe && w_rd);
 	else
 		o_ready = w_rd;
+	// }}}
 
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// HDMI encoding
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+
+	// Set *_pixel values
+	// {{{
 	always @(posedge i_pixclk)
 	if (w_rd)
 	begin
@@ -217,11 +298,16 @@ module	axishdmi #(
 		grn_pixel <= 0;
 		blu_pixel <= 0;
 	end
+	// }}}
 
+	// hdmi_type
+	// {{{
 	localparam	[1:0]	GUARD = 2'b00;
 	localparam	[1:0]	CTL_PERIOD  = 2'b01;
 	localparam	[1:0]	DATA_ISLAND = 2'b10;
 	localparam	[1:0]	VIDEO_DATA  = 2'b11;
+	localparam		GUARD_PIXELS= 2,
+				PREGUARD_CONTROL = 6;
 
 	initial	pre_line = 1'b1;
 	always @(posedge i_pixclk)
@@ -240,7 +326,7 @@ module	axishdmi #(
 			hdmi_type <= VIDEO_DATA;
 		else if (hpos < i_hm_width - 1)
 			hdmi_type <= VIDEO_DATA;
-		else if (hpos > i_hm_raw - 9)
+		else if (hpos >= i_hm_raw - 1-GUARD_PIXELS)
 			hdmi_type <= GUARD;
 		else
 			hdmi_type <= CTL_PERIOD;
@@ -249,13 +335,19 @@ module	axishdmi #(
 
 	always @(*)
 		hdmi_ctl = 4'h1;
+	// }}}
 
+	// hdmi_data
+	// {{{
 	always @(*)
 	begin
 		hdmi_data[1:0]	= { vsync, hsync };
 		hdmi_data[11:2] = 0;
 	end
+	// }}}
 
+	// TMDS encoding
+	// {{{
 `ifdef	FORMAL
 	(* anyseq *) reg [9:0]	w_blu, w_grn, w_red;
 	//
@@ -284,10 +376,18 @@ module	axishdmi #(
 			hdmi_type, hdmi_ctl[3:2],
 			hdmi_data[11:8], red_pixel, o_red);
 `endif
+	// }}}
 
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Formal properties for verification purposes
-//
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 	reg	f_past_valid;
 
@@ -497,9 +597,9 @@ module	axishdmi #(
 		begin
 			if (hpos < i_hm_width)
 				assert(hdmi_type == VIDEO_DATA);
-			if (hpos >= (i_hm_raw-2))
+			if (hpos >= (i_hm_raw-GUARD_PIXELS))
 				assert(hdmi_type == GUARD);
-			else if (hpos >= (i_hm_raw-14))
+			else if (hpos >= (i_hm_raw-GUARD_PIXELS-PREGUARD_CONTROL))
 				assert((hdmi_type == CTL_PERIOD)
 					&&(hdmi_ctl == 4'h1));
 		end
@@ -510,6 +610,7 @@ module	axishdmi #(
 		// assert(o_rd == (hdmi_type == VIDEO_DATA));
 
 `ifdef	VERIFIC
+	// {{{
 	sequence	VIDEO_PREAMBLE;
 		(hdmi_type == CTL_PERIOD) [*2]
 		##1 ((hdmi_type == CTL_PERIOD)&&(hdmi_ctl == 4'h1)) [*10]
@@ -544,6 +645,8 @@ module	axishdmi #(
 	//	((hdmi_type != DATA_ISLAND) throughout (not DATA_PREAMBLE))
 	//	|=> (hdmi_type != DATA_ISLAND));
 
+	// }}}
 `endif
 `endif
+// }}}
 endmodule

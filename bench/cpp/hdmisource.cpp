@@ -224,6 +224,9 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 	if ((m_xpos < m_mode.width())&&(m_ypos < m_mode.height())) {
 		int	stride = gdk_pixbuf_get_rowstride(m_image);
 
+		//
+		// Generate pixel data
+		//
 		guchar *raw, *line, *pixel;
 		raw = gdk_pixbuf_get_pixels(m_image);
 		line = raw + (stride * m_ypos);
@@ -251,8 +254,15 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 			vsync = SYNC_ACTIVE;
 		}
 
+		// There must be two guard pixels prior to starting either video
+		// data or data islands.  The same is not true of the preamble
+		// before the guard data.  One might argue it should be 12
+		// clocks, but all the spec says is that there should be 12
+		// clocks of control data somewhere between any two lines.
+		// We'll choose 8 here for convenience
 #define	PREPIXEL_GUARD	2	// From the HDMI spec, must be 2 pixels
 #define	PREPIXEL_PREAMBLE	(8+PREPIXEL_GUARD) // 8 pixels before the guard
+
 
 		if ((m_xpos >= m_mode.raw_width()-PREPIXEL_GUARD)
 			&&((m_ypos < m_mode.height()-1)

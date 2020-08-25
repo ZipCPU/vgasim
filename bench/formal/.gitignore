@@ -7,9 +7,10 @@ imgfifo_bl
 imgfifo_ys
 imgfifo_cv
 imgfifo_z3
-llvga
-atxfifo
+llvga_*/
+atxfifo_*/
 axishdmi_*/
 axissprite_*/
 axisvga_*/
 pix2stream_*/
+vidstream2pix_*/

@@ -539,7 +539,6 @@ module	axicamera #(
 	wire	pix_ready;
 
 	pix2stream #(
-		.OPT_MSB_FIRST(1'b0),
 		.BUS_DATA_WIDTH(C_AXI_DATA_WIDTH)
 	) p2si (
 		.i_clk(i_pix_clk), .i_reset(video_reset),

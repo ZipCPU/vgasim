@@ -41,28 +41,33 @@
 module	pix2stream #(
 		// {{{
 		parameter	HMODE_WIDTH    = 12,
-		parameter [0:0]	OPT_MSB_FIRST  = 1'b1,
 		parameter 	BUS_DATA_WIDTH = 32
 		// }}}
 	) (
 		// {{{
 		input	wire	i_clk,
 		input	wire	i_reset,
-		//
+		// Incoming video data
+		// {{{
 		input	wire				S_AXIS_TVALID,
 		output	wire				S_AXIS_TREADY,
 		input	wire [24-1:0]			S_AXIS_TDATA,
-		input	wire 				S_AXIS_TLAST, // Hsync
-		input	wire 				S_AXIS_TUSER, // Vsync
-		//
+		input	wire 				S_AXIS_TLAST, // HLAST
+		input	wire 				S_AXIS_TUSER, // VLAST
+		// }}}
+		// Outgoing video data for the memory bus
+		// {{{
 		output	wire				M_AXIS_TVALID,
 		input	wire				M_AXIS_TREADY,
 		output	wire [BUS_DATA_WIDTH-1:0]	M_AXIS_TDATA,	// Color
-		output	wire				M_AXIS_TLAST,	// Hsync
-		output	wire				M_AXIS_TUSER,	// Vsync
-		//
+		output	wire				M_AXIS_TLAST,	// HLAST
+		output	wire				M_AXIS_TUSER,	// VLAST
+		// }}}
+		// Pixel mapping mode control
+		// {{{
 		input	wire	[1:0]			i_mode
 		// , input	wire [HMODE_WIDTH-1:0]	i_pixels_per_line
+		// }}}
 		// }}}
 	);
 
@@ -277,20 +282,24 @@ module	pix2stream #(
 
 	generate if (BUS_DATA_WIDTH == 32)
 	begin
+		initial	clr_word = 0;
 		always @(posedge i_clk)
 		if (skd_valid && skd_ready)
 			clr_word <= { 8'h0, skd_data[23:0] };
 
+		initial	clr_zmask = 0;
 		always @(posedge i_clk)
 		if (z_step)
 			clr_zmask <= clr_word;
 
 	end  else begin
+		initial	clr_word = 0;
 		always @(posedge i_clk)
 		if (skd_valid && skd_ready)
 			clr_word <= { 8'h0, skd_data[23:0],
 						clr_word[BUS_DATA_WIDTH-1:32] };
 
+		initial	clr_zmask = 0;
 		always @(posedge i_clk)
 		if (z_step)
 			clr_zmask <= clr_word >> (BUS_DATA_WIDTH-clr_valid);
@@ -365,7 +374,8 @@ module	pix2stream #(
 	MODE_CLR8:	mem_data <= clr8_zmask;
 	MODE_CLR16:	mem_data <= clr16_zmask;
 	// MODE_DIRECT:	mem_data <= { clr_zmask[23:0], 8'h00 };
-	MODE_DIRECT:	mem_data <= { clr_zmask[7:0], clr_zmask[15:8], clr_zmask[23:16], 8'h00 };
+	// MODE_DIRECT:	mem_data <= { clr_zmask[7:0], clr_zmask[15:8], clr_zmask[23:16], 8'h00 };
+	MODE_DIRECT:	mem_data <= { 8'h00, clr_zmask[23:0] };
 	endcase
 
 	initial	mem_valid = 1'b0;
@@ -507,7 +517,7 @@ module	pix2stream #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// If S_AXIS_TVALID never goes high, then we should never produce
-	// any outputs.  Repeat then with TLAST.
+	// any outputs.  Repeat then with TLAST and TUSER.
 	//
 	(* anyconst *) reg	no_data, no_last, no_user;
 
@@ -630,7 +640,8 @@ module	pix2stream #(
 	MODE_CLR16:  assert(M_AXIS_TLAST
 				||(M_AXIS_TDATA[15:0] != neg_color[15:0]
 				&& M_AXIS_TDATA[31:0] != neg_color[15:0]));
-	MODE_DIRECT:  assert({ M_AXIS_TLAST, M_AXIS_TUSER,
+	MODE_DIRECT:  if (BUS_DATA_WIDTH == 32)
+			assert({ M_AXIS_TLAST, M_AXIS_TUSER,
 				M_AXIS_TDATA[23:0] } != neg_color[25:0]);
 	endcase
 	// }}}
@@ -654,9 +665,14 @@ module	pix2stream #(
 	// Induction, 32b, applied to clr32_word
 	// {{{
 	always @(*)
+	if (BUS_DATA_WIDTH == 32)
 	for(ik=0; ik<BUS_DATA_WIDTH; ik=ik+32)
 	if (!i_reset && i_mode == 2'b11 && chk_neg_color && (clr_valid + ik > 0))
 		assert({ clr_last, clr_user, clr_word[ik +: 24] } != neg_color[25:0]);
+
+	always @(*)
+	for(ik=0; ik<BUS_DATA_WIDTH; ik=ik+32)
+		assert(clr_word[ik + 24 +: 8] == 8'h00);
 	// }}}
 
 	// Induction, 8b, applied to clr8_zmask
@@ -684,10 +700,15 @@ module	pix2stream #(
 	// Induction, 32b, applied to clr32_zmask
 	// {{{
 	always @(*)
+	if (BUS_DATA_WIDTH == 32)
 	for(ik=0; ik<BUS_DATA_WIDTH; ik=ik+32)
 	if (!i_reset && i_mode == 2'b11 && chk_neg_color && ik < clr_zvalid)
 		assert({ clr_zlast && (ik == 0), clr_zuser && (ik == 0),
 				clr_zmask[ik +: 24] } != neg_color[25:0]);
+
+	always @(*)
+	for(ik=0; ik<BUS_DATA_WIDTH; ik=ik+32)
+		assert(clr_zmask[ik + 24 +: 8] == 8'h00);
 	// }}}
 
 	// Induction: Bounds checks on the clr*_?valid signals
@@ -815,8 +836,8 @@ module	pix2stream #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	always @(*)
-		assume(i_mode != 2'b00);
+	// always @(*)
+		// assume(i_mode != 2'b00);
 	// }}}
 `endif
 // }}}

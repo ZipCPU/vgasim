@@ -1,0 +1,32 @@
+[tasks]
+prf
+prfsof   prf opt_sof
+prf64    prf
+prf64sof prf opt_sof bus64
+cvr
+cvrsof   cvr opt_sof
+
+[options]
+prf: mode prove
+prf: depth 3
+cvr: mode cover
+cvr: depth 65
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal skidbuffer.v
+read -formal vidstream2pix.v
+--pycode-begin--
+cmd = "hierarchy -top vidstream2pix"
+cmd += " -chparam BUS_DATA_WIDTH %d" % (64 if "bus64" in tags else 32)
+cmd += " -chparam OPT_TUSER_IS_SOF %d" % (1 if "opt_sof" in tags else 0)
+output(cmd)
+--pycode-end--
+prep -top vidstream2pix
+cvr: chformal -assert -remove
+
+[files]
+../../rtl/skidbuffer.v
+../../rtl/vidstream2pix.v

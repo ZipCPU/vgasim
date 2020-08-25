@@ -761,16 +761,16 @@ module	axivideo #(
 	wire	[23:0]	pixel;
 
 	vidstream2pix #(.BUS_DATA_WIDTH(C_AXI_DATA_WIDTH),
-		.OPT_MSB_FIRST(1'b1),
+		.OPT_MSB_FIRST(1'b0),
 		.HMODE_WIDTH(HMODE_WIDTH)
 	) s2pix(
 		.i_clk(i_pixclk), .i_reset(!pix_reset_n),
 		.S_AXIS_TVALID(!afifo_empty), .S_AXIS_TREADY(cmap_read),
-		.S_AXIS_TDATA(cmap_data), .S_AXIS_TLAST(cmap_hsync),
-			.S_AXIS_TUSER(cmap_vsync),
+		.S_AXIS_TDATA(cmap_data), .S_AXIS_TLAST(cmap_vsync),
+			.S_AXIS_TUSER(cmap_hsync),
 		.M_AXIS_TVALID(pix_valid), .M_AXIS_TREADY(pix_ready),
-			.M_AXIS_TDATA(pixel), .M_AXIS_TLAST(pix_hsync),
-			.M_AXIS_TUSER(pix_vsync),
+			.M_AXIS_TDATA(pixel), .M_AXIS_TLAST(pix_vsync),
+			.M_AXIS_TUSER(pix_hsync),
 		//
 		// Colormap decoding interface
 		.i_mode(cmap_mode), .i_pixels_per_line(hm_width),

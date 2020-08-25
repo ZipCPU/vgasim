@@ -40,7 +40,8 @@
 module	sync2stream #(
 		// {{{
 		parameter [0:0]	OPT_INVERT_HSYNC = 0,
-		parameter [0:0]	OPT_INVERT_VSYNC = 0
+		parameter [0:0]	OPT_INVERT_VSYNC = 0,
+		parameter [0:0]	OPT_TUSER_IS_SOF = 0
 		// }}}
 	) (
 		// {{{
@@ -84,6 +85,8 @@ module	sync2stream #(
 	reg	[16:0]	vcount_lines, vcount_shelf, vcount_sync, vcount_tot;
 	reg		vin_shelf, vlost_lock, vlocked;
 	reg		empty_row;
+
+	reg		M_AXIS_HLAST, M_AXIS_VLAST;
 	// }}}
 
 	// Adjust for sync inversion (if necessary)
@@ -317,20 +320,41 @@ module	sync2stream #(
 		M_AXIS_TDATA <= i_pixel;
 	// }}}
 
-	// M_AXIS_TUSER -- last data in line signal
+	// M_AXIS_HLAST -- last data in line signal
 	// {{{
 	always @(posedge i_clk)
-		M_AXIS_TUSER <= !i_reset && i_pix_valid && (hcount_pix == o_width-1);
+		M_AXIS_HLAST <= !i_reset && i_pix_valid && (hcount_pix == o_width-1);
 	// }}}
 
-	// M_AXIS_TLAST -- last data in frame signal
+	// M_AXIS_VLAST -- last data in frame signal
 	// {{{
 	always @(posedge i_clk)
-		M_AXIS_TLAST <= !i_reset && i_pix_valid
+		M_AXIS_VLAST <= !i_reset && i_pix_valid
 			&& (hcount_pix == o_width-1)
 			&& (vcount_lines == o_height-1);
 	// }}}
 
+	// Adjust between VLAST == TLAST and TUSER == start of frame encodings
+	// (I've chosen the former, Xilinx chose the latter)
+	generate if (OPT_TUSER_IS_SOF)
+	begin : XILINXS_ENCODING
+
+		always @(*)
+			M_AXIS_TLAST = M_AXIS_HLAST;
+
+		always @(posedge i_clk)
+		if (M_AXIS_TVALID)
+			M_AXIS_TUSER <= M_AXIS_VLAST;
+
+	end else begin : VLAST_IS_TLAST
+
+		always @(*)
+			M_AXIS_TLAST = M_AXIS_VLAST;
+
+		always @(*)
+			M_AXIS_TUSER = M_AXIS_HLAST;
+
+	end endgenerate
 	// }}}
 
 	// Verilator lint_off UNUSED

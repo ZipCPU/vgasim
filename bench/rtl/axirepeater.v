@@ -270,7 +270,7 @@ module	axirepeater #(
 	) control_xbar (
 		.S_AXI_ACLK(i_clk), .S_AXI_ARESETN(!i_reset),
 		//
-		// The slave interface,
+		// The slave interface, coming in from externally
 		// {{{
 		// where an incoming master may make a request
 		.S_AXI_AWVALID(S_AXI_AWVALID),
@@ -297,7 +297,7 @@ module	axirepeater #(
 		.S_AXI_RDATA( S_AXI_RDATA),
 		.S_AXI_RRESP( S_AXI_RRESP),
 		// }}}
-		// The outgoing connections
+		// The outgoing connections: camera and display drivers
 		// {{{
 		.M_AXI_AWVALID({ axil_cam_awvalid, axil_hdmi_awvalid }),
 		.M_AXI_AWREADY({ axil_cam_awready, axil_hdmi_awready }),
@@ -347,13 +347,17 @@ module	axirepeater #(
 	// First, the protocol processor
 	//
 	demofull #(
+		// {{{
 		.C_S_AXI_ID_WIDTH(IW),
 		.C_S_AXI_DATA_WIDTH(DW),
 		.C_S_AXI_ADDR_WIDTH(AW)
+		// }}}
 	) aximemory (
+		// {{{
 		.S_AXI_ACLK(i_clk),
 		.S_AXI_ARESETN(!i_reset),
-		//
+		// AXI memory (slave) interface
+		// {{{
 		.S_AXI_AWVALID(axi_cam_awvalid),
 		.S_AXI_AWREADY(axi_cam_awready),
 		.S_AXI_AWID(   axi_cam_awid),
@@ -395,7 +399,9 @@ module	axirepeater #(
 		.S_AXI_RDATA( axi_hdmi_rdata),
 		.S_AXI_RLAST( axi_hdmi_rlast),
 		.S_AXI_RRESP( axi_hdmi_rresp),
-		//
+		// }}}
+		// A raw memory interface to an external memory
+		// {{{
 		.o_we(ram_we),
 		.o_waddr(ram_waddr),
 		.o_wdata(ram_wdata),
@@ -403,12 +409,13 @@ module	axirepeater #(
 		.o_rd(ram_rd),
 		.o_raddr(ram_raddr),
 		.i_rdata(ram_rdata)
+		// }}}
+		// }}}
 	);
 
 	//
-	// Then the memory itself
-	//
-
+	// The raw memory implementation itself
+	// {{{
 	always @(posedge i_clk)
 	for(rk=0; rk<DW/8; rk=rk+1)
 	if (ram_we && ram_wstrb[rk])
@@ -417,6 +424,7 @@ module	axirepeater #(
 	always @(posedge i_clk)
 	if (ram_rd)
 		ram_rdata <= ram[ram_raddr];
+	// }}}
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -426,11 +434,11 @@ module	axirepeater #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	wire		cam_pix_valid;
-	wire		cam_vsync;
-	wire		cam_hsync;
+	wire		cam_pix_valid, cam_vsync, cam_hsync;
 	wire [23:0]	cam_pixel;
 
+	// Convert HDMI to a digitized (VGA) pixel stream
+	// {{{
 	hdmi2vga
 	topixels(
 		.i_clk(i_cam_clk),
@@ -443,20 +451,27 @@ module	axirepeater #(
 			.o_vga_green(cam_pixel[15:8]),
 			.o_vga_blue(cam_pixel[7:0])
 	);
+	// }}}
 
 	axicamera #(
+		// {{{
 		.C_AXI_ADDR_WIDTH(AW),
 		.C_AXI_DATA_WIDTH(DW),
 		.C_AXI_ID_WIDTH(IW)
+		// }}}
 	) camdma (
+		// {{{
 		.S_AXI_ACLK(i_clk), .S_AXI_ARESETN(!i_reset),
-		//
+		// Video pixel port
+		// {{{
 		.i_pix_clk(i_cam_clk),
 		.i_pix_valid(cam_pix_valid),
 		.i_pixel(cam_pixel),
 		.i_hsync(cam_hsync),
 		.i_vsync(cam_vsync),
-		//
+		// }}}
+		// AXI-lite control
+		// {{{
 		.S_AXIL_AWVALID(axil_cam_awvalid),
 		.S_AXIL_AWREADY(axil_cam_awready),
 		.S_AXIL_AWADDR( axil_cam_awaddr[5:0]),
@@ -480,7 +495,9 @@ module	axirepeater #(
 		.S_AXIL_RREADY(axil_cam_rready),
 		.S_AXIL_RDATA( axil_cam_rdata),
 		.S_AXIL_RRESP( axil_cam_rresp),
-		//
+		// }}}
+		// AXI (full) master memory write interface
+		// {{{
 		.M_AXI_AWVALID(axi_cam_awvalid),
 		.M_AXI_AWREADY(axi_cam_awready),
 		.M_AXI_AWID(   axi_cam_awid),
@@ -522,8 +539,11 @@ module	axirepeater #(
 		.M_AXI_RDATA( axi_cam_rdata),
 		.M_AXI_RLAST( axi_cam_rlast),
 		.M_AXI_RRESP( axi_cam_rresp)
+		// }}}
+		// }}}
 	);
 
+	// Fill out the unused memory read interface
 	assign	axi_cam_arready = 0;
 	assign	axi_cam_rvalid  = 0;
 	assign	axi_cam_rid     = 0;
@@ -541,13 +561,17 @@ module	axirepeater #(
 	wire	[7:0]	unused_clk_word;
 
 	axivideo #(
+		// {{{
 		.C_AXI_ADDR_WIDTH(AW),
 		.C_AXI_DATA_WIDTH(DW),
 		.C_AXI_ID_WIDTH(IW)
+		// }}}
 	) video (
+		// {{{
 		.S_AXI_ACLK(i_clk),
 		.S_AXI_ARESETN(!i_reset),
-		//
+		// AXI-lite control port
+		// {{{
 		.S_AXIL_AWVALID(axil_hdmi_awvalid),
 		.S_AXIL_AWREADY(axil_hdmi_awready),
 		.S_AXIL_AWADDR( axil_hdmi_awaddr[10:0]),
@@ -571,8 +595,9 @@ module	axirepeater #(
 		.S_AXIL_RREADY(axil_hdmi_rready),
 		.S_AXIL_RDATA( axil_hdmi_rdata),
 		.S_AXIL_RRESP( axil_hdmi_rresp),
-		//
-		//
+		// }}}
+		// AXI (full) master memory read port
+		// {{{
 		.M_AXI_ARVALID(axi_hdmi_arvalid),
 		.M_AXI_ARREADY(axi_hdmi_arready),
 		.M_AXI_ARID(   axi_hdmi_arid),
@@ -591,12 +616,16 @@ module	axirepeater #(
 		.M_AXI_RDATA( axi_hdmi_rdata),
 		.M_AXI_RLAST( axi_hdmi_rlast),
 		.M_AXI_RRESP( axi_hdmi_rresp),
-		//
+		// }}}
+		// HDMI output video stream
+		// {{{
 		.i_pixclk(    i_hdmi_clk),
 		.o_clock_word(unused_clk_word),
 		.o_hdmi_red(  o_hdmi_red),
 		.o_hdmi_grn(  o_hdmi_grn),
 		.o_hdmi_blu(  o_hdmi_blu)
+		// }}}
+		// }}}
 	);
 	// }}}
 
@@ -604,7 +633,8 @@ module	axirepeater #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, 
+	assign	unused = &{ 1'b0,
+		// {{{
 		axi_hdmi_awvalid, axi_hdmi_awready, axi_hdmi_awid,
 		axi_hdmi_awaddr, axi_hdmi_awlen, axi_hdmi_awsize,
 		axi_hdmi_awburst, axi_hdmi_awlock, axi_hdmi_awcache,
@@ -623,6 +653,7 @@ module	axirepeater #(
 		axil_cam_awaddr[11:6], axil_cam_araddr[11:6],
 		axil_hdmi_awaddr[11],  axil_hdmi_araddr[11],
 		1'b0
+		// }}}
 		};
 	// Verilator lint_on  UNUSED
 
