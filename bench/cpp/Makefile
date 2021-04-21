@@ -70,7 +70,7 @@ VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD)
 VDEFS   := $(shell ./vversion.sh)
-FLAGS	:= -Wall -Og -g -std=c++11 $(VDEFS)
+FLAGS	:= -Wall -Og -g $(VDEFS)
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
 CFLAGS  :=  $(GFXFLAGS)
@@ -80,8 +80,8 @@ SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 all:	main_tb
 
-SOURCES := main_tb.cpp vgasim.cpp hdmisim.cpp
-HEADERS := image.h testb.h vgasim.h hdmisim.h videomode.h image.cpp
+SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp
+HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h videomode.h image.cpp
 #
 PROGRAMS := main_tb simcheck axi_tb hdmi_tb
 # Now the return to the "all" target, and fill in some details

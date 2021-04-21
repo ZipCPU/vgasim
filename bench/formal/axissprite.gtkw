@@ -1,0 +1,100 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Thu Aug 13 18:43:35 2020
+[*]
+[timestart] 0
+[size] 1920 1054
+[pos] -1 -1
+*-5.386335 100 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 196
+[signals_width] 182
+[sst_expanded] 1
+[sst_vpaned_height] 315
+@28
+axissprite.S_AXI_ARESETN
+axissprite.S_AXI_ACLK
+@200
+-
+@c00200
+-AXI-lite control
+@28
+axissprite.S_AXI_AWVALID
+axissprite.S_AXI_AWREADY
+@22
+axissprite.S_AXI_AWADDR[8:0]
+@200
+-
+@28
+axissprite.S_AXI_WVALID
+axissprite.S_AXI_WREADY
+@22
+axissprite.S_AXI_WDATA[31:0]
+axissprite.S_AXI_WSTRB[3:0]
+@200
+-
+@28
+axissprite.S_AXI_BVALID
+axissprite.S_AXI_BREADY
+axissprite.S_AXI_BRESP[1:0]
+@200
+-
+@28
+axissprite.S_AXI_ARVALID
+axissprite.S_AXI_ARREADY
+@22
+axissprite.S_AXI_ARADDR[8:0]
+@200
+-
+@28
+axissprite.S_AXI_RVALID
+axissprite.S_AXI_RREADY
+@22
+axissprite.S_AXI_RDATA[31:0]
+@28
+axissprite.S_AXI_RRESP[1:0]
+@1401200
+-AXI-lite control
+@28
+axissprite.axil_pipe_valid
+@800200
+-Video in
+@28
+axissprite.S_AXIS_TVALID
+axissprite.S_AXIS_TREADY
+@22
+axissprite.S_AXIS_TDATA[23:0]
+@28
+axissprite.S_AXIS_TLAST
+axissprite.S_AXIS_TUSER
+@1000200
+-Video in
+@800200
+-Video out
+@28
+axissprite.M_AXIS_TVALID
+axissprite.M_AXIS_TREADY
+@22
+axissprite.M_AXIS_TDATA[23:0]
+@28
+axissprite.M_AXIS_TLAST
+axissprite.M_AXIS_TUSER
+@1000200
+-Video out
+@22
+axissprite.r_top[15:0]
+axissprite.r_left[15:0]
+axissprite.maddr[5:0]
+axissprite.this_left[15:0]
+axissprite.this_top[15:0]
+@23
+axissprite.sprite_x[5:0]
+@22
+axissprite.sprite_y[5:0]
+@28
+axissprite.in_sprite_x
+axissprite.in_sprite_y
+@22
+axissprite.frame_x[15:0]
+axissprite.frame_y[15:0]
+[pattern_trace] 1
+[pattern_trace] 0
