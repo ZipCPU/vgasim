@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -40,7 +40,7 @@
 // }}}
 module	pix2stream #(
 		// {{{
-		parameter	HMODE_WIDTH    = 12,
+		// parameter	HMODE_WIDTH    = 12,
 		parameter 	BUS_DATA_WIDTH = 32
 		// }}}
 	) (

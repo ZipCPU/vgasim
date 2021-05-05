@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axishdmi
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Generates the timing signals (not the clock) for an outgoing
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -29,16 +29,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
+// }}}
 module	axishdmi #(
 		// {{{
 		parameter	HW=12,
@@ -304,10 +303,8 @@ module	axishdmi #(
 	// {{{
 	localparam	[1:0]	GUARD = 2'b00;
 	localparam	[1:0]	CTL_PERIOD  = 2'b01;
-	localparam	[1:0]	DATA_ISLAND = 2'b10;
 	localparam	[1:0]	VIDEO_DATA  = 2'b11;
-	localparam		GUARD_PIXELS= 2,
-				PREGUARD_CONTROL = 6;
+	localparam		GUARD_PIXELS= 2;
 
 	initial	pre_line = 1'b1;
 	always @(posedge i_pixclk)
@@ -389,6 +386,8 @@ module	axishdmi #(
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+	localparam	[1:0]	DATA_ISLAND = 2'b10;
+	localparam		PREGUARD_CONTROL = 6;
 	reg	f_past_valid;
 
 	////////////////////////////////////////////////////////////////////////

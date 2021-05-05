@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	atxfifo.v
-//
+// {{{
 // Project:	afifo, A formal proof of Cliff Cummings' asynchronous FIFO
 //
 // Purpose:	This file defines the behaviour of an asynchronous FIFO.
@@ -30,9 +30,9 @@
 // `ifdef FORMAL line and its corresponding `endif, are owned by Gisselquist
 // Technology, LLC, and Copyrighted as such.  Hence, the following copyright
 // statement regarding these properties:
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2021, Gisselquist Technology, LLC
+// {{{
 // These properties are free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -47,32 +47,36 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
-
 `default_nettype	none
-//
-//
-module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
-		i_rclk, i_rrst_n, i_rd, o_rdata, o_rempty);
-	parameter	DSIZE = 2,
-			ASIZE = 4;
-	localparam	DW = DSIZE,
-			AW = ASIZE;
-	input	wire			i_wclk, i_wrst_n, i_wr;
-	input	wire	[DW-1:0]	i_wdata;
-	output	reg			o_wfull;
-	output	reg	[AW:0]		o_wfill_level;
-	input	wire			i_rclk, i_rrst_n, i_rd;
-	output	wire	[DW-1:0]	o_rdata;
-	output	reg			o_rempty;
+// }}}
+module atxfifo #(
+		// {{{
+		parameter	DSIZE = 2,
+				ASIZE = 4,
+		localparam	DW = DSIZE,
+				AW = ASIZE
+		// }}}
+	) (
+		// {{{
+		input	wire			i_wclk, i_wrst_n, i_wr,
+		input	wire	[DW-1:0]	i_wdata,
+		output	reg			o_wfull,
+		output	reg	[AW:0]		o_wfill_level,
+		input	wire			i_rclk, i_rrst_n, i_rd,
+		output	wire	[DW-1:0]	o_rdata,
+		output	reg			o_rempty
+		// }}}
+	);
 
+	// Local declarations
+	// {{{
 	wire	[AW-1:0]	waddr, raddr;
 	wire			wfull_next, rempty_next;
 	reg	[AW:0]		wgray, wbin, wq2_rgray, wq1_rgray,
@@ -81,18 +85,20 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 `ifndef	F_ABSTRACT
 	reg	[DW-1:0]	mem	[0:((1<<AW)-1)];
 `endif
-
-	/////////////////////////////////////////////
-	//
+	wire	[AW:0]		wgraynext, wbinnext;
+	reg	[AW:0]	wq2_rbin;
+	wire	[AW:0]		rgraynext, rbinnext;
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Write logic
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	/////////////////////////////////////////////
 
-	//
-	// Cross clock domains
-	//
+	// wq2_rgray, wq1_rgray: Cross clock domains
+	// {{{
 	// Cross the read gray pointer into the write clock domain
 	initial	{ wq2_rgray,  wq1_rgray } = 0;
 	always @(posedge i_wclk or negedge i_wrst_n)
@@ -100,10 +106,7 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		{ wq2_rgray, wq1_rgray } <= 0;
 	else
 		{ wq2_rgray, wq1_rgray } <= { wq1_rgray, rgray };
-
-
-
-	wire	[AW:0]		wgraynext, wbinnext;
+	// }}}
 
 	// Calculate the next write address, and the next graycode pointer.
 	assign	wbinnext  = wbin + { {(AW){1'b0}}, ((i_wr) && (!o_wfull)) };
@@ -111,19 +114,22 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 
 	assign	waddr = wbin[AW-1:0];
 
-	// Register these two values--the address and its gray code
-	// representation
+	// wbin, wgray: Register these two values
+	// {{{
+	// 1) the address and 2) its gray code representation
 	initial	{ wbin, wgray } = 0;
 	always @(posedge i_wclk or negedge i_wrst_n)
 	if (!i_wrst_n)
 		{ wbin, wgray } <= 0;
 	else
 		{ wbin, wgray } <= { wbinnext, wgraynext };
+	// }}}
 
 	assign	wfull_next = (wgraynext == { ~wq2_rgray[AW:AW-1],
 				wq2_rgray[AW-2:0] });
 
-	//
+	// o_wfull
+	// {{{
 	// Calculate whether or not the register will be full on the next
 	// clock.
 	initial	o_wfull = 0;
@@ -132,13 +138,12 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		o_wfull <= 1'b0;
 	else
 		o_wfull <= wfull_next;
+	// }}}
 
-	//
-	// Calculate just how full we are
-	//
+	// wq2_rbin: Calculate just how full we are
+	// {{{
 	// We'll allow this to be a clock or two out of date, allowing the
 	// feeding circuit to set a threshold to stop with.
-	reg	[AW:0]	wq2_rbin;
 	integer	g2b;
 	always @(*)
 	begin
@@ -148,14 +153,19 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 			wq2_rbin[g2b] = wq2_rgray[g2b] ^ wq2_rbin[g2b+1];
 		end
 	end
+	// }}}
 
+	// o_wfill_level
+	// {{{
 	initial	o_wfill_level = 0;
 	always @(posedge i_wclk or negedge i_wrst_n)
 	if (!i_wrst_n)
 		o_wfill_level <= 0;
 	else
 		o_wfill_level <= wbin - wq2_rbin;
-
+	// }}}
+	// Actually write to memory
+	// {{{
 `ifndef	ABSTRACT
 	//
 	// Write to the FIFO on a clock
@@ -163,18 +173,19 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	if ((i_wr)&&(!o_wfull))
 		mem[waddr] <= i_wdata;
 `endif
-
-	/////////////////////////////////////////////
-	//
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Read logic
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	/////////////////////////////////////////////
 
 	//
-	// Cross clock domains
-	//
+	// rq2_wgray, rq1_wgray
+	// {{{
 	// Cross the write gray pointer into the read clock domain
 	initial	{ rq2_wgray,  rq1_wgray } = 0;
 	always @(posedge i_rclk or negedge i_rrst_n)
@@ -182,24 +193,23 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		{ rq2_wgray, rq1_wgray } <= 0;
 	else
 		{ rq2_wgray, rq1_wgray } <= { rq1_wgray, wgray };
-
-
-	wire	[AW:0]		rgraynext, rbinnext;
+	// }}}
 
 	// Calculate the next read address,
 	assign	rbinnext  = rbin + { {(AW){1'b0}}, ((i_rd)&&(!o_rempty)) };
 	// and the next gray code version associated with it
 	assign	rgraynext = (rbinnext >> 1) ^ rbinnext;
 
-	// Register these two values, the read address and the gray code version
-	// of it, on the next read clock
-	//
+	// rbin, rgray: Register these two values, the read address and
+	// {{{
+	// the gray code version of it, on the next read clock
 	initial	{ rbin, rgray } = 0;
 	always @(posedge i_rclk or negedge i_rrst_n)
 	if (!i_rrst_n)
 		{ rbin, rgray } <= 0;
 	else
 		{ rbin, rgray } <= { rbinnext, rgraynext };
+	// }}}
 
 	// Memory read address gray code and pointer calculation
 	assign	raddr = rbin[AW-1:0];
@@ -207,17 +217,20 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	// Determine if we'll be empty on the next clock
 	assign	rempty_next = (rgraynext == rq2_wgray);
 
+	// o_rempty
+	// {{{
 	initial o_rempty = 1;
 	always @(posedge i_rclk or negedge i_rrst_n)
 	if (!i_rrst_n)
 		o_rempty <= 1'b1;
 	else
 		o_rempty <= rempty_next;
+	// }}}
 
-	//
-	// Read from the memory--a clockless read here, clocked by the next
-	// read FLOP in the next processing stage (somewhere else)
-	//
+	// Read from the memory
+	// {{{
+	// This is a clockless read here, clocked by the next read FLOP in
+	// the next processing stage (somewhere else)
 `ifdef	ABSTRACT
 	assign	o_rdata = $anyseq;
 	always @($global_clock)
@@ -231,8 +244,18 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		assert($stable(o_rdata));
 `endif
 `endif
-
-
+	// }}}
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 `ifdef	ATXFIFO
 `define	ASSUME	assume
@@ -292,14 +315,15 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		assume(i_rclk == f_rclk_count[F_CLKBITS-1]);
 	end
 
-	////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Assumptions regarding the two reset inputs.  We'll insist that
 	// the reset inputs follow some external reset logic, and that both
 	// may be asynchronously asserted from that external reset wire, and
 	// only ever synchronously de-asserted.
 	//
-	////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	wire	f_areset_n;
 	assign	f_areset_n = $anyseq;
@@ -344,13 +368,13 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		assert(f_sync_reset_rd != 2'b10);
 `endif
 
-
-	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Now let's make some assumptions about how our inputs can only ever
 	// change on a clock edge.
 	//
-	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	always @($global_clock)
 	if (f_past_valid_gbl)
@@ -417,13 +441,14 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 		`ASSERT(wq2_rgray == 0);
 	end
 
-	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Calculate the fill level of the FIFO.
+	// {{{
+	////////////////////////////////////////////////////////////////////////
 	//
-	////////////////////////////////////////////////////
 	//
-	//
+
 	// First, let's examine the asynchronous fill.  This is the "true"
 	// fill of the FIFO that's never really known in either clock domain,
 	// but we can fake it here in our "formal" environment.
@@ -439,13 +464,13 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	// clock or two to clear, though, so this is an implication and not
 	// an equals.
 	always @(*)
-	if (f_fill == {1'b1,{(AW){1'b0}}})
+	if (f_fill == { 1'b1,{(AW){1'b0}} })
 		`ASSERT(o_wfull);
 
 	// If the FIFO is about to be full, the logic should be able
 	// to detect that condition.
 	always @(*)
-	if (f_fill == {1'b0,{(AW){1'b1}}})
+	if (f_fill == { 1'b0,{(AW){1'b1}} })
 		`ASSERT((wfull_next)||(!i_wr)||(o_wfull));
 
 	// Any time the FIFO is empty, o_rempty should be true.  It may be
@@ -538,8 +563,15 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	always @(*)
 	if (rgray == rq2_wgray)
 		`ASSERT(o_rempty);
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Gray code checking
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
-	////////////////////////////////////////////////////
 	//
 	// One of the keys properties of this algorithm is that
 	// no more than one bit of the gray coded values will ever
@@ -548,9 +580,9 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 	// let's make certain the algorithm is operating as we think
 	// it should.
 	//
-	////////////////////////////////////////////////////
-	//
-	//
+
+	// Verify wgray changes are onehot like they should be
+	// {{{
 `ifdef	ONEHOT
 	always @(*)
 		assert((wgray == wgray_next)
@@ -570,7 +602,10 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 				||(rq2_wgray ^ rq1_wgray ^ (1<<k) == 0));
 	end endgenerate
 `endif
+	// }}}
 
+	// Verify rgray changes are onehot like they should be
+	// {{{
 `ifdef ONEHOT
 	always @(*)
 		assert((rgray == rgray_next)
@@ -590,15 +625,19 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 				||(wq2_rgray ^ wq1_rgray ^ (1<<k) == 0));
 	end endgenerate
 `endif
-
+	// }}}
+	// }}}
 `ifdef	ATXFIFO
-	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
+	// Cover checks
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
 	// Some cover statements, to make sure valuable states
 	// are even reachable
-	//
-	////////////////////////////////////////////////////
-	//
 
 	// Make sure a reset is possible in either domain
 	always @(posedge i_wclk)
@@ -631,7 +670,9 @@ module atxfifo(i_wclk, i_wrst_n, i_wr, i_wdata, o_wfull, o_wfill_level,
 
 	always @(posedge i_rclk)
 		cover((o_rempty)&&(i_rd));
+	// }}}
 `endif
 
 `endif
+// }}}
 endmodule

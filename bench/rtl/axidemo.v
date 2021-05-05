@@ -51,9 +51,9 @@ module	axidemo #(
 		parameter IW = AXI_ID_WIDTH,
 		//
 		parameter C_AXIL_ADDR_WIDTH = 11,
-		parameter C_AXIL_DATA_WIDTH = 32,
-		parameter AWL = C_AXIL_ADDR_WIDTH,
-		parameter DWL = C_AXIL_ADDR_WIDTH
+		parameter C_AXIL_DATA_WIDTH = 32
+		// parameter AWL = C_AXIL_ADDR_WIDTH,
+		// parameter DWL = C_AXIL_ADDR_WIDTH
 		// }}}
 	) (
 		// {{{
@@ -233,10 +233,13 @@ module	axidemo #(
 	//
 	//
 	axivideo #(
+		// {{{
 		.C_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
 		.C_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
 		.C_AXI_ID_WIDTH(AXI_ID_WIDTH),
+		// }}}
 	) video (
+		// {{{
 		.S_AXI_ACLK(i_clk),
 		.S_AXI_ARESETN(!i_reset),
 		// AXI-lite control interface
@@ -303,6 +306,7 @@ module	axidemo #(
 		.o_vga_grn(o_vga_grn),
 		.o_vga_blu(o_vga_blu)
 `endif
+		// }}}
 		// }}}
 	);
 	// }}}

@@ -37,9 +37,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -54,17 +54,17 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
-// }}}
 //
 `default_nettype	none
 // `define	HDMI
 //
+// }}}
 module	axivideo #(
 		// {{{
 		//
@@ -104,7 +104,7 @@ module	axivideo #(
 		// per pixel--see the pixel mapper for more information.  The
 		// default mode, 3'b111, is a 32-bits per pixel mode where the
 		// top 8-bits are ignored.  (No alpha is supported)
-		parameter [2:0]	DEF_PIXEL_MODE = 3'b111,
+		// parameter [2:0]	DEF_PIXEL_MODE = 3'b111,
 		//
 		// DEF_FRAMEADDR: the default AXI address of the frame buffer
 		// containing video memory.  Unless OPT_UNALIGNED is set, this
@@ -217,16 +217,11 @@ module	axivideo #(
 		// }}}
 	);
 
+	// Local declarations
+	// {{{
 	wire	i_clk   =  S_AXI_ACLK;
 	wire	i_reset = !S_AXI_ARESETN;
 
-	////////////////////////////////////////////////////////////////////////
-	//
-	// Register/wire signal declarations
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	// {{{
 	wire	arskd_valid;
 	wire	awskd_valid, wskd_valid;
 
@@ -289,14 +284,13 @@ module	axivideo #(
 	reg		new_mode;
 
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite signaling
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	//
 	// Write signaling
@@ -367,10 +361,10 @@ module	axivideo #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite register logic
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	assign new_clk_speed = apply_wstrb(clk_speed,wskd_data,wskd_strb);
 
@@ -626,11 +620,14 @@ module	axivideo #(
 		end
 	endfunction
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Reset the pixel clock domain
 	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
 	initial	{ pix_reset_n, pix_reset_pipe } = 0;
 	always @(posedge i_pixclk, negedge S_AXI_ARESETN)
 	if (!S_AXI_ARESETN)
@@ -641,11 +638,13 @@ module	axivideo #(
 			pix_reset_n <= 0;
 	end
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Clock generator
 	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	generate if (OPT_GENCLK)
 	begin : GENERATE_CLOCK
 `ifdef	VERILATOR
@@ -865,14 +864,16 @@ module	axivideo #(
 			dma_awready, dma_wready, dma_bvalid, dma_arready };
 	// Verilator lint_on  UNUSED
 	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties used in verfiying (portions of) this core
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
-	////////////////////////////////////////////////////////////////////////
-	//
-	// Formal properties used in verfiying (portions of) this core
-	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
 	reg	f_past_valid;
 	initial	f_past_valid = 0;
 	always @(posedge S_AXI_ACLK)
@@ -881,10 +882,10 @@ module	axivideo #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The AXI-lite control interface
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 	localparam	F_AXIL_LGDEPTH = 4;
 	wire	[F_AXIL_LGDEPTH-1:0]	faxil_rd_outstanding,
 					faxil_wr_outstanding,
@@ -959,16 +960,16 @@ module	axivideo #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Cover checks
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	// While there are already cover properties in the formal property
 	// set above, you'll probably still want to cover something
 	// application specific here
 
 	// }}}
-	// }}}
 `endif
+// }}}
 endmodule

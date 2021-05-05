@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axivcamera
-//
+// {{{
 // Project:	WB2AXIPSP: bus bridges and other odds and ends
 //
 // Purpose:	Reads a video frame from a source and writes the result to
@@ -23,7 +23,7 @@
 //		write to the control register with the ERR bit set will clear
 //		it.  (Don't do this unless you know what caused it to halt ...)
 //	bit 3: DIRTY
-//		If you update core parameters while it is running, the busy
+//		If you update core parameters while it is running, the dirty
 //		bit will be set.  This bit is an indication that the current
 //		configuration doesn't necessarily match the one you are reading
 //		out.  To clear DIRTY, deactivate the core, wait for it to be
@@ -92,8 +92,8 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 //
 // This program is free software (firmware): you can redistribute it and/or
@@ -110,16 +110,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype none
-//
+// }}}
 module	axivcamera #(
 		// {{{
 		parameter	C_AXI_ADDR_WIDTH = 32,
@@ -177,8 +176,8 @@ module	axivcamera #(
 		input	wire					S_AXIS_TVALID,
 		output	wire					S_AXIS_TREADY,
 		input	wire	[C_AXI_DATA_WIDTH-1:0]		S_AXIS_TDATA,
-		input	wire					S_AXIS_TLAST,
-		input	wire					S_AXIS_TUSER,
+		input	wire	/* VLAST */			S_AXIS_TLAST,
+		input	wire	/* HLAST */			S_AXIS_TUSER,
 		// }}}
 		//
 		// The control interface
@@ -238,8 +237,6 @@ module	axivcamera #(
 		// }}}
 	);
 
-	// Core logic implementation
-	// {{{
 	// Local parameter declarations
 	// {{{
 	localparam [1:0]	FBUF_CONTROL	= 2'b00,
@@ -259,11 +256,9 @@ module	axivcamera #(
 	localparam	LGMAXBURST = (TMPLGMAXBURST+ADDRLSB > 12)
 				? (12-ADDRLSB) : TMPLGMAXBURST;
 
-	localparam [ADDRLSB-1:0] LSBZEROS = 0;
-	// }}}
-
 	wire	i_clk   =  S_AXI_ACLK;
 	wire	i_reset = !S_AXI_ARESETN;
+	// }}}
 
 	// Signal declarations
 	// {{{
@@ -333,17 +328,15 @@ module	axivcamera #(
 `endif
 
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite signaling
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	// This is mostly the skidbuffer logic, and handling of the VALID
 	// and READY signals for the AXI-lite control logic in the next
 	// section.
-	// {{{
 
 	//
 	// Write signaling
@@ -1308,16 +1301,14 @@ module	axivcamera #(
 		};
 	// Verilator lint_on  UNUSED
 	// }}}
-	// }}}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Formal properties
-//
+// {{{
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
-	// {{{
 	reg	[C_AXI_ADDR_WIDTH-1:0]	f_addr_completed;
 	reg	[C_AXI_ADDR_WIDTH-1:0]	f_last_addr,f_arnext, f_ckeob,f_cksob,
 		fv_start_addr, fv_axi_raddr, f_next_start;
@@ -1877,6 +1868,6 @@ module	axivcamera #(
 	if (M_AXI_WVALID)
 		assume(!lost_sync && cfg_active);
 	// }}}
-	// }}}
 `endif
+// }}}
 endmodule

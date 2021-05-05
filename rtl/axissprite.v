@@ -27,7 +27,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -708,8 +708,9 @@ module	axissprite #(
 	// End of video logic
 	// }}}
 
-	// Verilator lint_off UNUSED
+	// Make Verilator happy
 	// {{{
+	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, S_AXI_AWPROT, S_AXI_ARPROT,
 			S_AXI_ARADDR[ADDRLSB-1:0],
@@ -765,7 +766,6 @@ module	axissprite #(
 		.i_axi_awvalid(S_AXI_AWVALID),
 		.i_axi_awready(S_AXI_AWREADY),
 		.i_axi_awaddr( S_AXI_AWADDR),
-		.i_axi_awcache(4'h0),
 		.i_axi_awprot( S_AXI_AWPROT),
 		//
 		.i_axi_wvalid(S_AXI_WVALID),
@@ -780,7 +780,6 @@ module	axissprite #(
 		.i_axi_arvalid(S_AXI_ARVALID),
 		.i_axi_arready(S_AXI_ARREADY),
 		.i_axi_araddr( S_AXI_ARADDR),
-		.i_axi_arcache(4'h0),
 		.i_axi_arprot( S_AXI_ARPROT),
 		//
 		.i_axi_rvalid(S_AXI_RVALID),
@@ -1228,10 +1227,10 @@ module	axissprite #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Cover checks
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	reg	[3:0]	cvr_frames, cvr_pframes, cvr_skdframes;
 
@@ -1295,10 +1294,10 @@ module	axissprite #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Careless assumptions
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
-	// {{{
+	//
 
 	always @(*)
 		assume(f_pixels_per_line > 1);

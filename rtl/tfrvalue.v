@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	tfrvalue.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Transfer an incrementing value, such as a FIFO's read or
@@ -15,9 +15,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -32,28 +32,42 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype none
-//
-module	tfrvalue(i_aclk, i_value, i_bclk, o_value);
-	parameter	NB = 16;
-	input	wire			i_aclk, i_bclk;
-	input	wire	[(NB-1):0]	i_value;
-	output	wire	[(NB-1):0]	o_value;
+// }}}
+module	tfrvalue #(
+		parameter	NB = 16
+	) (
+		// {{{
+		// (i_aclk, i_value, i_bclk, o_value);
+		input	wire			i_aclk, i_bclk,
+		input	wire	[(NB-1):0]	i_value,
+		output	wire	[(NB-1):0]	o_value
+		// }}}
+	);
 
+	// Local registers
+	// {{{
 	(* ASYNC_REG = "TRUE" *) reg	q_tfr, q_ack;
 	reg			r_atfr, r_btfr;
 	reg			r_aack, r_back;
 	reg	[(NB-1):0]	r_aval;
 	(* ASYNC_REG = "TRUE" *) reg [(NB-1):0]	r_value;
+	// }}}
 
+	// r_atfr, r_aval
+	// {{{
+	// r_atfr is our request to transfer the data kept in r_aval.  Note
+	// that r_aval is only ever adjusted at the beginning of a transfer.
+	// Also, once the transfer has been acknowledged, r_atfr is dropped.
+	// The next transfer can/will happen once r_aack has been dropped as
+	// well.
 	initial	r_atfr = 0;
 	initial	r_aval = 0;
 	always @(posedge i_aclk)
@@ -64,12 +78,22 @@ module	tfrvalue(i_aclk, i_value, i_bclk, o_value);
 			r_atfr <= 1'b1;
 	end else if (r_aack)
 		r_atfr <= 1'b0;
+	// }}}
 
-
+	// r_btfr, qtfr
+	// {{{
+	// Move the request for a transfor from the A clock domain to the B
+	// clock domain
 	initial	{ r_btfr, q_tfr } = 0;
 	always @(posedge i_bclk)
 		{ r_btfr, q_tfr } <= { q_tfr, r_atfr };
+	// }}}
 
+	// r_value, r_back
+	// {{{
+	// Once we notice a request for a transfer, we copy the value to the
+	// B clock domain and issue an acknowledgement back to the A clock
+	// domain
 	initial	r_value = 0;
 	initial	r_back = 0;
 	always @(posedge i_bclk)
@@ -79,13 +103,27 @@ module	tfrvalue(i_aclk, i_value, i_bclk, o_value);
 		r_back <= 1'b1;
 	end else if (!r_btfr)
 		r_back <= 1'b0;
+	// }}}
 
+	// r_aack, q_ack
+	// {{{
+	// Cross the acknowledgement from the B clock domain back into the A
+	// clock domain
 	initial	{ r_aack, q_ack } = 0;
 	always @(posedge i_aclk)
 		{ r_aack, q_ack } <= { q_ack, r_back };
+	// }}}
 
 	assign	o_value = r_value;
-
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 	(* gclk *)	reg		gbl_clk;
 	localparam	CKBITS = 4;
@@ -215,6 +253,6 @@ module	tfrvalue(i_aclk, i_value, i_bclk, o_value);
 		cover((&f_cvr_changes)&& ({ r_atfr, r_aack } ==0));
 
 	// Subcover
-
 `endif
+// }}}
 endmodule

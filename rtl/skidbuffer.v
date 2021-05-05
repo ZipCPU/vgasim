@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	skidbuffer.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	A basic SKID buffer.
@@ -55,9 +55,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2019-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2019-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -72,41 +72,44 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype none
-//
-module skidbuffer(i_clk, i_reset,
-		i_valid, o_ready, i_data,
-		o_valid, i_ready, o_data);
-	parameter	[0:0]	OPT_LOWPOWER = 0;
-	parameter	[0:0]	OPT_OUTREG = 1;
-	//
-	parameter	[0:0]	OPT_PASSTHROUGH = 0;
-	parameter		DW = 8;
-	input	wire			i_clk, i_reset;
-	input	wire			i_valid;
-	output	reg			o_ready;
-	input	wire	[DW-1:0]	i_data;
-	output	reg			o_valid;
-	input	wire			i_ready;
-	output	reg	[DW-1:0]	o_data;
+// }}}
+module skidbuffer #(
+		// {{{
+		parameter	[0:0]	OPT_LOWPOWER = 0,
+		parameter	[0:0]	OPT_OUTREG = 1,
+		//
+		parameter	[0:0]	OPT_PASSTHROUGH = 0,
+		parameter		DW = 8,
+		parameter	[0:0]	OPT_INITIAL = 1'b1
+		// }}}
+	) (
+		// {{{
+		input	wire			i_clk, i_reset,
+		input	wire			i_valid,
+		output	reg			o_ready,
+		input	wire	[DW-1:0]	i_data,
+		output	reg			o_valid,
+		input	wire			i_ready,
+		output	reg	[DW-1:0]	o_data
+		// }}}
+	);
 
 	reg	[DW-1:0]	r_data;
 
 	generate if (OPT_PASSTHROUGH)
-	begin
+	begin : PASSTHROUGH
+		// {{{
+		always @(*)
+			{ o_valid, o_ready } = { i_valid, i_ready };
 
-		always @(*)
-			o_ready = i_ready;
-		always @(*)
-			o_valid = i_valid;
 		always @(*)
 		if (!i_valid && OPT_LOWPOWER)
 			o_data = 0;
@@ -115,13 +118,15 @@ module skidbuffer(i_clk, i_reset,
 
 		always @(*)
 			r_data = 0;
-	end else begin
-		//
+		// }}}
+	end else begin : LOGIC
 		// We'll start with skid buffer itself
-		//
+		// {{{
 		reg			r_valid;
 
-		initial	r_valid = 0;
+		// r_valid
+		// {{{
+		initial if (OPT_INITIAL) r_valid = 0;
 		always @(posedge i_clk)
 		if (i_reset)
 			r_valid <= 0;
@@ -130,8 +135,11 @@ module skidbuffer(i_clk, i_reset,
 			r_valid <= 1;
 		else if (i_ready)
 			r_valid <= 0;
+		// }}}
 
-		initial	r_data = 0;
+		// r_data
+		// {{{
+		initial if (OPT_INITIAL) r_data = 0;
 		always @(posedge i_clk)
 		if (OPT_LOWPOWER && i_reset)
 			r_data <= 0;
@@ -139,19 +147,29 @@ module skidbuffer(i_clk, i_reset,
 			r_data <= 0;
 		else if ((!OPT_LOWPOWER || !OPT_OUTREG || i_valid) && o_ready)
 			r_data <= i_data;
+		// }}}
 
+		// o_ready
+		// {{{
 		always @(*)
 			o_ready = !r_valid;
+		// }}}
 
 		//
 		// And then move on to the output port
 		//
 		if (!OPT_OUTREG)
-		begin
-
+		begin : NET_OUTPUT
+			// Outputs are combinatorially determined from inputs
+			// {{{
+			// o_valid
+			// {{{
 			always @(*)
 				o_valid = !i_reset && (i_valid || r_valid);
+			// }}}
 
+			// o_data
+			// {{{
 			always @(*)
 			if (r_valid)
 				o_data = r_data;
@@ -159,16 +177,24 @@ module skidbuffer(i_clk, i_reset,
 				o_data = i_data;
 			else
 				o_data = 0;
-		end else begin
-
-			initial	o_valid = 0;
+			// }}}
+			// }}}
+		end else begin : REG_OUTPUT
+			// Register our outputs
+			// {{{
+			// o_valid
+			// {{{
+			initial if (OPT_INITIAL) o_valid = 0;
 			always @(posedge i_clk)
 			if (i_reset)
 				o_valid <= 0;
 			else if (!o_valid || i_ready)
 				o_valid <= (i_valid || r_valid);
+			// }}}
 
-			initial	o_data = 0;
+			// o_data
+			// {{{
+			initial if (OPT_INITIAL) o_data = 0;
 			always @(posedge i_clk)
 			if (OPT_LOWPOWER && i_reset)
 				o_data <= 0;
@@ -182,17 +208,53 @@ module skidbuffer(i_clk, i_reset,
 				else
 					o_data <= 0;
 			end
+			// }}}
+
+			// }}}
 		end
-
+		// }}}
 	end endgenerate
-
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+`ifdef	SKIDBUFFER
+`define	ASSUME	assume
+`else
+`define	ASSUME	assert
+`endif
+
+	reg	f_past_valid;
+
+	initial	f_past_valid = 0;
+	always @(posedge i_clk)
+		f_past_valid <= 1;
+
+	always @(*)
+	if (!f_past_valid)
+		assume(i_reset);
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Incoming stream properties / assumptions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	always @(posedge i_clk)
+	if (!f_past_valid)
+	begin
+		`ASSUME(!i_valid || !OPT_INITIAL);
+	end else if ($past(i_valid && !o_ready && !i_reset) && !i_reset)
+		`ASSUME(i_valid && $stable(i_data));
+
 `ifdef	VERIFIC
 `define	FORMAL_VERIFIC
-`endif
-`endif
-//
-`ifdef	FORMAL_VERIFIC
 	// Reset properties
 	property RESET_CLEARS_IVALID;
 		@(posedge i_clk) i_reset |=> !i_valid;
@@ -208,91 +270,131 @@ module skidbuffer(i_clk, i_reset,
 `else
 	assert	property (IDATA_HELD_WHEN_NOT_READY);
 `endif
+`endif
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Outgoing stream properties / assumptions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
 
 	generate if (!OPT_PASSTHROUGH)
 	begin
 
-		assert property (@(posedge i_clk)
-			OPT_OUTREG && i_reset |=> o_ready && !o_valid);
+		always @(posedge i_clk)
+		if (!f_past_valid) // || $past(i_reset))
+		begin
+			// Following any reset, valid must be deasserted
+			assert(!o_valid || !OPT_INITIAL);
+		end else if ($past(o_valid && !i_ready && !i_reset) && !i_reset)
+			// Following any stall, valid must remain high and
+			// data must be preserved
+			assert(o_valid && $stable(o_data));
 
-		assert property (@(posedge i_clk)
-			!OPT_OUTREG && i_reset |-> !o_valid);
-
+	end endgenerate
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Other properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	generate if (!OPT_PASSTHROUGH)
+	begin
 		// Rule #1:
-		//	Once o_valid goes high, the data cannot change until the
-		//	clock after i_ready
-		assert property (@(posedge i_clk)
-			disable iff (i_reset)
-			o_valid && !i_ready
-			|=> (o_valid && $stable(o_data)));
+		//	If registered, then following any reset we should be
+		//	ready for a new request
+		// {{{
+		always @(posedge i_clk)
+		if (f_past_valid && $past(OPT_OUTREG && i_reset))
+			assert(o_ready);
+		// }}}
 
 		// Rule #2:
 		//	All incoming data must either go directly to the
 		//	output port, or into the skid buffer
+		// {{{
+`ifndef	VERIFIC
+		always @(posedge i_clk)
+		if (f_past_valid && !$past(i_reset) && $past(i_valid && o_ready
+			&& (!OPT_OUTREG || o_valid) && !i_ready))
+			assert(!o_ready && r_data == $past(i_data));
+`else
 		assert property (@(posedge i_clk)
 			disable iff (i_reset)
 			(i_valid && o_ready
 				&& (!OPT_OUTREG || o_valid) && !i_ready)
 				|=> (!o_ready && r_data == $past(i_data)));
+`endif
+		// }}}
 
 		// Rule #3:
 		//	After the last transaction, o_valid should become idle
+		// {{{
 		if (!OPT_OUTREG)
 		begin
-
-			assert property (@(posedge i_clk)
-				disable iff (i_reset)
-				i_ready |=> (o_valid == i_valid));
-
+			// {{{
+			always @(posedge i_clk)
+			if (f_past_valid && !$past(i_reset) && !i_reset
+					&& $past(i_ready))
+			begin
+				assert(o_valid == i_valid);
+				assert(!i_valid || (o_data == i_data));
+			end
+			// }}}
 		end else begin
+			// {{{
+			always @(posedge i_clk)
+			if (f_past_valid && !$past(i_reset))
+			begin
+				if ($past(i_valid && o_ready))
+					assert(o_valid);
 
-			assert property (@(posedge i_clk)
-				disable iff (i_reset)
-				i_valid && o_ready |=> o_valid);
-
-			assert property (@(posedge i_clk)
-				disable iff (i_reset)
-				!i_valid && o_ready && i_ready |=> !o_valid);
-
+				if ($past(!i_valid && o_ready && i_ready))
+					assert(!o_valid);
+			end
+			// }}}
 		end
+		// }}}
 
 		// Rule #4
-		//	Same thing, but this time for r_valid
-		assert property (@(posedge i_clk)
-			!o_ready && i_ready |=> o_ready);
+		//	Same thing, but this time for o_ready
+		// {{{
+		always @(posedge i_clk)
+		if (f_past_valid && $past(!o_ready && i_ready))
+			assert(o_ready);
+		// }}}
 
-
+		// If OPT_LOWPOWER is set, o_data and r_data both need to be
+		// zero any time !o_valid or !r_valid respectively
+		// {{{
 		if (OPT_LOWPOWER)
 		begin
-			//
-			// If OPT_LOWPOWER is set, o_data and r_data both need
-			// to be zero any time !o_valid or !r_valid respectively
-			assert property (@(posedge i_clk)
-				(OPT_OUTREG || !i_reset) && !o_valid |-> o_data == 0);
+			always @(*)
+			if ((OPT_OUTREG || !i_reset) && !o_valid)
+				assert(o_data == 0);
 
-			assert property (@(posedge i_clk)
-				o_ready |-> r_data == 0);
+			always @(*)
+			if (o_ready)
+				assert(r_data == 0);
 
-			// else
-			//	if OPT_LOWPOWER isn't set, we can lower our
-			//	logic count by not forcing these values to zero.
 		end
-
+		// }}}
+	end endgenerate
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cover checks
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 `ifdef	SKIDBUFFER
+	generate if (!OPT_PASSTHROUGH)
+	begin
 		reg	f_changed_data;
-
-		// Cover test
-		cover property (@(posedge i_clk)
-			disable iff (i_reset)
-			(!o_valid && !i_valid)
-			##1 i_valid &&  i_ready [*3]
-			##1 i_valid && !i_ready
-			##1 i_valid &&  i_ready [*2]
-			##1 i_valid && !i_ready [*2]
-			##1 i_valid &&  i_ready [*3]
-			// Wait for the design to clear
-			##1 o_valid && i_ready [*0:5]
-			##1 (!o_valid && !i_valid && f_changed_data));
 
 		initial	f_changed_data = 0;
 		always @(posedge i_clk)
@@ -305,10 +407,74 @@ module skidbuffer(i_clk, i_reset,
 		end else if (!i_valid && i_data != 0)
 			f_changed_data <= 0;
 
-`endif	// SKIDCOVER
-	end endgenerate
 
-`endif	// FORMAL_VERIFIC
+`ifndef	VERIFIC
+		reg	[3:0]	cvr_steps, cvr_hold;
+
+		always @(posedge i_clk)
+		if (i_reset)
+		begin
+			cvr_steps <= 0;
+			cvr_hold  <= 0;
+		end else begin
+			cvr_steps <= cvr_steps + 1;
+			cvr_hold  <= cvr_hold  + 1;
+			case(cvr_steps)
+			 0: if (o_valid || i_valid)
+				cvr_steps <= 0;
+			 1: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			 2: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			 3: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			 4: if (!i_valid ||  i_ready)
+				cvr_steps <= 0;
+			 5: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			 6: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			 7: if (!i_valid ||  i_ready)
+				cvr_steps <= 0;
+			 8: if (!i_valid ||  i_ready)
+				cvr_steps <= 0;
+			 9: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			10: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			11: if (!i_valid || !i_ready)
+				cvr_steps <= 0;
+			12: begin
+				cvr_steps <= cvr_steps;
+				cover(!o_valid && !i_valid && f_changed_data);
+				if (!o_valid || !i_ready)
+					cvr_steps <= 0;
+				else
+					cvr_hold <= cvr_hold + 1;
+				end
+			default: assert(0);
+			endcase
+		end
+
+`else
+		// Cover test
+		cover property (@(posedge i_clk)
+			disable iff (i_reset)
+			(!o_valid && !i_valid)
+			##1 i_valid &&  i_ready [*3]
+			##1 i_valid && !i_ready
+			##1 i_valid &&  i_ready [*2]
+			##1 i_valid && !i_ready [*2]
+			##1 i_valid &&  i_ready [*3]
+			// Wait for the design to clear
+			##1 o_valid && i_ready [*0:5]
+			##1 (!o_valid && !i_valid && f_changed_data));
+`endif
+	end endgenerate
+`endif	// SKIDBUFFER
+	// }}}
+`endif
+// }}}
 endmodule
 `ifndef	YOSYS
 `default_nettype wire

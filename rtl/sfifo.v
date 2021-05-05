@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	sfifo.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	A synchronous data FIFO.
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,47 +27,55 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
-module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty);
-	parameter	BW=8;	// Byte/data width
-	parameter 	LGFLEN=4;
-	parameter [0:0]	OPT_ASYNC_READ = 1'b1;
+// }}}
+module sfifo #(
+		// {{{
+		parameter	BW=8,	// Byte/data width
+		parameter 	LGFLEN=4,
+		parameter [0:0]	OPT_ASYNC_READ = 1'b1,
+		parameter [0:0]	OPT_WRITE_ON_FULL = 1'b0,
+		parameter [0:0]	OPT_READ_ON_EMPTY = 1'b0
+		// }}}
+	) (
+		// {{{
+		input	wire		i_clk,
+		input	wire		i_reset,
+		//
+		// Write interface
+		input	wire		i_wr,
+		input	wire [(BW-1):0]	i_data,
+		output	reg 		o_full,
+		output	reg [LGFLEN:0]	o_fill,
+		//
+		// Read interface
+		input	wire		i_rd,
+		output	reg [(BW-1):0]	o_data,
+		output	reg		o_empty	// True if FIFO is empty
+		// }}}
+	);
+
+	// Register/net declarations
+	// {{{
 	localparam	FLEN=(1<<LGFLEN);
-
-	//
-	//
-	input	wire		i_clk;
-	input	wire		i_reset;
-	//
-	// Write interface
-	input	wire		i_wr;
-	input	wire [(BW-1):0]	i_data;
-	output	reg 		o_full;
-	output	reg [LGFLEN:0]	o_fill;
-	//
-	// Read interface
-	input	wire		i_rd;
-	output	reg [(BW-1):0]	o_data;
-	output	reg		o_empty;	// True if FIFO is empty
-	// 
-
+	reg			r_full, r_empty;
 	reg	[(BW-1):0]	mem[0:(FLEN-1)];
 	reg	[LGFLEN:0]	wr_addr, rd_addr;
 	reg	[LGFLEN-1:0]	rd_next;
 
-
 	wire	w_wr = (i_wr && !o_full);
 	wire	w_rd = (i_rd && !o_empty);
+	// }}}
 
+	// o_fill
+	// {{{
 	initial	o_fill = 0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -77,55 +85,103 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 	2'b10: o_fill <= o_fill + 1;
 	default: o_fill <= wr_addr - rd_addr;
 	endcase
+	// }}}
 
-	initial	o_full = 0;
+	// r_full, o_full
+	// {{{
+	initial	r_full = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		o_full <= 0;
+		r_full <= 0;
 	else case({ w_wr, w_rd})
-	2'b01: o_full <= 1'b0;
-	2'b10: o_full <= (o_fill == { 1'b0, {(LGFLEN){1'b1}}});
-	default: o_full <= (o_fill == { 1'b1, {(LGFLEN){1'b0}} });
+	2'b01: r_full <= 1'b0;
+	2'b10: r_full <= (o_fill == { 1'b0, {(LGFLEN){1'b1}} });
+	default: r_full <= (o_fill == { 1'b1, {(LGFLEN){1'b0}} });
 	endcase
+
+	always @(*)
+	if (OPT_WRITE_ON_FULL && i_rd)
+		o_full = 1'b0;
+	else
+		o_full = r_full;
+	// }}}
 		
-	// Write
+	// wr_addr, the write address pointer
+	// {{{
 	initial	wr_addr = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		wr_addr <= 0;
 	else if (w_wr)
 		wr_addr <= wr_addr + 1'b1;
+	// }}}
 
+	// Write to memory
+	// {{{
 	always @(posedge i_clk)
 	if (w_wr)
 		mem[wr_addr[(LGFLEN-1):0]] <= i_data;
+	// }}}
 
+	// rd_addr, the read address pointer
+	// {{{
 	initial	rd_addr = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		rd_addr <= 0;
 	else if (w_rd)
 		rd_addr <= rd_addr + 1;
+	// }}}
 
 	always @(*)
 		rd_next = rd_addr[LGFLEN-1:0] + 1;
 
-	generate if (OPT_ASYNC_READ)
-	begin : ASYNCHRONOUS_READ
-		always @(*)
-			o_empty = (o_fill  == 0);
+	// r_empty, o_empty
+	// {{{
+	initial	r_empty = 1'b1;
+	always @(posedge i_clk)
+	if (i_reset)
+		r_empty <= 1'b1;
+	else case ({ w_wr, w_rd })
+	2'b01: r_empty <= (o_fill <= 1);
+	2'b10: r_empty <= 1'b0;
+	default: begin end
+	endcase
 
+	always @(*)
+	if (OPT_READ_ON_EMPTY && i_wr)
+		o_empty = 1'b0;
+	else
+		o_empty = r_empty;
+	// }}}
+
+	// Read from the FIFO
+	// {{{
+	generate if (OPT_ASYNC_READ && OPT_READ_ON_EMPTY)
+	begin : ASYNCHRONOUS_READ_ON_EMPTY
+		// o_data
+		// {{{
+		always @(*)
+		begin
+			o_data = mem[rd_addr[LGFLEN-1:0]];
+			if (r_empty)
+				o_data = i_data;
+		end
+		// }}}
+	end else if (OPT_ASYNC_READ)
+	begin : ASYNCHRONOUS_READ
+		// o_data
+		// {{{
 		always @(*)
 			o_data = mem[rd_addr[LGFLEN-1:0]];
-
+		// }}}
 	end else begin : REGISTERED_READ
+		// {{{
 		reg		bypass_valid;
 		reg [BW-1:0]	bypass_data, rd_data;
 
-		always @(*)
-			o_empty = (o_fill  == 0);
-
-
+		// Memory read, bypassing it if we must
+		// {{{
 		initial bypass_valid = 0;
 		always @(posedge i_clk)
 		if (i_reset)
@@ -134,7 +190,7 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 			bypass_valid <= 1'b0;
 			if (!i_wr)
 				bypass_valid <= 1'b0;
-			else if (o_empty || (i_rd && (o_fill == 1)))
+			else if (r_empty || (i_rd && (o_fill == 1)))
 				bypass_valid <= 1'b1;
 		end
 
@@ -147,9 +203,16 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 			rd_data <= mem[(w_rd)?rd_next : rd_addr[LGFLEN-1:0]];
 
 		always @(*)
-			o_data = (bypass_valid) ? bypass_data : rd_data;
-
+		if (OPT_READ_ON_EMPTY && r_empty)
+			o_data = i_data;
+		else if (bypass_valid)
+			o_data = bypass_data;
+		else
+			o_data = rd_data;
+		// }}}
+		// }}}
 	end endgenerate
+	// }}}
 
 	// Make Verilator happy
 	// verilator lint_off UNUSED
@@ -159,12 +222,11 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-//
-//
+////////////////////////////////////////////////////////////////////////////////
 //
 // FORMAL METHODS
-//
-//
+// {{{
+////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -181,16 +243,20 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 `endif
 
 	reg			f_past_valid;
-	wire	[LGFLEN:0]	f_fill, f_next, f_empty;
-
-	//
-	// Assertions about our outputs
-	//
-	//
+	wire	[LGFLEN:0]	f_fill, f_next;
+	wire			f_empty;
 
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Assertions about our flags and counters
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	assign	f_fill = wr_addr - rd_addr;
 	assign	f_empty = (wr_addr == rd_addr);
@@ -198,42 +264,65 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 
 	always @(*)
 	begin
-		assert(f_fill <= { 1'b1, {(LGFLEN){1'b0}}});
+		assert(f_fill <= { 1'b1, {(LGFLEN){1'b0}} });
 		assert(o_fill == f_fill);
 
-		assert(o_full  == (f_fill == {1'b1, {(LGFLEN){1'b0}}}));
-		if (OPT_ASYNC_READ)
-			assert(o_empty == (f_fill == 0));
+		assert(r_full  == (f_fill == {1'b1, {(LGFLEN){1'b0}} }));
+		assert(r_empty == (f_fill == 0));
 		assert(rd_next == f_next[LGFLEN-1:0]);
+
+		if (!OPT_WRITE_ON_FULL)
+		begin
+			assert(o_full == r_full);
+		end else begin
+			assert(o_full == (r_full && !i_rd));
+		end
+
+		if (!OPT_READ_ON_EMPTY)
+		begin
+			assert(o_empty == r_empty);
+		end else begin
+			assert(o_empty == (r_empty && !i_wr));
+		end
 	end
 
 	always @(posedge i_clk)
 	if (!OPT_ASYNC_READ && f_past_valid)
 	begin
 		if (f_fill == 0)
-			assert(o_empty);
-		else if ($past(f_fill)>1)
-			assert(!o_empty);
-		else if ($past(!i_rd && f_fill > 0))
-			assert(!o_empty);
+		begin
+			assert(r_empty);
+			assert(o_empty || (OPT_READ_ON_EMPTY && i_wr));
+		end else if ($past(f_fill)>1)
+		begin
+			assert(!r_empty);
+		end else if ($past(!i_rd && f_fill > 0))
+			assert(!r_empty);
 	end
 
 	always @(*)
-	if ((OPT_ASYNC_READ&&f_past_valid) || !o_empty)
-		assert(mem[rd_addr] == o_data);
+	if (!r_empty)
+	begin
+		// This also applies for the registered read case
+		assert(mem[rd_addr[LGFLEN-1:0]] == o_data);
+	end else if (OPT_READ_ON_EMPTY)
+		assert(o_data == i_data);
 
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Formal contract:
-	//
+	// Formal contract: (Twin write test)
+	// {{{
 	// If you write two values in succession, you should be able to read
 	// those same two values in succession some time later.
 	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
+	// Verilator lint_off UNDRIVEN
 	(* anyconst *)	reg	[LGFLEN:0]	f_first_addr;
+	// Verilator lint_on  UNDRIVEN
 			reg	[LGFLEN:0]	f_second_addr;
 			reg	[BW-1:0]	f_first_data, f_second_data;
 
@@ -270,27 +359,29 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 
 	always @(*)
 	if (f_first_addr_in_fifo)
-		assert(mem[f_first_addr] == f_first_data);
+		assert(mem[f_first_addr[LGFLEN-1:0]] == f_first_data);
 	always @(*)
-		f_first_in_fifo = (f_first_addr_in_fifo && (mem[f_first_addr] == f_first_data));
+		f_first_in_fifo = (f_first_addr_in_fifo && (mem[f_first_addr[LGFLEN-1:0]] == f_first_data));
 
 	always @(*)
 	if (f_second_addr_in_fifo)
-		assert(mem[f_second_addr] == f_second_data);
+		assert(mem[f_second_addr[LGFLEN-1:0]] == f_second_data);
 
 	always @(*)
-		f_second_in_fifo = (f_second_addr_in_fifo && (mem[f_second_addr] == f_second_data));
+		f_second_in_fifo = (f_second_addr_in_fifo && (mem[f_second_addr[LGFLEN-1:0]] == f_second_data));
 
 	always @(posedge i_clk)
 	if (f_past_valid && !$past(i_reset))
 	begin
 		case({$past(f_first_in_fifo), $past(f_second_in_fifo)})
 		2'b00: begin
-				if ($past(w_wr)
+				if ($past(w_wr && (!w_rd || !r_empty))
 					&&($past(wr_addr == f_first_addr)))
+				begin
 					assert(f_first_in_fifo);
-				else
+				end else begin
 					assert(!f_first_in_fifo);
+				end
 				//
 				// The second could be in the FIFO, since
 				// one might write other data than f_first_data
@@ -300,16 +391,20 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 		2'b01: begin
 				assert(!f_first_in_fifo);
 				if ($past(w_rd && (rd_addr==f_second_addr)))
+				begin
 					assert((o_empty&&!OPT_ASYNC_READ)||!f_second_in_fifo);
-				else
+				end else begin
 					assert(f_second_in_fifo);
+				end
 			end
 		2'b10: begin
 				if ($past(w_wr)
 					&&($past(wr_addr == f_second_addr)))
+				begin
 					assert(f_second_in_fifo);
-				else
+				end else begin
 					assert(!f_second_in_fifo);
+				end
 				if ($past(!w_rd ||(rd_addr != f_first_addr)))
 					assert(f_first_in_fifo);
 			end
@@ -327,21 +422,21 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 			end
 		endcase
 	end
-
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	//	Cover properties
-	//
+	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+`ifdef	SFIFO
 	reg	f_was_full;
 	initial	f_was_full = 0;
 	always @(posedge i_clk)
 	if (o_full)
 		f_was_full <= 1;
 
-`ifdef	SFIFO
 	always @(posedge i_clk)
 		cover($fell(f_empty));
 
@@ -358,8 +453,14 @@ module sfifo(i_clk, i_reset, i_wr, i_data, o_full, o_fill, i_rd, o_data, o_empty
 	if (f_past_valid)
 		cover($past(o_empty,2)&&(!$past(o_empty))&& o_empty);
 `endif
+	// }}}
 
+	// Make Verilator happy
+	// Verilator lint_off UNUSED
+	wire	unused_formal;
+	assign	unused_formal = &{ 1'b0, f_next[LGFLEN], f_empty };
 `endif // FORMAL
+// }}}
 endmodule
 `ifndef	YOSYS
 `default_nettype wire

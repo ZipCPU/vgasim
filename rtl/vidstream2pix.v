@@ -25,7 +25,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -193,19 +193,25 @@ module	vidstream2pix #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
 	skidbuffer #(
+		// {{{
 		.OPT_OUTREG(1),
 		.DW(BUS_DATA_WIDTH+2)
 `ifdef	FORMAL
 		, .OPT_PASSTHROUGH(1'b1)
 `endif
+		// }}}
 	) tskd (
+		// {{{
 		.i_clk(i_clk),
 		.i_reset(i_reset),
 		.i_valid(S_AXIS_TVALID), .o_ready(S_AXIS_TREADY),
 			.i_data({ S_AXIS_TDATA, S_AXIS_FRAME, S_AXIS_HLAST }),
 		.o_valid(skd_valid), .i_ready(skd_ready),
-			.o_data({ skd_data, skd_frame, skd_hlast }));
+			.o_data({ skd_data, skd_frame, skd_hlast })
+		// }}}
+	);
 
 	always @(*)
 		skd_ready = !s_valid || (s_step && s_last_in_word);
@@ -617,8 +623,9 @@ module	vidstream2pix #(
 	begin
 		assume(S_AXIS_HLAST ==(f_bus_x == (f_bus_words_per_line - 1)));
 		if (OPT_TUSER_IS_SOF)
+		begin
 			assume(S_AXIS_FRAME == ((f_bus_x== 0)&&(f_bus_y == 0)));
-		else
+		end else
 			assume(S_AXIS_FRAME == (S_AXIS_HLAST
 					&& (f_bus_y == f_lines_per_frame-1)));
 	end
@@ -631,6 +638,10 @@ module	vidstream2pix #(
 	always @(posedge i_clk)
 	if (!i_reset)
 		assert(f_bus_y < f_lines_per_frame);
+
+	always @(*)
+	if (!f_past_valid)
+		assume(!S_AXIS_TVALID);
 
 	always @(posedge i_clk)
 	if (f_past_valid && $past(!i_reset && S_AXIS_TVALID && !S_AXIS_TREADY))
@@ -684,11 +695,14 @@ module	vidstream2pix #(
 		if (!OPT_TUSER_IS_SOF)
 		begin
 			if (!M_AXIS_HLAST)
+			begin
 				assert(!M_AXIS_FRAME);
+			end
 			assert(f_pixel_y < f_lines_per_frame);
 			if (M_AXIS_FRAME)
+			begin
 				assert(f_pixel_y + 1 == f_lines_per_frame);
-			else
+			end else
 				assert(f_pixel_y <= f_lines_per_frame - 1);
 		end else begin
 			assert(f_pixel_y <= f_lines_per_frame);
@@ -799,10 +813,12 @@ module	vidstream2pix #(
 	if (!i_reset)
 	begin
 		if (c_valid && !c_hlast)
+		begin
 			assert(f_s_x == f_c_x + 1);
-		else if (c_valid && c_hlast)
+		end else if (c_valid && c_hlast)
+		begin
 			assert(f_s_x == 0);
-		else
+		end else
 			assert(f_s_x == f_c_x);
 	end
 
@@ -810,8 +826,9 @@ module	vidstream2pix #(
 	if (!i_reset)
 	begin
 		if (f_bus_x != 0 || !s_valid)
+		begin
 			assert(f_s_y == f_bus_y);
-		else if (f_bus_y == 0)
+		end else if (f_bus_y == 0)
 		begin
 			assert(f_s_x == 0 || f_s_x + scount == i_pixels_per_line-1);
 			assert(f_s_y == 0 || f_s_y == f_lines_per_frame-1);
@@ -837,8 +854,9 @@ module	vidstream2pix #(
 		endcase
 		// }}}
 		else if (f_s_x != 0)
+		begin
 			assert(f_s_x + scount + (s_valid ? 1:0) == i_pixels_per_line);
-		else
+		end else
 			assert(!s_valid);
 	end
 	// }}}
@@ -854,8 +872,9 @@ module	vidstream2pix #(
 		if (c_valid && c_hlast)
 		begin
 			if (f_c_y >= f_lines_per_frame - 1)
+			begin
 				assert(f_s_y == 0);
-			else
+			end else
 				assert(f_s_y == f_c_y + 1);
 		end else
 			assert(f_s_y == f_c_y);
@@ -865,12 +884,15 @@ module	vidstream2pix #(
 	if (!i_reset)
 	begin
 		if (!s_valid)
+		begin
 			assert(f_s_y == f_bus_y);
-		else if (!s_last_word_in_packet)
+		end else if (!s_last_word_in_packet)
+		begin
 			assert(f_s_y == f_bus_y);
-		else if (f_bus_y > 0)
+		end else if (f_bus_y > 0)
+		begin
 			assert(f_s_y == f_bus_y - 1);
-		else
+		end else
 			assert(f_s_y == 0 || f_s_y == f_lines_per_frame-1);
 	end
 	// }}}
@@ -881,8 +903,9 @@ module	vidstream2pix #(
 	if (!i_reset && s_valid)
 	begin
 		if (OPT_TUSER_IS_SOF)
+		begin
 			assert(s_frame == (f_s_y == 0 && f_s_x == 0));
-		else
+		end else
 			assert(s_frame == (f_s_y == f_lines_per_frame - 1
 					&& f_s_x + (scount+(s_valid ? 1:0))
 							>= i_pixels_per_line));
@@ -924,10 +947,12 @@ module	vidstream2pix #(
 	if (!i_reset)
 	begin
 		if (M_AXIS_TVALID && !M_AXIS_HLAST)
+		begin
 			assert(f_c_x == f_pixel_x + 1);
-		else if (M_AXIS_TVALID && M_AXIS_HLAST)
+		end else if (M_AXIS_TVALID && M_AXIS_HLAST)
+		begin
 			assert(f_c_x == 0);
-		else
+		end else
 			assert(f_c_x == f_pixel_x);
 
 		assert(f_c_x < i_pixels_per_line);
@@ -946,8 +971,9 @@ module	vidstream2pix #(
 		if (pix_valid && pix_hlast)
 		begin
 			if (f_pixel_y >= f_lines_per_frame - 1)
+			begin
 				assert(f_c_y == 0);
-			else
+			end else
 				assert(f_c_y == f_pixel_y + 1);
 		end else
 			assert(f_c_y == f_pixel_y);
@@ -961,8 +987,9 @@ module	vidstream2pix #(
 	begin
 		assert(c_hlast == (f_c_x + 1 == i_pixels_per_line));
 		if (OPT_TUSER_IS_SOF)
+		begin
 			assert(c_frame == ((f_c_x == 0)&&(f_c_y == 0)));
-		else
+		end else
 			assert(c_frame == (c_hlast && (f_c_y + 1 == f_lines_per_frame)));
 		/*
 		if (OPT_TUSER_IS_SOF)
