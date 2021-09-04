@@ -23,7 +23,7 @@
 //		write to the control register with the ERR bit set will clear
 //		it.  (Don't do this unless you know what caused it to halt ...)
 //	bit 3: DIRTY
-//		If you update core parameters while it is running, the dirty
+//		If you update core parameters while it is running, the busy
 //		bit will be set.  This bit is an indication that the current
 //		configuration doesn't necessarily match the one you are reading
 //		out.  To clear DIRTY, deactivate the core, wait for it to be
@@ -92,7 +92,7 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-// }}}
+//
 // Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 //
@@ -237,6 +237,8 @@ module	axivcamera #(
 		// }}}
 	);
 
+	// Core logic implementation
+	// {{{
 	// Local parameter declarations
 	// {{{
 	localparam [1:0]	FBUF_CONTROL	= 2'b00,
@@ -255,10 +257,10 @@ module	axivcamera #(
 
 	localparam	LGMAXBURST = (TMPLGMAXBURST+ADDRLSB > 12)
 				? (12-ADDRLSB) : TMPLGMAXBURST;
+	// }}}
 
 	wire	i_clk   =  S_AXI_ACLK;
 	wire	i_reset = !S_AXI_ARESETN;
-	// }}}
 
 	// Signal declarations
 	// {{{
@@ -321,22 +323,18 @@ module	axivcamera #(
 	reg	[LGMAXBURST-1:0]	till_boundary;
 	reg	[LGFIFO:0]		fifo_data_available;
 	reg				fifo_bursts_available;
-
-
-`ifdef	FORMAL
-	reg	[C_AXI_ADDR_WIDTH:0]	f_wr_line_addr, f_wr_addr;
-`endif
-
 	// }}}
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// AXI-lite signaling
-	// {{{
+	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	// This is mostly the skidbuffer logic, and handling of the VALID
 	// and READY signals for the AXI-lite control logic in the next
 	// section.
+	// {{{
 
 	//
 	// Write signaling
@@ -630,17 +628,14 @@ module	axivcamera #(
 	//
 	//
 
-	reg	S_AXIS_SOF, S_AXIS_HLAST, S_AXIS_VLAST;
+	wire	S_AXIS_SOF, S_AXIS_HLAST, S_AXIS_VLAST;
 	generate if (OPT_TUSER_IS_SOF)
 	begin : XILINX_SOF_LOCK
 		reg	[15:0]	axis_line;
 		reg		axis_last_line;
 
-		always @(*)
-			S_AXIS_HLAST = S_AXIS_TLAST;
-
-		always @(*)
-			S_AXIS_SOF = S_AXIS_TUSER;
+		assign	S_AXIS_HLAST = S_AXIS_TLAST;
+		assign	S_AXIS_SOF = S_AXIS_TUSER;
 
 		//  Generate S_AXIS_VLAST from S_AXIS_SOF
 		always @(posedge S_AXI_ACLK)
@@ -657,16 +652,13 @@ module	axivcamera #(
 		always @(posedge S_AXI_ACLK)
 			axis_last_line <= (axis_line+1 >= cfg_frame_lines);
 
-		always @(*)
-			S_AXIS_VLAST = axis_last_line && S_AXIS_HLAST;
+		assign	S_AXIS_VLAST = axis_last_line && S_AXIS_HLAST;
 
 	end else begin : VLAST_LOCK
 
-		always @(*)
-			S_AXIS_VLAST = S_AXIS_TLAST;
+		assign	S_AXIS_VLAST = S_AXIS_TLAST;
 
-		always @(*)
-			S_AXIS_HLAST = S_AXIS_TUSER;
+		assign	S_AXIS_HLAST = S_AXIS_TUSER;
 
 		/*
 		initial	S_AXIS_SOF = 0;
@@ -676,8 +668,7 @@ module	axivcamera #(
 		else if (S_AXIS_TVALID && S_AXIS_TREADY)
 			S_AXIS_SOF <= S_AXIS_VLAST;
 		*/
-		always @(*)
-			S_AXIS_SOF = 1'b0;
+		assign	S_AXIS_SOF = 1'b0;
 
 		// Verilator lint_off UNUSED
 		wire	unused_sof;
@@ -739,11 +730,6 @@ module	axivcamera #(
 			fifo_bursts_available <= |next_data_available[LGFIFO:LGMAXBURST];
 		end
 
-`ifdef	FORMAL
-		always @(*)
-			assert(fifo_bursts_available == |fifo_data_available[LGFIFO:LGMAXBURST]);
-`endif
-
 		sfifo #(.BW(C_AXI_DATA_WIDTH+2), .LGFLEN(LGFIFO))
 		sfifo(i_clk, reset_fifo,
 			write_to_fifo, { S_AXIS_VLAST,
@@ -796,27 +782,6 @@ module	axivcamera #(
 	always @(posedge i_clk)
 	if (!cfg_active && r_stopped)
 		frame_needs_alignment <= w_frame_needs_alignment;
-
-`ifdef	FORMAL
-	always @(*)
-	if (cfg_active || !r_stopped)
-	begin
-		if (cfg_frame_addr[ADDRLSB +: LGMAXBURST] == 0)
-			assert(frame_needs_alignment == 1'b0);
-		else if (|cfg_line_words[15-ADDRLSB:LGMAXBURST])
-			assert(frame_needs_alignment);
-		else if (~cfg_frame_addr[ADDRLSB +: LGMAXBURST] < cfg_line_words[LGMAXBURST-1:0])
-			assert(frame_needs_alignment);
-		else
-			assert(!frame_needs_alignment);
-		assert(line_multiple_bursts
-					== (cfg_line_words >= (1<<LGMAXBURST)));
-
-	end
-	always @(*)
-	if (cfg_continuous)
-		assert(req_nframes == 0);
-`endif
 	// }}}
 
 	// line_needs_alignment
@@ -914,30 +879,6 @@ module	axivcamera #(
 			req_vlast <= (req_nlines <= 1);
 		end
 	end
-`ifdef	FORMAL
-	always @(*)
-	if (cfg_active)
-	begin
-		assert(req_vlast == (req_nlines == 0));
-		assert(req_nlines <= cfg_frame_lines -1);
-		// assert(req_addr >= r_frame_addr);
-		// assert(req_line_addr >= r_frame_addr);
-		assert(req_line_addr <= req_addr);
-		assert(req_multiple_bursts
-				== |req_line_words[15-ADDRLSB:LGMAXBURST]);
-	end
-
-	always @(*)
-	if (cfg_active || !r_stopped)
-	begin
-		assert(cfg_frame_lines != 0);
-		assert(cfg_line_words  != 0);
-	end
-
-	always @(*)
-	if (cfg_active)
-		assert(!r_err);
-`endif
 	// }}}
 
 	// }}}
@@ -1023,32 +964,6 @@ module	axivcamera #(
 			wr_vlast <= (wr_lines <= 1);
 		end
 	end
-
-`ifdef	FORMAL
-	always @(posedge i_clk)
-	if (i_reset || r_stopped)
-	begin
-		f_wr_addr      <= { 1'b0, cfg_frame_addr };
-		f_wr_line_addr <= { 1'b0, cfg_frame_addr };
-	end else if (M_AXI_WVALID && M_AXI_WREADY)
-	begin
-		if (wr_vlast && wr_hlast)
-		begin
-			f_wr_addr <= cfg_frame_addr;
-			f_wr_line_addr <= cfg_frame_addr;
-		end else if (wr_hlast)
-		begin
-			f_wr_addr <= f_wr_line_addr + cfg_line_step;
-			f_wr_line_addr <= f_wr_line_addr + cfg_line_step;
-		end else begin
-			f_wr_addr <= f_wr_addr + (1<<ADDRLSB);
-		end
-	end
-
-	always @(*)
-	if (M_AXI_WVALID && wr_hlast)
-		assert(M_AXI_WLAST);
-`endif
 	// }}}
 
 	// }}}
@@ -1086,10 +1001,6 @@ module	axivcamera #(
 		end
 	default: begin end
 	endcase
-`ifdef	FORMAL
-	always @(*)
-		assert(aw_none_outstanding == (aw_bursts_outstanding == 0));
-`endif
 	// }}}
 
 	// r_stopped
@@ -1289,8 +1200,9 @@ module	axivcamera #(
 	// End AXI protocol section
 	// }}}
 
-	// Verilator lint_off UNUSED
+	// Make Verilator happy
 	// {{{
+	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, S_AXIL_AWPROT, S_AXIL_ARPROT, M_AXI_BID,
 			M_AXI_BRESP[0], fifo_empty,
@@ -1301,546 +1213,30 @@ module	axivcamera #(
 		};
 	// Verilator lint_on  UNUSED
 	// }}}
+	// }}}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Formal properties
-// {{{
+//
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
-	reg	[C_AXI_ADDR_WIDTH-1:0]	f_addr_completed;
-	reg	[C_AXI_ADDR_WIDTH-1:0]	f_last_addr,f_arnext, f_ckeob,f_cksob,
-		fv_start_addr, fv_axi_raddr, f_next_start;
-	reg	f_past_valid;
-	reg	f_araddr_is_aligned, f_araddr_is_initial,
-		f_araddr_is_final;
-	reg	f_arnext_is_aligned, f_arnext_is_initial,
-		f_arnext_is_final;
-	reg	f_cross_alignment;
-	reg	f_ckinitial, f_ckaligned, f_ckactive,
-		f_cklnfirst, f_cklnfull, f_cklnfinal;
-	reg	[LGFIFO:0]	fv_ar_requests_remaining;
-	reg	[LGMAXBURST-1:0]	f_rd_subaddr;
-
-
-	initial	f_past_valid = 0;
-	always @(posedge i_clk)
-		f_past_valid <= 1;
-	////////////////////////////////////////////////////////////////////////
-	//
-	// Properties of the AXI-stream data interface
-	// {{{
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
-
-	// (These are captured by the FIFO within)
-
-	// }}}
-	////////////////////////////////////////////////////////////////////////
-	//
-	// The AXI-lite control interface
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	// {{{
-	localparam	F_AXIL_LGDEPTH = 4;
-	wire	[F_AXIL_LGDEPTH-1:0]	faxil_rd_outstanding,
-			faxil_wr_outstanding, faxil_awr_outstanding;
-
-
-	faxil_slave #(
-		// {{{
-		.C_AXI_DATA_WIDTH(C_AXIL_DATA_WIDTH),
-		.C_AXI_ADDR_WIDTH(C_AXIL_ADDR_WIDTH),
-		.F_LGDEPTH(F_AXIL_LGDEPTH),
-		.F_AXI_MAXWAIT(2),
-		.F_AXI_MAXDELAY(2),
-		.F_AXI_MAXRSTALL(3)
-		// }}}
-	) faxil(
-		// {{{
-		.i_clk(S_AXI_ACLK), .i_axi_reset_n(S_AXI_ARESETN),
-		//
-		.i_axi_awvalid(S_AXIL_AWVALID),
-		.i_axi_awready(S_AXIL_AWREADY),
-		.i_axi_awaddr( S_AXIL_AWADDR),
-		.i_axi_awcache(4'h0),
-		.i_axi_awprot( S_AXIL_AWPROT),
-		//
-		.i_axi_wvalid(S_AXIL_WVALID),
-		.i_axi_wready(S_AXIL_WREADY),
-		.i_axi_wdata( S_AXIL_WDATA),
-		.i_axi_wstrb( S_AXIL_WSTRB),
-		//
-		.i_axi_bvalid(S_AXIL_BVALID),
-		.i_axi_bready(S_AXIL_BREADY),
-		.i_axi_bresp( S_AXIL_BRESP),
-		//
-		.i_axi_arvalid(S_AXIL_ARVALID),
-		.i_axi_arready(S_AXIL_ARREADY),
-		.i_axi_araddr( S_AXIL_ARADDR),
-		.i_axi_arcache(4'h0),
-		.i_axi_arprot( S_AXIL_ARPROT),
-		//
-		.i_axi_rvalid(S_AXIL_RVALID),
-		.i_axi_rready(S_AXIL_RREADY),
-		.i_axi_rdata( S_AXIL_RDATA),
-		.i_axi_rresp( S_AXIL_RRESP),
-		//
-		.f_axi_rd_outstanding(faxil_rd_outstanding),
-		.f_axi_wr_outstanding(faxil_wr_outstanding),
-		.f_axi_awr_outstanding(faxil_awr_outstanding)
-		// }}}
-		);
-
-	always @(*)
-	begin
-		assert(faxil_rd_outstanding == (S_AXIL_RVALID ? 1:0)
-			+(S_AXIL_ARREADY ? 0:1));
-		assert(faxil_wr_outstanding == (S_AXIL_BVALID ? 1:0)
-			+(S_AXIL_WREADY ? 0:1));
-		assert(faxil_awr_outstanding== (S_AXIL_BVALID ? 1:0)
-			+(S_AXIL_AWREADY ? 0:1));
-	end
-
-	always @(*)
-		assert(cfg_zero_length ==
-			((cfg_line_words == 0)||(cfg_frame_lines == 0)));
-
-	always @(*)
-	if (cfg_zero_length)
-		assert(!cfg_active);
-
-	// }}}
-	////////////////////////////////////////////////////////////////////////
-	//
-	// The AXI master memory interface
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
 	// {{{
 
-	//
-	localparam	F_AXI_LGDEPTH = 11; // LGLENW-LGMAXBURST+2 ??
+	// The formal properties for this core are maintained elsewhere
 
-	wire	[F_AXI_LGDEPTH-1:0]	faxi_awr_nbursts, faxi_rd_outstanding,
-					faxi_wrid_nbursts;
-	wire	[C_AXI_ID_WIDTH-1:0]	faxi_wr_checkid;
-	wire				faxi_wr_ckvalid;
-	wire	[C_AXI_ADDR_WIDTH-1:0]	faxi_wr_addr;
-	wire	[1:0]			faxi_wr_burst;
-	wire	[2:0]			faxi_wr_size;
-	wire	[7:0]			faxi_wr_len, faxi_wr_incr;
-	wire				faxi_wr_lockd;
-	wire	[8:0]			faxi_wr_pending;
-
-	faxi_master #(
-		// {{{
-		.C_AXI_ID_WIDTH(C_AXI_ID_WIDTH),
-		.C_AXI_ADDR_WIDTH(C_AXI_ADDR_WIDTH),
-		.C_AXI_DATA_WIDTH(C_AXI_DATA_WIDTH),
-		//
-		.OPT_EXCLUSIVE(1'b0),
-		.OPT_NARROW_BURST(1'b0),
-		.F_LGDEPTH(F_AXI_LGDEPTH),
-		.F_AXI_MAXSTALL(3),
-		.F_AXI_MAXRSTALL(2),
-		.F_AXI_MAXDELAY(3)
-		// }}}
-	) faxi(
-		// {{{
-		.i_clk(S_AXI_ACLK), .i_axi_reset_n(S_AXI_ARESETN),
-		// The (unused) write interface
-		// {{{
-		.i_axi_awvalid(M_AXI_AWVALID),
-		.i_axi_awready(M_AXI_AWREADY),
-		.i_axi_awid(   AXI_ID),
-		.i_axi_awaddr( M_AXI_AWADDR),
-		.i_axi_awlen(  M_AXI_AWLEN),
-		.i_axi_awsize( M_AXI_AWSIZE),
-		.i_axi_awburst(M_AXI_AWBURST),
-		.i_axi_awlock( M_AXI_AWLOCK),
-		.i_axi_awcache(M_AXI_AWCACHE),
-		.i_axi_awprot( M_AXI_AWPROT),
-		.i_axi_awqos(  M_AXI_AWQOS),
-		//
-		.i_axi_wvalid(M_AXI_WVALID),
-		.i_axi_wready(M_AXI_WREADY),
-		.i_axi_wdata( M_AXI_WDATA),
-		.i_axi_wstrb( M_AXI_WSTRB),
-		.i_axi_wlast( M_AXI_WLAST),
-		//
-		.i_axi_bvalid(M_AXI_BVALID),
-		.i_axi_bready(M_AXI_BREADY),
-		.i_axi_bid(   M_AXI_BID),
-		.i_axi_bresp( M_AXI_BRESP),
-		// }}}
-		// The read interface
-		// {{{
-		.i_axi_arvalid(1'b0),
-		.i_axi_arready(1'b0),
-		.i_axi_arid(   M_AXI_AWID),
-		.i_axi_araddr( M_AXI_AWADDR),
-		.i_axi_arlen(  M_AXI_AWLEN),
-		.i_axi_arsize( M_AXI_AWSIZE),
-		.i_axi_arburst(M_AXI_AWBURST),
-		.i_axi_arlock( M_AXI_AWLOCK),
-		.i_axi_arcache(M_AXI_AWCACHE),
-		.i_axi_arprot( M_AXI_AWPROT),
-		.i_axi_arqos(  M_AXI_AWQOS),
-		//
-		.i_axi_rvalid(1'b0),
-		.i_axi_rready(1'b0),
-		.i_axi_rdata( {(C_AXI_DATA_WIDTH){1'b0}}),
-		.i_axi_rlast( 1'b0),
-		.i_axi_rresp( 2'b00),
-		//
-		//
-		.f_axi_awr_nbursts(faxi_awr_nbursts),
-		.f_axi_wr_pending(faxi_wr_pending),
-		//
-		.f_axi_wr_ckvalid(  faxi_wr_ckvalid),
-		.f_axi_wr_checkid(  faxi_wr_checkid),
-		.f_axi_wrid_nbursts(faxi_wrid_nbursts),
-		.f_axi_wr_addr( faxi_wr_addr),
-		.f_axi_wr_incr( faxi_wr_incr),
-		.f_axi_wr_burst(faxi_wr_burst),
-		.f_axi_wr_size( faxi_wr_size),
-		.f_axi_wr_len(  faxi_wr_len),
-		.f_axi_wr_lockd(faxi_wr_lockd),
-		//
-		.f_axi_rd_outstanding(faxi_rd_outstanding)
-		//
-		// }}}
-	);
-
-
-	always @(*)
-	begin
-		assume(faxi_wr_checkid == AXI_ID);
-
-		assert(M_AXI_AWBURST == 2'b01);
-	end
-
-	always @(*)
-	if (M_AXI_AWVALID || M_AXI_WVALID)
-		assert(!r_stopped);
-
-	always @(*)
-	begin
-		assert(axi_awaddr[ADDRLSB-1:0]     == 0);
-		assert(cfg_frame_addr[ADDRLSB-1:0] == 0);
-		assert(req_addr[ADDRLSB-1:0]       == 0);
-		assert(req_line_addr[ADDRLSB-1:0]  == 0);
-	end
-
-	always @(*)
-		f_last_addr = f_wr_addr + ((wr_pending-1) << ADDRLSB);
-
-	always @(*)
-	if (M_AXI_WVALID && wr_pending != wr_line_beats + 1)
-		assert(&f_last_addr[ADDRLSB +: LGMAXBURST]);
-
-	always @(*)
-	if (!r_stopped)
-		assert(f_wr_addr[ADDRLSB-1:0] == 0);
-
-	always @(*)
-	if (faxi_wr_ckvalid || M_AXI_AWVALID)
-	begin
-		assert(!r_stopped);
-		if (faxi_wr_ckvalid)
-		begin
-			assert(!faxi_wr_lockd);
-			assert(faxi_wr_burst == 2'b01);
-			assert(faxi_wr_size == M_AXI_AWSIZE);
-			assert(faxi_wr_addr[ADDRLSB-1:0] == 0);
-			assert(faxi_wr_addr == f_wr_addr);
-		end else begin
-			assert(!M_AXI_AWLOCK);
-			assert(M_AXI_AWBURST == 2'b01);
-			assert(M_AXI_AWADDR[ADDRLSB-1:0] == 0);
-			assert(M_AXI_AWADDR == f_wr_addr[C_AXI_ADDR_WIDTH-1:0]);
-		end
-
-		if (!soft_reset && !phantom_start)
-		begin
-			if (wr_pending != wr_line_beats +1)
-			begin
-				// This is not the last burst of the line
-				assert(req_line_addr == f_wr_line_addr);
-				assert(req_nlines == wr_lines);
-
-				assert(wr_line_beats +1 - wr_pending == req_line_words);
-				assert(f_wr_addr + (wr_pending<<ADDRLSB)
-						== req_addr);
-			end else if (!wr_vlast)
-			begin
-				// Last burst of the line, but not of the frame
-				assert(req_line_addr == f_wr_line_addr + cfg_line_step);
-				assert(req_nlines == wr_lines - 1);
-				assert(req_line_words == cfg_line_words);
-				assert(wr_line_beats +1 == wr_pending);
-			end else begin
-				// Last burst of both line and frame
-				assert(req_line_addr == { 1'b0, cfg_frame_addr });
-				assert(req_nlines == cfg_frame_lines-1);
-				assert(req_line_words == cfg_line_words);
-				assert(wr_line_beats +1 == wr_pending);
-			end
-		end
-	end else if (!r_stopped)
-	begin
-		assert(req_addr   == f_wr_addr);
-		assert(req_line_addr == f_wr_line_addr);
-		assert(req_nlines == wr_lines);
-		assert(req_vlast  == wr_vlast);
-	end
-
-	always @(*)
-	if (cfg_active || !r_stopped)
-	begin
-		assert(req_vlast == (req_nlines == 0));
-		assert(wr_vlast  == (wr_lines == 0));
-		assert(wr_lines  <= cfg_frame_lines - 1);
-
-		if (cfg_frame_lines <= 1)
-		begin
-			assert(req_vlast);
-			assert(wr_vlast);
-		end
-	end
-
-	always @(*)
-	if (!r_stopped && !req_needs_alignment && !req_newline)
-		assert(req_addr[ADDRLSB+LGMAXBURST-1:0] == 0
-			||(req_line_words < ~req_addr[ADDRLSB +: LGMAXBURST]));
-
-	always @(*)
-	if (cfg_active)
-	begin
-		if (req_addr[ADDRLSB +: LGMAXBURST] == 0)
-			assert(!req_needs_alignment);
-		else if (req_addr[ADDRLSB +: LGMAXBURST]
-				+ req_line_words > (1<<LGMAXBURST))
-			assert(req_needs_alignment);	/// !!!!!
-		else if (req_addr[ADDRLSB +: LGMAXBURST]
-				+ req_line_words < (1<<LGMAXBURST))
-			assert(!req_needs_alignment);
-		if (req_line_words != cfg_line_words)
-			assert(!req_needs_alignment);
-	end
-
-	always @(*)
-	if (cfg_active && !req_newline)
-	begin
-		if (|next_line_addr[ADDRLSB +: LGMAXBURST])
-		begin
-			if (|cfg_line_words[15-ADDRLSB:LGMAXBURST])
-				assert(line_needs_alignment);
-			else if (~next_line_addr[ADDRLSB +: LGMAXBURST]
-					< cfg_line_words[LGMAXBURST-1:0])
-				assert(line_needs_alignment);
-			else
-				assert(!line_needs_alignment);
-		end else
-			assert(!line_needs_alignment);	// !!!!
-	end
-
-	always @(*)
-	if (cfg_active && !req_newline)
-	begin
-		if (cfg_frame_addr[ADDRLSB +: LGMAXBURST] == 0)
-			assert(!frame_needs_alignment);
-		else if (|cfg_line_words[15-ADDRLSB:LGMAXBURST])
-			assert(frame_needs_alignment);
-		else if (~cfg_frame_addr[ADDRLSB +: LGMAXBURST]
-				< cfg_line_words[LGMAXBURST-1:0])
-			assert(frame_needs_alignment);
-		else
-			assert(!frame_needs_alignment);
-	end
-
-
-	always @(*)
-		assert(faxi_rd_outstanding == 0);
-
-	always @(*)
-		assert(aw_bursts_outstanding == faxi_awr_nbursts
-				+ ((!phantom_start && M_AXI_AWVALID) ? 1:0));
-
-	always @(*)
-	begin
-		if (LGFIFO > 0) // !!!
-			assert(M_AXI_WVALID == (M_AXI_AWVALID || faxi_wr_pending > 0));
-		if (!M_AXI_AWVALID)
-			assert(faxi_wr_pending == wr_pending);
-		else
-			assert(wr_pending == M_AXI_AWLEN + 1);
-	end
-
-	always @(*)
-	if (M_AXI_AWID == faxi_wr_checkid)
-		assert(faxi_wrid_nbursts == faxi_awr_nbursts);
-	else
-		assert(faxi_wrid_nbursts == 0);
-
-	always @(*)
-	if (!soft_reset)
-		assert(!M_AXI_AWVALID || M_AXI_AWADDR[ADDRLSB-1:0] == 0);
-
-	always @(*)
-	begin
-		assert(cfg_frame_addr[ADDRLSB-1:0] == 0);
-		if (!r_stopped)
-		begin
-			assert(req_addr[ADDRLSB-1:0] == 0);
-			assert(req_line_addr[ADDRLSB-1:0] == 0);
-			assert(f_wr_line_addr[ADDRLSB-1:0] == 0);
-		end
-	end
-
-	always @(*)
-	if (r_stopped)
-	begin
-		assert(faxi_awr_nbursts == 0);
-		assert(!M_AXI_AWVALID);
-		assert(!M_AXI_WVALID);
-	end
-
-	always @(*)
-	begin
-		assert(fifo_data_available <= (1<<LGFIFO));
-		assert(fifo_data_available <= fifo_fill);
-		if (!reset_fifo && LGFIFO > 0)	// && soft_reset ??
-		begin
-			assert(fifo_data_available + faxi_wr_pending
-			+((M_AXI_AWVALID && !phantom_start) ? (M_AXI_AWLEN+1):0)
-			== fifo_fill);
-		end
-	end
-
-	always @(*)
-	if (!soft_reset && !r_stopped)
-		assert(req_line_words >= (phantom_start ? (M_AXI_AWLEN+1):0));
-	// }}}
-
-	// }}}
-	////////////////////////////////////////////////////////////////////////
-	//
-	// Other formal properties
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	// {{{
-
-	always @(*)
-	if (cfg_active)
-	begin
-		if (M_AXI_AWVALID)
-			assert(f_wr_addr[C_AXI_ADDR_WIDTH-1:0] == M_AXI_AWADDR);
-		if (M_AXI_AWVALID && M_AXI_AWADDR[ADDRLSB+LGMAXBURST-1:0] != 0)
-			assert(wr_line_beats == cfg_line_words-1);
-		if ((cfg_line_words >= (1<<LGMAXBURST))
-				&& (req_addr[ADDRLSB+LGMAXBURST-1:0] != 0))
-			assert(!req_hlast);
-		if (!req_newline)
-			assert(req_hlast == (req_line_words <= next_awlen+1));
-		if (req_addr[ADDRLSB+LGMAXBURST-1:0] != 0)
-			assert(req_line_words == cfg_line_words);
-		if (req_addr[ADDRLSB+LGMAXBURST-1:0] != 0)
-			assert(req_addr[ADDRLSB+LGMAXBURST-1:0]
-				== req_line_addr[ADDRLSB+LGMAXBURST-1:0]);
-		assert(req_line_words + (req_addr[C_AXI_ADDR_WIDTH:ADDRLSB]
-				- req_line_addr[C_AXI_ADDR_WIDTH:ADDRLSB])
-			== cfg_line_words);
-		assert(req_line_words <= cfg_line_words);
-		assert((req_addr[C_AXI_ADDR_WIDTH:ADDRLSB]
-				- req_line_addr[C_AXI_ADDR_WIDTH:ADDRLSB])
-				<= cfg_line_words);
-	end
-
-	always @(*)
-	if (soft_reset)
-		assert(!cfg_active);
-
-	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Contract checks
-	//
-	////////////////////////////////////////////////////////////////////////
-	//
 	// {{{
-
-	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Cover checks
 	//
-	////////////////////////////////////////////////////////////////////////
-	//
-	// {{{
-	reg			cvr_full_frame, cvr_full_size;
-	(* anyconst *) reg	cvr_hlast_rlast;
 
-	always @(posedge i_clk)
-	if (r_stopped)
-		cvr_full_size <= ({cfg_line_step, {(ADDRLSB){1'b0}} } >= cfg_line_words)
-				&&(cfg_line_words > 5)
-				&&(cfg_frame_lines > 4);
-	else begin
-		if ($changed(cfg_line_step))
-			cvr_full_size <= 0;
-		if ($changed(cfg_line_words))
-			cvr_full_size <= 0;
-		if ($changed(cfg_frame_lines))
-			cvr_full_size <= 0;
-		if ($changed(cfg_frame_addr))
-			cvr_full_size <= 0;
-	end
+	// The formal proof for this core doesn't (yet) include a contract
+	// check.
 
-	always @(posedge i_clk)
-	if (r_stopped || !cvr_full_size)
-		cvr_full_frame <= 0;
-	else if (!cvr_full_frame)
-		cvr_full_frame <= wr_vlast && wr_hlast
-					&& M_AXI_WVALID && M_AXI_WREADY;
-
-	always @(*)
-		cover(!soft_reset);
-
-	always @(*)
-		cover(start_burst);
-
-	always @(*)
-		cover(M_AXI_AWVALID && M_AXI_AWREADY);
-
-	always @(*)
-		cover(M_AXI_WVALID && M_AXI_WLAST);
-
-	always @(*)
-		cover(M_AXI_BVALID);
-
-	always @(*)
-		cover(!r_stopped && cvr_full_frame);
-
-	always @(*)
-		cover(cvr_full_frame && phantom_start && !r_stopped);
-
-	always @(*)
-	if (cvr_hlast_rlast)
-	begin
-		assume(S_AXIS_TVALID);
-		assume(cfg_frame_addr[12:0] == 0);
-		assume(cfg_line_step[3:0] == 0);
-	end
-
-	always @(*)
-		cover(cvr_hlast_rlast && cvr_full_frame && phantom_start && !r_stopped);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1849,15 +1245,6 @@ module	axivcamera #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	always @(posedge i_clk)
-	if (S_AXI_ARESETN && (!r_stopped || cfg_active))
-	begin
-		assert($stable(cfg_frame_addr));
-		assert($stable(cfg_frame_lines));
-		assert($stable(cfg_line_words));
-		if (!$rose(cfg_active))
-			assert($stable(cfg_line_step));
-	end
 
 	// If the FIFO gets reset, then we really don't care about what
 	// gets written to memory.  However, it is possible that a value
@@ -1868,6 +1255,6 @@ module	axivcamera #(
 	if (M_AXI_WVALID)
 		assume(!lost_sync && cfg_active);
 	// }}}
+	// }}}
 `endif
-// }}}
 endmodule

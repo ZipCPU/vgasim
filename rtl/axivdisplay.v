@@ -135,6 +135,11 @@ module	axivdisplay #(
 		localparam	ADDRLSB = $clog2(C_AXI_DATA_WIDTH)-3,
 		localparam	AXILLSB = $clog2(C_AXIL_DATA_WIDTH)-3,
 		//
+		// OPT_UNALIGNED: Allow unaligned accesses, address requests
+		// and sizes which may or may not match the underlying data
+		// width.  If set, the core will quietly align these requests.
+		// parameter [0:0]	OPT_UNALIGNED = 1'b0,
+		//
 		// OPT_LGMAXBURST
 		parameter	OPT_LGMAXBURST = 8,
 		//
@@ -1057,8 +1062,9 @@ module	axivdisplay #(
 	// End AXI protocol section
 	// }}}
 
-	// Verilator lint_off UNUSED
+	// Make Verilator happy
 	// {{{
+	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, S_AXIL_AWPROT, S_AXIL_ARPROT, M_AXI_RID,
 			M_AXI_RRESP[0], fifo_full, wskd_strb[2:0],
@@ -1276,19 +1282,11 @@ module	axivdisplay #(
 	// ...
 	//
 
-	always @(*)
-	if (r_busy)
-	begin
-		if (!OPT_UNALIGNED)
-			assert(!M_AXI_ARVALID || M_AXI_ARADDR[ADDRLSB-1:0] == 0);
-	end
-
 	reg	[LGMAXBURST-1:0]	f_rd_subaddr;
 	always @(*)
 		f_rd_subaddr = f_rd_addr[ADDRLSB +: LGMAXBURST];
 
 	always @(*)
-	if (!OPT_UNALIGNED)
 	begin
 		assert(cfg_frame_addr[ADDRLSB-1:0] == 0);
 		if (!r_stopped)
@@ -1375,7 +1373,7 @@ module	axivdisplay #(
 		cvr_full_frame <= rd_vlast && rd_hlast && M_AXI_RVALID && M_AXI_RREADY;
 
 	always @(*)
-		cover(r_busy);
+		cover(!soft_reset);
 
 	always @(*)
 		cover(start_burst);
@@ -1390,10 +1388,10 @@ module	axivdisplay #(
 		cover(M_AXI_RVALID & M_AXI_RLAST);
 
 	always @(*)
-		cover(!axi_abort_pending && cvr_full_frame);
+		cover(!r_stopped && cvr_full_frame);
 
 	always @(*)
-		cover(cvr_full_frame && phantom_start && !axi_abort_pending);
+		cover(cvr_full_frame && phantom_start && !r_stopped);
 
 	always @(*)
 	if (cvr_hlast_rlast)
@@ -1406,7 +1404,7 @@ module	axivdisplay #(
 	end
 
 	always @(*)
-		cover(cvr_hlast_rlast && cvr_full_frame && phantom_start && !axi_abort_pending);
+		cover(cvr_hlast_rlast && cvr_full_frame && phantom_start && !r_stopped);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
