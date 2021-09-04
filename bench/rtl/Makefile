@@ -44,11 +44,12 @@ RTL   := ../../rtl
 .DELETE_ON_ERROR:
 
 .PHONY: demo
-test: demo axidemo axihdmi axirepeater
+test: demo axidemo axihdmi axirepeater spritedemo
 demo:        $(VDIRFB)/Vdemo__ALL.a
 axidemo:     $(VDIRFB)/Vaxidemo__ALL.a
 axihdmi:     $(VDIRFB)/Vaxihdmi__ALL.a
 axirepeater: $(VDIRFB)/Vaxirepeater__ALL.a
+spritedemo:  $(VDIRFB)/Vspritedemo__ALL.a
 
 VOBJ := obj_dir
 SUBMAKE := $(MAKE) --no-print-directory --directory=$(VOBJ) -f
@@ -59,8 +60,8 @@ VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
 VFLAGS := -Wall --MMD -O3 --trace -y ../../rtl -cc
 
-$(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.h
-$(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.cpp
+# $(VDIRFB)/Vdemo.h: $(VDIRFB)/Vdemo.h
+# $(VDIRFB)/Vdemo.mk: $(VDIRFB)/Vdemo.cpp
 $(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.mk
 $(VDIRFB)/Vdemo.h: demo.v
 
@@ -71,8 +72,8 @@ $(VDIRFB)/Vaxidemo.h: axidemo.v
 
 # $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
 $(VDIRFB)/V%.h:  $(VDIRFB)/V%.cpp
-$(VDIRFB)/V%.mk: $(VDIRFB)/V%.cpp
-$(VDIRFB)/V%.cpp: $(FBDIR)/%.v
+$(VDIRFB)/V%.cpp: $(VDIRFB)/V%.mk
+$(VDIRFB)/V%.mk: $(FBDIR)/%.v
 	$(VERILATOR) $(VFLAGS) $*.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
@@ -86,6 +87,9 @@ $(VDIRFB)/Vaxihdmi.cpp $(VDIRFB)/Vaxihdmi.mk: axidemo.v demofull.v $(RTL)/axivdi
 
 $(VDIRFB)/Vaxirepeater.cpp $(VDIRFB)/Vaxirepeater.mk: axirepeater.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc axirepeater.v
+
+$(VDIRFB)/Vspritedemo.cpp $(VDIRFB)/Vspritedemo.mk: spritedemo.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
+	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc spritedemo.v
 
 ## CLEAN
 ## {{{

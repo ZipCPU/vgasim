@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -248,8 +248,14 @@ module	axirepeater #(
 	wire [DW-1:0]	axi_hdmi_rdata;
 	wire		axi_hdmi_rlast;
 	wire [1:0]	axi_hdmi_rresp;
+
 	// }}}
 
+	// (Unused) external video interface
+	wire	ex_clk, ex_aresetn;
+	wire	ex_tvalid, ex_tready;
+	wire	[23:0]	ex_tdata;
+	wire		ex_tuser, ex_tlast;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -617,6 +623,20 @@ module	axirepeater #(
 		.M_AXI_RLAST( axi_hdmi_rlast),
 		.M_AXI_RRESP( axi_hdmi_rresp),
 		// }}}
+		// External interface
+		// {{{
+		// Bypass the external interface, connecting the output
+		// back into the input (it'll be ignored anyway)
+		.M_VID_ACLK(ex_clk), .M_VID_ARESETN(ex_aresetn),
+		//
+		.M_VID_TVALID(ex_tvalid), .M_VID_TREADY(ex_tready),
+		.M_VID_TDATA(ex_tdata),   .M_VID_TUSER(ex_tuser),
+		.M_VID_TLAST(ex_tlast),
+
+		.S_VID_TVALID(ex_tvalid), .S_VID_TREADY(ex_tready),
+		.S_VID_TDATA(ex_tdata),   .S_VID_TUSER(ex_tuser),
+		.S_VID_TLAST(ex_tlast),
+		// }}}
 		// HDMI output video stream
 		// {{{
 		.i_pixclk(    i_hdmi_clk),
@@ -652,6 +672,9 @@ module	axirepeater #(
 		//
 		axil_cam_awaddr[11:6], axil_cam_araddr[11:6],
 		axil_hdmi_awaddr[11],  axil_hdmi_araddr[11],
+		//
+		ex_clk, ex_aresetn,
+		//
 		1'b0
 		// }}}
 		};

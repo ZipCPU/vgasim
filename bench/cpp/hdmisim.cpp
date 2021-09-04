@@ -99,6 +99,7 @@ void	HDMISIM::get_preferred_height_for_width_vfunc(int w,
 #define	DATA_ISLAND	4
 
 int	HDMISIM::bitreverse(int val) {
+	// {{{
 	int	result = 0, tmp = val;
 
 	for(int k=0; k<10; k++) {
@@ -109,14 +110,18 @@ int	HDMISIM::bitreverse(int val) {
 
 	return result;
 }
+// }}}
 
 bool	HDMISIM::isguard(int val) {
+	// {{{
 	if ((val == 0x2cc)||(val == 0x133))
 		return true;
 	return false;
 }
+// }}}
 
 int	HDMISIM::ctldata(int val) {
+	// {{{
 	switch(val) {
 	case 0x354:	return 0;
 	case 0x0ab:	return 1;
@@ -125,8 +130,10 @@ int	HDMISIM::ctldata(int val) {
 	default:	return -1;
 	}
 }
+// }}}
 
 int	HDMISIM::pktdata(int val) {
+	// {{{
 	switch(val) {
 	case 0x29c:	return 0;
 	case 0x263:	return 1;
@@ -150,8 +157,10 @@ int	HDMISIM::pktdata(int val) {
 	default:	return -1;
 	}
 }
+// }}}
 
 int	HDMISIM::pixeldata(int val) {
+	// {{{
 	int	midp, result = 0;
 
 	midp = val & 0x3ff;
@@ -167,8 +176,10 @@ int	HDMISIM::pixeldata(int val) {
 	result = bitreverse(midp);
 	return result;
 }
+// }}}
 
 void	HDMISIM::operator()(const int blu, const int grn, const int red) {
+	// {{{
 	int	brblu, brgrn, brred, r=0, g=0, b=0, hsync, vsync, s;
 	int	xv, yv;
 
@@ -464,8 +475,10 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 	m_last_g     = g;
 	m_last_b     = b;
 }
+// }}}
 
 bool	HDMISIM::on_draw(CONTEXT &gc) {
+	// {{{
 	// printf("ON-DRAW\n");
 	gc->save();
 	// gc->rectangle(0,0,VGA_WIDTH, VGA_HEIGHT);
@@ -476,20 +489,24 @@ bool	HDMISIM::on_draw(CONTEXT &gc) {
 
 	return true;
 }
+// }}}
 
 void	HDMIWIN::init(void) {
-
+	// {{{
 	m_hdmisim->set_size_request(SIMWIN::width(),SIMWIN::height());
 	set_border_width(0);
 	add(*m_hdmisim);
 	show_all();
 	Gtk::Window::set_title(Glib::ustring("HDMI Simulator"));
 };
+// }}}
 
 HDMIWIN::HDMIWIN(void) : SIMWIN(640,480) {
+	//  {{{
 	m_hdmisim = new HDMISIM(640, 480);
 	init();
 }
+// }}}
 
 HDMIWIN::HDMIWIN(const int w, const int h) : SIMWIN(w,h) {
 	m_hdmisim = new HDMISIM(w, h);

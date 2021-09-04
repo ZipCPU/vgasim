@@ -10,8 +10,9 @@ cvr
 prf: mode  prove
 cvr: mode  cover
 # depth 4
-depth 10
+depth 13
 cvr: depth 90
+multiclock on
 
 [engines]
 smtbmc

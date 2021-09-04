@@ -26,6 +26,10 @@
 ##		An AXI demonstrator.  This demo configures an AXI Video source,
 ##		and then feeds the result into the VGA (or HDMI) simulator.
 ##
+##	sprite_tb
+##		The AXI demonstrator, modified to include the hardware sprite
+##		generator.
+##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
@@ -82,12 +86,11 @@ SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
-all:	main_tb
 
 SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
 HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp
 #
-PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb # hdmicam_tb
+PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb sprite_tb # hdmicam_tb
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -104,6 +107,10 @@ $(OBJDIR)/hdmi_tb.o: axi_tb.cpp
 	$(mk-objdir)
 	$(CXX) -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
 
+$(OBJDIR)/sprite_tb.o: axi_tb.cpp
+	$(mk-objdir)
+	$(CXX) -DSPRITETB -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
+
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
 	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
 
@@ -117,6 +124,10 @@ main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a
 AXIOBJS := $(OBJDIR)/axi_tb.o
 axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
 	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+
+SPRITEOBJS := $(OBJDIR)/sprite_tb.o
+sprite_tb: $(SPRITEOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vspritedemo__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vspritedemo__ALL.a $(GFXLIBS) -o $@
 
 HDMIOBJS := $(OBJDIR)/hdmi_tb.o
 hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a

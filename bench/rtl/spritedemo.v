@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axidemo.v
+// Filename: 	spritedemo.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// Copyright (C) 2021, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -41,7 +41,7 @@
 `default_nettype	none
 // `define	HDMI
 // }}}
-module	axidemo #(
+module	spritedemo #(
 		// {{{
 		parameter AXI_ADDR_WIDTH = 26,
 		parameter AXI_DATA_WIDTH = 32,
@@ -50,7 +50,9 @@ module	axidemo #(
 		parameter DW = AXI_DATA_WIDTH,
 		parameter IW = AXI_ID_WIDTH,
 		//
-		parameter C_AXIL_ADDR_WIDTH = 11,
+		parameter	SPRITE_FILE="gtpix.hex",
+		//
+		parameter C_AXIL_ADDR_WIDTH = 16,
 		parameter C_AXIL_DATA_WIDTH = 32
 		// parameter AWL = C_AXIL_ADDR_WIDTH,
 		// parameter DWL = C_AXIL_ADDR_WIDTH
@@ -99,13 +101,53 @@ module	axidemo #(
 		output	wire	[C_AXIL_DATA_WIDTH-1:0]		S_AXI_RDATA,
 		output	wire	[1:0]				S_AXI_RRESP
 		// }}}
-
 		// }}}
 	);
 
 	// Register/net declarations
 	// {{{
-	// Internal AXI interface
+	// Internal AXI-lite interface
+
+	// Video control interface
+	// {{{
+	wire				axil_vid_awvalid, axil_vid_awready;
+	wire	[C_AXIL_ADDR_WIDTH-1:0]	axil_vid_awaddr;
+	wire	[2:0]			axil_vid_awprot;
+	wire				axil_vid_wvalid, axil_vid_wready;
+	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_vid_wdata;
+	wire [C_AXIL_DATA_WIDTH/8-1:0]	axil_vid_wstrb;
+	wire	[2:0]			axil_vid_awprot;
+	wire				axil_vid_bvalid, axil_vid_bready;
+	wire	[1:0]			axil_vid_bresp;
+	wire				axil_vid_arvalid, axil_vid_arready;
+	wire	[C_AXIL_ADDR_WIDTH-1:0]	axil_vid_araddr;
+	wire	[2:0]			axil_vid_arprot;
+	wire				axil_vid_rvalid, axil_vid_rready;
+	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_vid_rdata;
+	wire	[1:0]			axil_vid_rresp;
+	// }}}
+
+	// Sprite control interface
+	// {{{
+	wire				axil_sprite_awvalid,axil_sprite_awready;
+	wire	[C_AXIL_ADDR_WIDTH-1:0]	axil_sprite_awaddr;
+	wire	[2:0]			axil_sprite_awprot;
+	wire				axil_sprite_wvalid, axil_sprite_wready;
+	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_sprite_wdata;
+	wire [C_AXIL_DATA_WIDTH/8-1:0]	axil_sprite_wstrb;
+	wire	[2:0]			axil_sprite_awprot;
+	wire				axil_sprite_bvalid, axil_sprite_bready;
+	wire	[1:0]			axil_sprite_bresp;
+	wire				axil_sprite_arvalid,axil_sprite_arready;
+	wire	[C_AXIL_ADDR_WIDTH-1:0]	axil_sprite_araddr;
+	wire	[2:0]			axil_sprite_arprot;
+	wire				axil_sprite_rvalid, axil_sprite_rready;
+	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_sprite_rdata;
+	wire	[1:0]			axil_sprite_rresp;
+	// }}}
+
+	// Internal AXI (not lite) interface
+	// {{{
 	wire		mem_awready, mem_arready, mem_wready, mem_rready,
 			mem_arvalid, mem_bvalid, mem_rvalid, mem_rlast;
 	wire [IW-1:0]	mem_arid, mem_bid, mem_rid;
@@ -120,25 +162,117 @@ module	axidemo #(
 
 	wire	[1:0]	mem_rresp, mem_bresp;
 	wire [DW-1:0]	mem_rdata;
+	// }}}
 
 	// RAM interface
+	// {{{
 	wire			ram_we, ram_rd;
 	reg	[AWW-1:0]	ram_waddr, ram_raddr;
 	reg	[DW-1:0]	ram_wdata, ram_rdata;
 	reg	[DW/8-1:0]	ram_wstrb;
 	reg	[DW-1:0]	ram	[0:(1<<AWW)-1];
 	integer			rk;
+	// }}}
 
 	// (Unused) clock output generator
 	wire	[7:0]	genclk_word;
 
-	// (Unused) external video interface
-	wire	ex_clk, ex_aresetn;
-	wire	ex_tvalid, ex_tready;
-	wire	[23:0]	ex_tdata;
-	wire		ex_tuser, ex_tlast;
+	// Video stream cut interface
+	// {{{
+	wire	vid_aclk, vid_reset_n;
+	//
+	// The video source
+	wire		vsrc_tvalid, vsrc_tready;
+	wire	[23:0]	vsrc_tdata;
+	wire		vsrc_tuser, vsrc_tlast;
+	//
+	// The video sink
+	wire		vsnk_tvalid, vsnk_tready;
+	wire	[23:0]	vsnk_tdata;
+	wire		vsnk_tuser, vsnk_tlast;
 	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// AXI-lite Crossbar
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	axilxbar #(
+		// {{{
+		.C_AXI_DATA_WIDTH(C_AXIL_DATA_WIDTH),
+		.C_AXI_ADDR_WIDTH(C_AXIL_ADDR_WIDTH),
+		.NM(1), .NS(2),
+		.SLAVE_ADDR(
+			{ { 1'b1, 15'h0 },
+			  { 1'b0, 15'h0 } }
+		),
+		.SLAVE_MASK(
+			{ { 1'b1, 15'h0 },
+			  { 1'b1, 15'h0 } }
+		)
+		// }}}
+	) u_axilxbar (
+		// {{{
+		.S_AXI_ACLK(i_clk), .S_AXI_ARESETN(!i_reset),
+		// Incoming interfaces from the various AXI-lite masters
+		// {{{
+		.S_AXI_AWVALID(S_AXI_AWVALID),
+		.S_AXI_AWREADY(S_AXI_AWREADY),
+		.S_AXI_AWADDR( S_AXI_AWADDR),
+		.S_AXI_AWPROT( S_AXI_AWPROT),
+		//
+		.S_AXI_WVALID(S_AXI_WVALID),
+		.S_AXI_WREADY(S_AXI_WREADY),
+		.S_AXI_WDATA( S_AXI_WDATA),
+		.S_AXI_WSTRB( S_AXI_WSTRB),
+		//
+		.S_AXI_BVALID(S_AXI_BVALID),
+		.S_AXI_BREADY(S_AXI_BREADY),
+		.S_AXI_BRESP( S_AXI_BRESP),
+		//
+		.S_AXI_ARVALID(S_AXI_ARVALID),
+		.S_AXI_ARREADY(S_AXI_ARREADY),
+		.S_AXI_ARADDR( S_AXI_ARADDR),
+		.S_AXI_ARPROT( S_AXI_ARPROT),
+		//
+		.S_AXI_RVALID(S_AXI_RVALID),
+		.S_AXI_RREADY(S_AXI_RREADY),
+		.S_AXI_RDATA( S_AXI_RDATA),
+		.S_AXI_RRESP( S_AXI_RRESP),
+		// }}}
+		// Outgoing interfaces to the various AXI-lite slaves
+		// {{{
+		.M_AXI_AWVALID({ axil_sprite_awvalid, axil_vid_awvalid }),
+		.M_AXI_AWREADY({ axil_sprite_awready, axil_vid_awready }),
+		.M_AXI_AWADDR( { axil_sprite_awaddr,  axil_vid_awaddr }),
+		.M_AXI_AWPROT( { axil_sprite_awprot,  axil_vid_awprot }),
+		//
+		.M_AXI_WVALID({ axil_sprite_wvalid, axil_vid_wvalid }),
+		.M_AXI_WREADY({ axil_sprite_wready, axil_vid_wready }),
+		.M_AXI_WDATA( { axil_sprite_wdata,  axil_vid_wdata }),
+		.M_AXI_WSTRB( { axil_sprite_wstrb,  axil_vid_wstrb }),
+		//
+		.M_AXI_BVALID({ axil_sprite_bvalid, axil_vid_bvalid }),
+		.M_AXI_BREADY({ axil_sprite_bready, axil_vid_bready }),
+		.M_AXI_BRESP( { axil_sprite_bresp,  axil_vid_bresp }),
+		//
+		.M_AXI_ARVALID({ axil_sprite_arvalid, axil_vid_arvalid }),
+		.M_AXI_ARREADY({ axil_sprite_arready, axil_vid_arready }),
+		.M_AXI_ARADDR( { axil_sprite_araddr,  axil_vid_araddr }),
+		.M_AXI_ARPROT( { axil_sprite_arprot,  axil_vid_arprot }),
+		//
+		.M_AXI_RVALID({ axil_sprite_rvalid, axil_vid_rvalid }),
+		.M_AXI_RREADY({ axil_sprite_rready, axil_vid_rready }),
+		.M_AXI_RDATA( { axil_sprite_rdata,  axil_vid_rdata }),
+		.M_AXI_RRESP( { axil_sprite_rresp,  axil_vid_rresp })
+		// }}}
+		// }}}
+	);
+
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// The AXI block RAM controller
@@ -244,7 +378,7 @@ module	axidemo #(
 		.C_AXI_ADDR_WIDTH(AXI_ADDR_WIDTH),
 		.C_AXI_DATA_WIDTH(AXI_DATA_WIDTH),
 		.C_AXI_ID_WIDTH(AXI_ID_WIDTH),
-		.OPT_EXTERNAL(1'b0)
+		.OPT_EXTERNAL(1'b1)
 		// }}}
 	) video (
 		// {{{
@@ -252,29 +386,29 @@ module	axidemo #(
 		.S_AXI_ARESETN(!i_reset),
 		// AXI-lite control interface
 		// {{{
-		.S_AXIL_AWVALID(S_AXI_AWVALID),
-		.S_AXIL_AWREADY(S_AXI_AWREADY),
-		.S_AXIL_AWADDR(S_AXI_AWADDR),
-		.S_AXIL_AWPROT(S_AXI_AWPROT),
+		.S_AXIL_AWVALID(axil_vid_awvalid),
+		.S_AXIL_AWREADY(axil_vid_awready),
+		.S_AXIL_AWADDR( axil_vid_awaddr[10:0]),
+		.S_AXIL_AWPROT( axil_vid_awprot),
 		//
-		.S_AXIL_WVALID(S_AXI_WVALID),
-		.S_AXIL_WREADY(S_AXI_WREADY),
-		.S_AXIL_WDATA( S_AXI_WDATA),
-		.S_AXIL_WSTRB( S_AXI_WSTRB),
+		.S_AXIL_WVALID(axil_vid_wvalid),
+		.S_AXIL_WREADY(axil_vid_wready),
+		.S_AXIL_WDATA( axil_vid_wdata),
+		.S_AXIL_WSTRB( axil_vid_wstrb),
 		//
-		.S_AXIL_BVALID(S_AXI_BVALID),
-		.S_AXIL_BREADY(S_AXI_BREADY),
-		.S_AXIL_BRESP( S_AXI_BRESP),
+		.S_AXIL_BVALID(axil_vid_bvalid),
+		.S_AXIL_BREADY(axil_vid_bready),
+		.S_AXIL_BRESP( axil_vid_bresp),
 		//
-		.S_AXIL_ARVALID(S_AXI_ARVALID),
-		.S_AXIL_ARREADY(S_AXI_ARREADY),
-		.S_AXIL_ARADDR(S_AXI_ARADDR),
-		.S_AXIL_ARPROT(S_AXI_ARPROT),
+		.S_AXIL_ARVALID(axil_vid_arvalid),
+		.S_AXIL_ARREADY(axil_vid_arready),
+		.S_AXIL_ARADDR( axil_vid_araddr[10:0]),
+		.S_AXIL_ARPROT( axil_vid_arprot),
 		//
-		.S_AXIL_RVALID(S_AXI_RVALID),
-		.S_AXIL_RREADY(S_AXI_RREADY),
-		.S_AXIL_RDATA(S_AXI_RDATA),
-		.S_AXIL_RRESP(S_AXI_RRESP),
+		.S_AXIL_RVALID(axil_vid_rvalid),
+		.S_AXIL_RREADY(axil_vid_rready),
+		.S_AXIL_RDATA( axil_vid_rdata),
+		.S_AXIL_RRESP( axil_vid_rresp),
 		// }}}
 		// AXI data interface
 		// {{{
@@ -301,15 +435,15 @@ module	axidemo #(
 		// {{{
 		// Bypass the external interface, connecting the output
 		// back into the input (it'll be ignored anyway)
-		.M_VID_ACLK(ex_clk), .M_VID_ARESETN(ex_aresetn),
+		.M_VID_ACLK(vid_aclk), .M_VID_ARESETN(vid_reset_n),
 		//
-		.M_VID_TVALID(ex_tvalid), .M_VID_TREADY(ex_tready),
-		.M_VID_TDATA(ex_tdata),   .M_VID_TUSER(ex_tuser),
-		.M_VID_TLAST(ex_tlast),
+		.M_VID_TVALID(vsrc_tvalid), .M_VID_TREADY(vsrc_tready),
+		.M_VID_TDATA(vsrc_tdata),   .M_VID_TUSER(vsrc_tuser),
+		.M_VID_TLAST(vsrc_tlast),
 
-		.S_VID_TVALID(ex_tvalid), .S_VID_TREADY(ex_tready),
-		.S_VID_TDATA(ex_tdata),   .S_VID_TUSER(ex_tuser),
-		.S_VID_TLAST(ex_tlast),
+		.S_VID_TVALID(vsnk_tvalid), .S_VID_TREADY(vsnk_tready),
+		.S_VID_TDATA(vsnk_tdata),   .S_VID_TUSER(vsnk_tuser),
+		.S_VID_TLAST(vsnk_tlast),
 		// }}}
 		// Pixel output interface(s)
 		// {{{
@@ -332,6 +466,64 @@ module	axidemo #(
 		// }}}
 	);
 	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// The Sprite demo
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	axissprite #(
+		// {{{
+		.XSIZE(64), .YSIZE(64),
+		.INITIAL_MEM(SPRITE_FILE),
+		.OPT_TUSER_IS_SOF(1'b0)
+		// }}}
+	) u_sprite (
+		// {{{
+		.S_AXI_ACLK(i_clk),    .S_AXI_ARESETN(!i_reset),	// Systm
+		.S_VID_ACLK(vid_aclk), .S_VID_ARESETN(vid_reset_n),
+		// Control interface
+		// {{{
+		.S_AXI_AWVALID(axil_sprite_awvalid),
+		.S_AXI_AWREADY(axil_sprite_awready),
+		.S_AXI_AWADDR( axil_sprite_awaddr[14:0]),
+		.S_AXI_AWPROT( axil_sprite_awprot),
+		//
+		.S_AXI_WVALID(axil_sprite_wvalid),
+		.S_AXI_WREADY(axil_sprite_wready),
+		.S_AXI_WDATA( axil_sprite_wdata),
+		.S_AXI_WSTRB( axil_sprite_wstrb),
+		//
+		.S_AXI_BVALID(axil_sprite_bvalid),
+		.S_AXI_BREADY(axil_sprite_bready),
+		.S_AXI_BRESP( axil_sprite_bresp),
+		//
+		.S_AXI_ARVALID(axil_sprite_arvalid),
+		.S_AXI_ARREADY(axil_sprite_arready),
+		.S_AXI_ARADDR( axil_sprite_araddr[14:0]),
+		.S_AXI_ARPROT( axil_sprite_arprot),
+		//
+		.S_AXI_RVALID(axil_sprite_rvalid),
+		.S_AXI_RREADY(axil_sprite_rready),
+		.S_AXI_RDATA( axil_sprite_rdata),
+		.S_AXI_RRESP( axil_sprite_rresp),
+		// }}}
+		// Video interface
+		// {{{
+		// Incoming
+		.S_AXIS_TVALID(vsrc_tvalid), .S_AXIS_TREADY(vsrc_tready),
+		.S_AXIS_TDATA( vsrc_tdata),  .S_AXIS_TUSER( vsrc_tuser),
+		.S_AXIS_TLAST( vsrc_tlast),
+		// Outgoing / result
+		.M_AXIS_TVALID(vsnk_tvalid), .M_AXIS_TREADY(vsnk_tready),
+		.M_AXIS_TDATA( vsnk_tdata),  .M_AXIS_TUSER( vsnk_tuser),
+		.M_AXIS_TLAST( vsnk_tlast)
+		// }}}
+		// }}}
+	);
+
+	// }}}
 
 	// Make Verilator happy
 	// {{{
@@ -339,8 +531,9 @@ module	axidemo #(
 	wire	unused;
 	assign	unused = &{ 1'b0, mem_bvalid, mem_awready, mem_wready,
 				mem_bid, mem_bresp, genclk_word,
-				ex_clk, ex_aresetn
-				};
+			axil_sprite_awaddr[15], axil_sprite_araddr[15],
+			axil_vid_awaddr[15:11], axil_vid_araddr[15:11]
+			};
 	// verilator lint_on  UNUSED
 	// }}}
 endmodule
