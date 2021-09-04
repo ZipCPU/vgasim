@@ -260,10 +260,21 @@ module	axishdmi #(
 
 	// o_ready
 	// {{{
+	// If we've lost sync, flush the incoming frame and then force the
+	// input to wait until the first of the frame.
 	always @(*)
 	if (lost_sync)
-		o_ready = (!i_vlast || !i_hlast) || (r_newframe && w_rd);
-	else
+	begin
+		if (!i_vlast || !i_hlast)
+			// Skip to the end of the incoming frame before
+			// trying again
+			o_ready = 1'b1;
+		else if (!r_newframe)
+			o_ready = 1'b0;
+		else
+			// First pixel of a new frame--sync to it
+			o_ready = 1'b1;
+	end else
 		o_ready = w_rd;
 	// }}}
 
