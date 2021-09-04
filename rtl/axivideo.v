@@ -119,6 +119,7 @@ module	axivideo #(
 		//
 		// AXI_ID is the ID we will use for all of our AXI transactions
 		parameter	AXI_ID = 0,
+		parameter [0:0]	OPT_EXTERNAL = 1'b1,
 		//
 		// xMODE_WIDTH is the number of bits required to hold the
 		// various mode numbers
@@ -197,6 +198,25 @@ module	axivideo #(
 		input	wire				M_AXI_RLAST,
 		input	wire	[C_AXI_ID_WIDTH-1:0]	M_AXI_RID,
 		input	wire	[1:0]			M_AXI_RRESP,
+		// }}}
+		//
+		// The external video processing pipeline interface
+		// {{{
+		// Outgoing / Master
+		output	wire		M_VID_ACLK,
+		output	wire		M_VID_ARESETN,
+		//
+		output	wire		M_VID_TVALID,
+		input	wire		M_VID_TREADY,
+		output	wire	[23:0]	M_VID_TDATA,
+		output	wire		M_VID_TUSER,
+		output	wire		M_VID_TLAST,
+		// Incoming / slave
+		input	wire		S_VID_TVALID,
+		output	wire		S_VID_TREADY,
+		input	wire	[23:0]	S_VID_TDATA,
+		input	wire		S_VID_TUSER,
+		input	wire		S_VID_TLAST,
 		// }}}
 		//
 		// The video interface
@@ -283,6 +303,15 @@ module	axivideo #(
 	reg		cmap_read_flag, dma_read_flag;
 	reg		new_mode;
 
+	wire				cmap_hsync, cmap_vsync, cmap_read;
+	wire	[C_AXI_DATA_WIDTH-1:0]	cmap_data;
+	wire		pix_valid, pix_ready, pix_hsync, pix_vsync;
+	wire	[23:0]	pixel;
+
+	wire		vin_valid, vin_ready, vin_hsync, vin_vsync;
+	wire	[23:0]	vin_data;
+
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -296,25 +325,38 @@ module	axivideo #(
 	// Write signaling
 	//
 	// {{{
-	skidbuffer #(.OPT_OUTREG(0),
+	skidbuffer #(
+		// {{{
+		.OPT_OUTREG(0),
 			.OPT_LOWPOWER(OPT_LOWPOWER),
-			.DW(C_AXIL_ADDR_WIDTH-AXILLSB))
-	axilawskid(//
+			.DW(C_AXIL_ADDR_WIDTH-AXILLSB)
+		// }}}
+	)
+	axilawskid(
+		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset(i_reset),
 		.i_valid(S_AXIL_AWVALID), .o_ready(S_AXIL_AWREADY),
 		.i_data(S_AXIL_AWADDR[C_AXIL_ADDR_WIDTH-1:AXILLSB]),
 		.o_valid(awskd_valid), .i_ready(axil_write_ready),
-		.o_data(awskd_addr));
+		.o_data(awskd_addr)
+		// }}}
+	);
 
-	skidbuffer #(.OPT_OUTREG(0),
-			.OPT_LOWPOWER(OPT_LOWPOWER),
-			.DW(C_AXIL_DATA_WIDTH+C_AXIL_DATA_WIDTH/8))
-	axilwskid(//
+	skidbuffer #(
+		// {{{
+		.OPT_OUTREG(0),
+		.OPT_LOWPOWER(OPT_LOWPOWER),
+		.DW(C_AXIL_DATA_WIDTH+C_AXIL_DATA_WIDTH/8)
+		// }}}
+	) axilwskid(
+		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset(i_reset),
 		.i_valid(S_AXIL_WVALID), .o_ready(S_AXIL_WREADY),
 		.i_data({ S_AXIL_WDATA, S_AXIL_WSTRB }),
 		.o_valid(wskd_valid), .i_ready(axil_write_ready),
-		.o_data({ wskd_data, wskd_strb }));
+		.o_data({ wskd_data, wskd_strb })
+		// }}}
+	);
 
 	assign	axil_write_ready = awskd_valid && wskd_valid
 			&& (!S_AXIL_BVALID || S_AXIL_BREADY)
@@ -339,15 +381,21 @@ module	axivideo #(
 	// {{{
 
 
-	skidbuffer #(.OPT_OUTREG(0),
-			.OPT_LOWPOWER(OPT_LOWPOWER),
-			.DW(C_AXIL_ADDR_WIDTH-AXILLSB))
-	axilarskid(//
+	skidbuffer #(
+		// {{{
+		.OPT_OUTREG(0),
+		.OPT_LOWPOWER(OPT_LOWPOWER),
+		.DW(C_AXIL_ADDR_WIDTH-AXILLSB)
+		// }}}
+	) axilarskid(
+		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset(i_reset),
 		.i_valid(S_AXIL_ARVALID), .o_ready(S_AXIL_ARREADY),
 		.i_data(S_AXIL_ARADDR[C_AXIL_ADDR_WIDTH-1:AXILLSB]),
 		.o_valid(arskd_valid), .i_ready(axil_read_ready),
-		.o_data(arskd_addr));
+		.o_data(arskd_addr)
+		// }}}
+	);
 
 	assign	axil_read_ready = arskd_valid
 			&& (!axil_read_valid || !read_staging || S_AXIL_RREADY);
@@ -733,11 +781,16 @@ module	axivideo #(
 	//
 	// Asynchronous FIFO
 	// {{{
-	wire				cmap_hsync, cmap_vsync, cmap_read;
-	wire	[C_AXI_DATA_WIDTH-1:0]	cmap_data;
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
-	afifo #( .LGFIFO(5), .WIDTH(C_AXI_DATA_WIDTH+2)
+	afifo #(
+		// {{{
+		.LGFIFO(5), .WIDTH(C_AXI_DATA_WIDTH+2)
+		// }}}
 	) switch_clocks(
+		// {{{
 		// Write (incoming) interface--bus clock
 		.i_wclk(S_AXI_ACLK), .i_wr_reset_n(S_AXI_ARESETN),
 		.i_wr(mem_tvalid && mem_tready),
@@ -748,7 +801,9 @@ module	axivideo #(
 		.i_rclk(i_pixclk), .i_rd_reset_n(pix_reset_n),
 		.i_rd(cmap_read),
 			.o_rd_data({ cmap_hsync, cmap_vsync, cmap_data }),
-			.o_rd_empty(afifo_empty));
+			.o_rd_empty(afifo_empty)
+		// }}}
+	);
 
 	assign	mem_tready = !afifo_full;
 	// }}}
@@ -756,13 +811,17 @@ module	axivideo #(
 	//
 	// vidstream2pix
 	// {{{
-	wire		pix_valid, pix_ready, pix_hsync, pix_vsync;
-	wire	[23:0]	pixel;
-
-	vidstream2pix #(.BUS_DATA_WIDTH(C_AXI_DATA_WIDTH),
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	vidstream2pix #(
+		// {{{
+		.BUS_DATA_WIDTH(C_AXI_DATA_WIDTH),
 		.OPT_MSB_FIRST(1'b0),
 		.HMODE_WIDTH(HMODE_WIDTH)
+		// }}}
 	) s2pix(
+		// {{{
 		.i_clk(i_pixclk), .i_reset(!pix_reset_n),
 		.S_AXIS_TVALID(!afifo_empty), .S_AXIS_TREADY(cmap_read),
 		.S_AXIS_TDATA(cmap_data), .S_AXIS_TLAST(cmap_vsync),
@@ -781,7 +840,57 @@ module	axivideo #(
 		.i_cmap_we(awskd_valid && wskd_valid && awskd_addr[8]),
 			.i_cmap_waddr(cmap_waddr),
 			.i_cmap_wdata(dma_wdata[23:0]), .i_cmap_wstrb(dma_wstrb[2:0])
+		// }}}
 	);
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Optional external video processing chain
+	// {{{
+	generate if (OPT_EXTERNAL)
+	begin : GEN_EXTERNAL
+		// {{{
+		assign	M_VID_ACLK    = i_pixclk;
+		assign	M_VID_ARESETN = pix_reset_n;
+
+		assign	M_VID_TVALID = pix_valid;
+		assign	pix_ready    = M_VID_TREADY;
+		assign	M_VID_TDATA  = pixel;
+		assign	M_VID_TLAST  = pix_vsync;
+		assign	M_VID_TUSER  = pix_hsync;
+
+		assign	vin_valid    = S_VID_TVALID;
+		assign	S_VID_TREADY = vin_ready;
+		assign	vin_data     = S_VID_TDATA;
+		assign	vin_hsync    = S_VID_TUSER;
+		assign	vin_vsync    = S_VID_TLAST;
+		// }}}
+	end else begin : GEN_INTERNAL_ONLY
+		// {{{
+		assign	M_VID_ACLK    = 1'b0;
+		assign	M_VID_ARESETN = 1'b0;
+
+		assign	M_VID_TVALID = 1'b0;
+		assign	S_VID_TREADY = 1'b0;
+		assign	M_VID_TDATA  = 0;
+		assign	M_VID_TUSER  = 0;
+		assign	M_VID_TLAST  = 0;
+
+		assign	vin_valid = pix_valid;
+		assign	pix_ready = vin_ready;
+		assign	vin_data  = pixel;
+		assign	vin_hsync = pix_hsync;
+		assign	vin_vsync = pix_vsync;
+
+		// Verilator lint_off UNUSED
+		wire	unused_interface;
+		assign	unused_interface = &{ 1'b0,
+				S_VID_TVALID, M_VID_TREADY, S_VID_TDATA,
+					S_VID_TUSER, S_VID_TLAST
+				};
+		// Verilator lint_on  UNUSED
+		// }}}
+	end endgenerate
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -800,9 +909,9 @@ module	axivideo #(
 		//
 		// Video stream interface
 		// {{{
-		.i_valid(pix_valid), .o_ready(pix_ready),
-			.i_hlast(pix_hsync), .i_vlast(pix_vsync),
-			.i_rgb_pix(pixel),
+		.i_valid(vin_valid), .o_ready(vin_ready),
+			.i_hlast(vin_hsync), .i_vlast(vin_vsync),
+			.i_rgb_pix(vin_data),
 		// }}}
 		// Video mode information
 		// {{{
@@ -831,9 +940,9 @@ module	axivideo #(
 		//
 		// Video stream interface
 		// {{{
-		.i_valid(pix_valid), .o_ready(pix_ready),
-			.i_hlast(pix_hsync), .i_vlast(pix_vsync),
-			.i_rgb_pix(pixel),
+		.i_valid(vin_valid), .o_ready(vin_ready),
+			.i_hlast(vin_hsync), .i_vlast(vin_vsync),
+			.i_rgb_pix(vin_data),
 		// }}}
 		// Video mode information
 		// {{{
