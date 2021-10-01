@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axivdisplay
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Reads from memory for the purposes of serving a video frame
@@ -9,7 +9,8 @@
 //		buffer.  The result of this core is an AXI stream having the
 //	word size of the memory interface in the first place.  TLAST is set
 //	based upon the end of the frame, and TUSER based upon the end of the
-//	line.
+//	line.  An option exists to use Xilinx's encoding instead where TLAST
+//	is the end of the line and TUSER is the first pixel word of the frame.
 //
 //	This core is in many ways similar to the AXI MM2S core, but with some
 //	key differences: The AXI MM2S core generates a single transfer.  This
@@ -72,25 +73,29 @@
 //  12:	(reserved for the upper FBUF_ADDRESS)
 //
 //  BUGS:
-//	Memory reads are currently allowed to wrap around the end of memory.
+//	1. Memory reads are currently allowed to wrap around the end of memory.
 //	I'm not (yet) sure if this is a good thing or a bad thing.  I mean, its
 //	a great thing for small dedicated memories designated for this purpose
 //	alone, but perhaps a bad thing if the memory space is shared with
 //	peripherals as well as a CPU.
 //
-//	I'd still like to add an option to handle  memory addresses that aren't
-//	aligned.  Until that is done, the means of interacting with the core
-//	will change from one implementation to another.
+//	2. I'd still like to add an option to handle  memory addresses that
+//	aren't aligned.  Until that is done, the means of interacting with the
+//	core will change from one implementation to another.
+//
+//	3. If the configuration changes mid-write, but without de-activating
+//	the core and waiting for it to come to idle, the synchronization flags
+//	might out-of-sync with the pixels.  To resolve, deactivate the core and
+//	let it come to whenever changing configuration parameters.
 // }}}
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2020, Gisselquist Technology, LLC
+// }}}
+// Copyright (C) 2020-2021, Gisselquist Technology, LLC
 // {{{
-//
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -105,16 +110,16 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
 `default_nettype none
-//
+// }}}
 module	axivdisplay #(
 		// {{{
 		parameter	C_AXI_ADDR_WIDTH = 32,
@@ -133,7 +138,7 @@ module	axivdisplay #(
 		// OPT_UNALIGNED: Allow unaligned accesses, address requests
 		// and sizes which may or may not match the underlying data
 		// width.  If set, the core will quietly align these requests.
-		parameter [0:0]	OPT_UNALIGNED = 1'b0,
+		// parameter [0:0]	OPT_UNALIGNED = 1'b0,
 		//
 		// OPT_LGMAXBURST
 		parameter	OPT_LGMAXBURST = 8,
@@ -154,7 +159,14 @@ module	axivdisplay #(
 		parameter	LGFIFO = OPT_LGMAXBURST+1,
 		//
 		// AXI_ID is the ID we will use for all of our AXI transactions
-		parameter	AXI_ID = 0
+		parameter	AXI_ID = 0,
+		//
+		// OPT_TUSER_IS_SOF.  Xilinx and I chose different stream
+		// encodings.  I encode TLAST== VLAST and
+		// TUSER == (optional) HLAST.  Xilinx chose TLAST == HLAST
+		// and TUSER == SOF(start of frame).  Set OPT_TUSER_IS_SOF to
+		// use Xilinx's encoding.
+		parameter [0:0]	OPT_TUSER_IS_SOF = 0
 		// }}}
 	) (
 		// {{{
@@ -166,8 +178,8 @@ module	axivdisplay #(
 		output	wire					M_AXIS_TVALID,
 		input	wire					M_AXIS_TREADY,
 		output	wire	[C_AXI_DATA_WIDTH-1:0]		M_AXIS_TDATA,
-		output	wire	/* VLAST */			M_AXIS_TLAST,
-		output	wire	/* HLAST */			M_AXIS_TUSER,
+		output	wire	/* VLAST or HLAST */		M_AXIS_TLAST,
+		output	wire	/* HLAST or SOF */		M_AXIS_TUSER,
 		// }}}
 		//
 		// The control interface
@@ -242,8 +254,6 @@ module	axivdisplay #(
 
 	localparam	LGMAXBURST = (TMPLGMAXBURST+ADDRLSB > 12)
 				? (12-ADDRLSB) : TMPLGMAXBURST;
-
-	localparam [ADDRLSB-1:0] LSBZEROS = 0;
 	// }}}
 
 	wire	i_clk   =  S_AXI_ACLK;
@@ -251,7 +261,7 @@ module	axivdisplay #(
 
 	// Signal declarations
 	// {{{
-	reg				r_busy, r_err, r_stopped;
+	reg				soft_reset, r_err, r_stopped;
 	reg				cfg_active, cfg_zero_length, cfg_dirty;
 	reg	[C_AXI_ADDR_WIDTH-1:0]	cfg_frame_addr;
 	reg	[15:0]			cfg_frame_lines, cfg_line_step;
@@ -293,16 +303,15 @@ module	axivdisplay #(
 	// wire				realign_last_valid;
 
 	reg	axi_arvalid, lag_start, phantom_start, start_burst,
-		axi_abort_pending, ar_none_outstanding;
+		ar_none_outstanding;
 	reg	[C_AXI_ADDR_WIDTH-1:0]	axi_araddr;
 	reg	[LGMAXBURST:0]		max_burst;
 	reg	[7:0]			axi_arlen;
 	reg	[15:0]			ar_bursts_outstanding;
 	//
-	reg				vlast, hlast;
+	wire				vlast, hlast;
 	reg	[15:0]			r_frame_lines, r_line_step;
 	reg	[16-ADDRLSB-1:0]	r_line_words;
-	reg	[C_AXI_ADDR_WIDTH:0]	r_frame_addr;
 
 	reg				req_hlast, req_vlast;
 	reg	[15:0]			req_nlines;
@@ -322,6 +331,7 @@ module	axivdisplay #(
 	reg	[C_AXI_ADDR_WIDTH:0]	f_rd_line_addr, f_rd_addr;
 `endif
 
+	wire	M_AXIS_VLAST, M_AXIS_HLAST;
 	// }}}
 
 	////////////////////////////////////////////////////////////////////////
@@ -411,14 +421,15 @@ module	axivdisplay #(
 	// {{{
 
 	//
-	// r_busy,  r_err
+	// soft_reset,  r_err
 	// {{{
+	initial	soft_reset = 1;
 	always @(posedge i_clk)
 	if (i_reset)
 	begin
-		r_busy <= 0;
+		soft_reset <= 1;
 		r_err  <= 0;
-	end else if (!r_busy)
+	end else if (soft_reset)
 	begin
 
 		if ((axil_write_ready && awskd_addr == FBUF_CONTROL)
@@ -426,15 +437,21 @@ module	axivdisplay #(
 			r_err <= cfg_zero_length;
 
 		if (cfg_active && !r_err && r_stopped)
-			r_busy <= 1;
+			soft_reset <= 0;
 
-	end else // if (r_busy)
+	end else // if (!soft_reset)
 	begin
+		// Halt on any bus error.  We'll require user intervention
+		// to start back up again
 		if (M_AXI_RREADY && M_AXI_RVALID && M_AXI_RRESP[1])
 		begin
-			r_busy <= 0;
+			soft_reset <= 1;
 			r_err  <= 1;
 		end
+
+		// Halt on any user request
+		if (!cfg_active)
+			soft_reset <= 1;
 	end
 	// }}}
 
@@ -508,18 +525,18 @@ module	axivdisplay #(
 	end else begin
 		if (r_stopped)
 			cfg_dirty <= 0;
-
-		if (axil_write_ready)
-		begin
+		if (cfg_active && req_hlast && req_vlast && phantom_start)
+			cfg_dirty <= 0;
 		if (M_AXI_RREADY && M_AXI_RVALID && M_AXI_RRESP[1])
 			cfg_active <= 0;
 
+		if (axil_write_ready)
 		case(awskd_addr)
 		FBUF_CONTROL: begin
-			if (wskd_strb[0] && wskd_data[CBIT_ACTIVE]
+			if (wskd_strb[0])
+				cfg_active <= wskd_data[CBIT_ACTIVE]
 					&& (!r_err || wskd_data[CBIT_ERR])
-					&& (!cfg_zero_length))
-				cfg_active <= 1;
+					&& (!cfg_zero_length);
 
 			if (new_control[31:16] == 0)
 			begin
@@ -549,7 +566,6 @@ module	axivdisplay #(
 			end
 		default: begin end
 		endcase
-		end
 	end
 	// }}}
 
@@ -561,8 +577,8 @@ module	axivdisplay #(
 		w_status_word[31:16]		= cfg_line_step;
 		w_status_word[CBIT_DIRTY]	= cfg_dirty;
 		w_status_word[CBIT_ERR]		= r_err;
-		w_status_word[CBIT_BUSY]	= r_busy;
-		w_status_word[CBIT_ACTIVE]	= cfg_active || (r_busy || !r_stopped);
+		w_status_word[CBIT_BUSY]	= !soft_reset;
+		w_status_word[CBIT_ACTIVE]	= cfg_active || (!soft_reset || !r_stopped);
 	end
 
 	always @(posedge i_clk)
@@ -607,24 +623,12 @@ module	axivdisplay #(
 	// {{{
 	assign	reset_fifo = r_stopped;
 
-	// Realign the data (if OPT_UNALIGN) before sending it to the FIFO
-	// {{{
-	// This allows us to handle unaligned addresses.
-	generate if (OPT_UNALIGNED)
-	begin : REALIGN_DATA
-
-		/* DRAFT REALIGNMENT NOT (YET) WRITTEN */
-
-	end else begin : ALIGNED_DATA
-
-		assign	write_to_fifo  = M_AXI_RVALID;
-		assign	write_data = M_AXI_RDATA;
-		// assign	realign_last_valid = 0;
-		assign	vlast = rd_vlast;
-		assign	hlast = rd_hlast;
-		assign	M_AXI_RREADY  = !fifo_full;
-
-	end endgenerate
+	assign	write_to_fifo  = M_AXI_RVALID;
+	assign	write_data = M_AXI_RDATA;
+	// assign	realign_last_valid = 0;
+	assign	vlast = rd_vlast;
+	assign	hlast = rd_hlast;
+	assign	M_AXI_RREADY  = !fifo_full;
 	// }}}
 
 	generate if (LGFIFO > 0)
@@ -647,12 +651,11 @@ module	axivdisplay #(
 		assign	M_AXIS_TVALID  = !fifo_empty;
 		assign	read_from_fifo = M_AXIS_TVALID && M_AXIS_TREADY;
 
-
 		sfifo #(.BW(C_AXI_DATA_WIDTH+2), .LGFLEN(LGFIFO))
 		sfifo(i_clk, reset_fifo,
 			write_to_fifo, { vlast && hlast, hlast, write_data },
 				fifo_full, fifo_fill,
-			read_from_fifo, { M_AXIS_TLAST, M_AXIS_TUSER,
+			read_from_fifo, { M_AXIS_VLAST, M_AXIS_HLAST,
 				M_AXIS_TDATA }, fifo_empty);
 
 		assign no_fifo_space_available = (fifo_space_available < (1<<LGMAXBURST));
@@ -664,13 +667,38 @@ module	axivdisplay #(
 		assign	fifo_empty = !M_AXIS_TVALID;
 		assign	M_AXIS_TVALID = write_to_fifo;
 
-		assign	M_AXIS_TLAST = vlast && hlast;
-		assign	M_AXIS_TUSER = hlast;
+		assign	M_AXIS_VLAST = vlast && hlast;
+		assign	M_AXIS_HLAST = hlast;
 		assign	M_AXIS_TDATA = M_AXI_RDATA;
 
 		assign no_fifo_space_available = (ar_bursts_outstanding >= 3);
 		// }}}
 	end endgenerate
+	// }}}
+
+	// Switch between TLAST/TUSER encodings if necessary
+	// {{{
+	generate if (OPT_TUSER_IS_SOF)
+	begin : XILINX_ENCODING
+
+		reg	SOF;
+
+		initial	SOF = 1'b1;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN || r_stopped)
+			SOF <= 1'b1;
+		else if (M_AXIS_TVALID && M_AXIS_TREADY)
+			SOF <= M_AXIS_VLAST;
+
+		assign	M_AXIS_TLAST = M_AXIS_HLAST;
+		assign	M_AXIS_TUSER = SOF;
+
+	end else begin : VLAST_EQUALS_TLAST
+
+		assign	M_AXIS_TLAST = M_AXIS_VLAST;
+		assign	M_AXIS_TUSER = M_AXIS_HLAST;
+	end endgenerate
+	// }}}
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -681,17 +709,12 @@ module	axivdisplay #(
 	//
 	//
 	// {{{
-	initial	r_frame_addr = 0;
 	always @(posedge  i_clk)
 	if (i_reset || r_stopped || (phantom_start && req_hlast && req_vlast))
 	begin
-		if (cfg_active)
-		begin
-			r_frame_addr  <= { 1'b0, cfg_frame_addr };
-			r_frame_lines <= cfg_frame_lines;
-			r_line_words  <= cfg_line_words;
-			r_line_step   <= { {(ADDRLSB){1'b0}}, cfg_line_step[15:ADDRLSB] };
-		end
+		r_frame_lines <= cfg_frame_lines;
+		r_line_words  <= cfg_line_words;
+		r_line_step   <= { {(ADDRLSB){1'b0}}, cfg_line_step[15:ADDRLSB] };
 	end
 
 	initial	req_addr = 0;
@@ -706,16 +729,9 @@ module	axivdisplay #(
 	begin
 		if (req_hlast && req_vlast)
 		begin
-			if (cfg_active)
-			begin
-				req_addr       <= { 1'b0, cfg_frame_addr };
-				req_line_addr  <= { 1'b0, cfg_frame_addr };
-				req_line_words <= cfg_line_words;
-			end else begin
-				req_addr       <= r_frame_addr;
-				req_line_addr  <= r_frame_addr;
-				req_line_words <= r_line_words;
-			end
+			req_addr       <= { 1'b0, cfg_frame_addr };
+			req_line_addr  <= { 1'b0, cfg_frame_addr };
+			req_line_words <= cfg_line_words;
 		end else if (req_hlast)
 		begin
 			// verilator lint_off WIDTH
@@ -727,11 +743,11 @@ module	axivdisplay #(
 			req_line_words <= r_line_words;
 		end else begin
 			// verilator lint_off WIDTH
-			req_addr <= req_addr +((M_AXI_ARLEN+1) << M_AXI_ARSIZE);
+			req_addr <= req_addr + (1<<(LGMAXBURST+ADDRLSB));
 			req_line_words <= req_line_words - (M_AXI_ARLEN+1);
 			// verilator lint_on  WIDTH
 
-			req_addr[ADDRLSB-1:0] <= 0;
+			req_addr[LGMAXBURST+ADDRLSB-1:0] <= 0;
 		end
 	end
 
@@ -744,14 +760,8 @@ module	axivdisplay #(
 	begin
 		if (req_vlast)
 		begin
-			if (cfg_active)
-			begin
-				req_nlines <= cfg_frame_lines-1;
-				req_vlast <= (cfg_frame_lines <= 1);
-			end else begin
-				req_nlines <= r_frame_lines-1;
-				req_vlast <= (r_frame_lines <= 1);
-			end
+			req_nlines <= cfg_frame_lines-1;
+			req_vlast <= (cfg_frame_lines <= 1);
 		end else begin
 			req_nlines <= req_nlines - 1;
 			req_vlast <= (req_nlines <= 1);
@@ -761,11 +771,9 @@ module	axivdisplay #(
 	always @(*)
 	if (!r_stopped)
 	begin
-		assert(!r_frame_addr[C_AXI_ADDR_WIDTH]);
-
 		assert(req_vlast == (req_nlines == 0));
-		assert(req_addr >= r_frame_addr);
-		assert(req_line_addr >= r_frame_addr);
+		assert(req_addr >= { 1'b0, cfg_frame_addr });
+		assert(req_line_addr >= { 1'b0, cfg_frame_addr });
 		assert(req_line_addr <= req_addr);
 	end
 
@@ -837,8 +845,8 @@ module	axivdisplay #(
 	begin
 		if (rd_vlast && rd_hlast)
 		begin
-			f_rd_addr <= r_frame_addr;
-			f_rd_line_addr <= r_frame_addr;
+			f_rd_addr <= cfg_frame_addr;
+			f_rd_line_addr <= cfg_frame_addr;
 		end else if (rd_hlast)
 		begin
 			f_rd_addr <= f_rd_line_addr + (r_line_step << M_AXI_ARSIZE);
@@ -888,25 +896,17 @@ module	axivdisplay #(
 	endcase
 	// }}}
 
-	// r_stopped, axi_abort_pending
+	// r_stopped
 	// {{{
-	// Are we stopping early?  Aborting something ongoing?
-	initial	axi_abort_pending = 0;
-	always @(posedge i_clk)
-	if (i_reset || r_stopped)
-		axi_abort_pending <= 0;
-	else if (M_AXI_RVALID && M_AXI_RREADY && M_AXI_RRESP[1])
-		axi_abort_pending <= 1;
-	else if (!r_busy && !ar_none_outstanding)
-		axi_abort_pending <= 1;
-
+	// Following an error or drop of cfg_active, soft_reset will go high.
+	// We then come to a stop once everything becomes inactive
 	initial	r_stopped = 1;
 	always @(posedge  i_clk)
 	if (i_reset)
 		r_stopped <= 1;
 	else if (r_stopped)
-		r_stopped <= !r_busy || !cfg_active;
-	else if (axi_abort_pending && ar_none_outstanding && !M_AXI_ARVALID)
+		r_stopped <= soft_reset || !cfg_active;
+	else if (soft_reset && ar_none_outstanding && !M_AXI_ARVALID)
 		r_stopped <= 1;
 	// }}}
 
@@ -931,7 +931,7 @@ module	axivdisplay #(
 			start_burst = 0;
 
 		// If the user wants us to stop, then stop
-		if (axi_abort_pending)
+		if (!cfg_active || soft_reset)
 			start_burst  = 0;
 	end
 	// }}}
@@ -943,7 +943,7 @@ module	axivdisplay #(
 	always @(posedge i_clk)
 	if (lag_start)
 	begin
-		if (req_line_words > (1<<LGMAXBURST))
+		if (req_line_words >= (1<<LGMAXBURST))
 			max_burst <= (1<<LGMAXBURST);
 		else
 			// Verilator lint_off WIDTH
@@ -988,7 +988,7 @@ module	axivdisplay #(
 			assert(axi_arlen+1 == req_line_words);
 		else
 			assert(axi_arlen+1 < req_line_words);
-	end else if (!r_stopped && !lag_start)
+	end else if (!soft_reset && !r_stopped && !lag_start)
 	begin
 		if (max_burst != req_line_words)
 			assert(!req_hlast);
@@ -1062,8 +1062,9 @@ module	axivdisplay #(
 	// End AXI protocol section
 	// }}}
 
-	// Verilator lint_off UNUSED
+	// Make Verilator happy
 	// {{{
+	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, S_AXIL_AWPROT, S_AXIL_ARPROT, M_AXI_RID,
 			M_AXI_RRESP[0], fifo_full, wskd_strb[2:0],
@@ -1281,19 +1282,11 @@ module	axivdisplay #(
 	// ...
 	//
 
-	always @(*)
-	if (r_busy)
-	begin
-		if (!OPT_UNALIGNED)
-			assert(!M_AXI_ARVALID || M_AXI_ARADDR[ADDRLSB-1:0] == 0);
-	end
-
 	reg	[LGMAXBURST-1:0]	f_rd_subaddr;
 	always @(*)
 		f_rd_subaddr = f_rd_addr[ADDRLSB +: LGMAXBURST];
 
 	always @(*)
-	if (!OPT_UNALIGNED)
 	begin
 		assert(cfg_frame_addr[ADDRLSB-1:0] == 0);
 		if (!r_stopped)
@@ -1380,7 +1373,7 @@ module	axivdisplay #(
 		cvr_full_frame <= rd_vlast && rd_hlast && M_AXI_RVALID && M_AXI_RREADY;
 
 	always @(*)
-		cover(r_busy);
+		cover(!soft_reset);
 
 	always @(*)
 		cover(start_burst);
@@ -1395,10 +1388,10 @@ module	axivdisplay #(
 		cover(M_AXI_RVALID & M_AXI_RLAST);
 
 	always @(*)
-		cover(!axi_abort_pending && cvr_full_frame);
+		cover(!r_stopped && cvr_full_frame);
 
 	always @(*)
-		cover(cvr_full_frame && phantom_start && !axi_abort_pending);
+		cover(cvr_full_frame && phantom_start && !r_stopped);
 
 	always @(*)
 	if (cvr_hlast_rlast)
@@ -1411,7 +1404,7 @@ module	axivdisplay #(
 	end
 
 	always @(*)
-		cover(cvr_hlast_rlast && cvr_full_frame && phantom_start && !axi_abort_pending);
+		cover(cvr_hlast_rlast && cvr_full_frame && phantom_start && !r_stopped);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//

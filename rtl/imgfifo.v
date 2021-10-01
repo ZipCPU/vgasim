@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	imgfifo.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,61 +27,68 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
-module	imgfifo(i_clk, i_pixclk,
-		//
-		i_reset, i_newframe, i_baseaddr, i_linewords, i_nlines,
-		//
-		o_wb_cyc, o_wb_stb, o_wb_addr,
-			i_wb_ack, i_wb_err, i_wb_stall, i_wb_data,
-		//
-		i_rd, o_valid, o_word,
-		// 
-		o_err);
-	parameter	ADDRESS_WIDTH=24, LGFLEN = 11,
-			BUSW=32, LW=11;
-	localparam	AW=ADDRESS_WIDTH,
-			FIFO_ADDRESS_WIDTH=LGFLEN,
-			FAW = FIFO_ADDRESS_WIDTH;
-	input	wire			i_clk, i_pixclk;
-	input	wire			i_reset;
-	// verilator lint_off SYNCASYNCNET
-	input	wire			i_newframe;
-	// verilator lint_on SYNCASYNCNET
-	input	wire [(AW-1):0]		i_baseaddr;
-	input	wire [LGFLEN:0]		i_linewords;
-	input	wire [(LW-1):0]		i_nlines;
-	// Wishbone bus commanding
-	output	reg			o_wb_cyc, o_wb_stb;
-	output	reg [(AW-1):0]		o_wb_addr;
-	// Return values on the Wishbone
-	input	wire			i_wb_ack;
-	input	wire			i_wb_err;
-	input	wire			i_wb_stall;
-	input	wire	[(BUSW-1):0]	i_wb_data;
-	// Now for the interface to the reader on the other end
-	input	wire			i_rd;
-	output	wire			o_valid;
-	output	reg	[(BUSW-1):0]	o_word;
-	output	wire			o_err;
+// }}}
+module	imgfifo #(
+		// {{{
+		parameter	ADDRESS_WIDTH=24, LGFLEN = 11,
+				BUSW=32, LW=11,
+		localparam	AW=ADDRESS_WIDTH,
+				FIFO_ADDRESS_WIDTH=LGFLEN,
+				FAW = FIFO_ADDRESS_WIDTH
+		// }}}
+	) (
+		// {{{
+		input	wire			i_clk, i_pixclk,
+		input	wire			i_reset,
+		// verilator lint_off SYNCASYNCNET
+		input	wire			i_newframe,
+		// verilator lint_on SYNCASYNCNET
+		input	wire [(AW-1):0]		i_baseaddr,
+		input	wire [LGFLEN:0]		i_linewords,
+		input	wire [(LW-1):0]		i_nlines,
+		// Wishbone bus commanding
+		output	reg			o_wb_cyc, o_wb_stb,
+		output	reg [(AW-1):0]		o_wb_addr,
+		// Return values on the Wishbone
+		input	wire			i_wb_stall,
+		input	wire			i_wb_ack,
+		input	wire	[(BUSW-1):0]	i_wb_data,
+		input	wire			i_wb_err,
+		// Now for the interface to the reader on the other end
+		input	wire			i_rd,
+		output	wire			o_valid,
+		output	reg	[(BUSW-1):0]	o_word,
+		output	wire			o_err
+		// }}}
+	);
 
+	// Local declarations
+	// {{{
 	reg	last_ack, last_stb;
 	reg	room_for_another_line_in_fifo, end_of_frame;
 	reg	[LW-1:0]	vpos;
 	wire	[FAW:0]	fifo_availability, fifo_fill;
 
 	reg	[2:0]	wb_reset_pipe;
-	wire	wb_reset, pix_reset;
+	wire		wb_reset, pix_reset;
+	reg	[2:0]	pix_reset_pipe;
+	reg	[(FAW-1):0]	stb_count;
+	reg	[(FAW-1):0]	ack_count;
+	wire	fifo_empty, fifo_full;
+	wire	wb_reset_n  = !wb_reset;
+	wire	pix_reset_n = !pix_reset;
+	// }}}
 
+	// wb_reset, wb_reset_pipe
+	// {{{
 	initial	wb_reset_pipe = -1;
 	always @(posedge i_clk or posedge i_reset or posedge i_newframe)
 	if (i_reset)
@@ -91,45 +98,60 @@ module	imgfifo(i_clk, i_pixclk,
 	else
 		wb_reset_pipe <= { wb_reset_pipe[1:0], 1'b0 };
 	assign	wb_reset = wb_reset_pipe[2];
+	// }}}
 
-	reg	[2:0]	pix_reset_pipe;
+	// pix_reset, pix_reset_pipe
+	// {{{
 	initial	pix_reset_pipe = -1;
 	always @(posedge i_pixclk or posedge i_reset)
-		if (i_reset)
-			pix_reset_pipe <= -1;
-		else if (i_newframe)
-			pix_reset_pipe <= -1;
-		else
-			pix_reset_pipe <= { pix_reset_pipe[1:0], 1'b0 };
+	if (i_reset)
+		pix_reset_pipe <= -1;
+	else if (i_newframe)
+		pix_reset_pipe <= -1;
+	else
+		pix_reset_pipe <= { pix_reset_pipe[1:0], 1'b0 };
 	assign	pix_reset = (pix_reset_pipe[2]) || (i_newframe);
+	// }}}
 
-
+	// Wishbone request: CYC, STB, ADDR
+	// {{{
+	// We only request a line at a time, and then wait until there's room
+	// for the next line in the FIFO before requesting it.  Ideally, any
+	// supporting FIFO should have room for at least two lines within it.
 	initial	o_wb_cyc  = 1'b0;
 	initial	o_wb_stb  = 1'b0;
 	initial	o_wb_addr = 0;
 	always @(posedge  i_clk)
 	if ((wb_reset)||(i_wb_err))
 	begin
+		// {{{
 		o_wb_cyc <= 1'b0;
 		o_wb_stb <= 1'b0;
 		o_wb_addr <= i_baseaddr;
+		// }}}
 	end else if (o_wb_cyc)
 	begin
+		// {{{
 		if (!i_wb_stall)
+			// Stop requesting at the end of the line
 			o_wb_stb  <= (o_wb_stb)&&(!last_stb);
 		if ((o_wb_stb)&&(!i_wb_stall))
+			// Increment the address with every item requested
 			o_wb_addr <= o_wb_addr + 1'b1;
 		if ((i_wb_ack)&&(last_ack))
+			// On the last acknowledgment, close up shop
 			o_wb_cyc <= 1'b0;
-	end else begin
-		if (room_for_another_line_in_fifo)
-		begin
-			o_wb_cyc <= 1'b1;
-			o_wb_stb <= 1'b1;
-		end
+		// }}}
+	end else if (room_for_another_line_in_fifo)
+	begin
+		// Start reading a new line
+		o_wb_cyc <= 1'b1;
+		o_wb_stb <= 1'b1;
 	end
+	// }}}
 
-	reg	[(FAW-1):0]	stb_count;
+	// last_stb, stb_count
+	// {{{
 	initial	stb_count= 0;
 	always @(posedge i_clk)
 	if ((wb_reset)||(!o_wb_cyc))
@@ -145,25 +167,10 @@ module	imgfifo(i_clk, i_pixclk,
 		last_stb <= ({ 2'b0, stb_count } >= { 1'b0, i_linewords}- 2);
 	else
 		last_stb <= ({ 2'b0, stb_count } >= { 1'b0, i_linewords}- 1'b1);
+	// }}}
 
-/*
-always @(posedge i_clk)
-if (!i_reset)
-begin
-	assume($stable(i_linewords));
-	assume($stable(i_nlines));
-end
-
-always @(*)
-begin
-assert(stb_count <= i_linewords);
-if (stb_count == i_linewords)
-	assert(!o_wb_stb);
-end
-*/
-
-	reg	[(FAW-1):0]	ack_count;
-
+	// last_ack, ack_count
+	// {{{
 	initial	ack_count= 0;
 	always @(posedge i_clk)
 	if ((wb_reset)||(!o_wb_cyc))
@@ -179,21 +186,14 @@ end
 		last_ack <= ({2'b00, ack_count} >= {1'b0, i_linewords} - 2);
 	else
 		last_ack <= ({2'b00, ack_count} >= {1'b0, i_linewords} - 1'b1);
+	// }}}
 
-/*
-always @(*)
-begin
-assert(ack_count <= i_linewords);
-assert(ack_count <= stb_count);
-if (ack_count == i_linewords)
-	assert(!o_wb_cyc);
-end
-*/
-
+	// vpos, end_of_frame
+	// {{{
 	initial	vpos = 0;
 	initial	end_of_frame = 0;
 	always @(posedge i_clk)
-	if ((wb_reset))
+	if (wb_reset)
 	begin
 		vpos <= 0;
 		end_of_frame <= (i_nlines == 0);
@@ -203,16 +203,12 @@ end
 			vpos <= vpos + 1'b1;
 		end_of_frame <= (i_nlines==0)||(vpos >= i_nlines-1'b1);
 	end
+	// }}}
 
-/*
-always @(*)
-begin
-	assert(vpos <= i_nlines);
-	assert(en_of_frame == (vpos >= i_nlines));
-end
-*/
 	assign	fifo_availability = ({1'b1,{(FAW){1'b0}}} - fifo_fill);
 
+	// room_for_another_line_in_fifo?
+	// {{{
 	initial	room_for_another_line_in_fifo = 1'b0;
 	always @(posedge i_clk)
 	if ((wb_reset))
@@ -222,21 +218,34 @@ end
 	else if (!end_of_frame)
 		room_for_another_line_in_fifo
 			<= (fifo_availability > i_linewords + 1);
+	// }}}
 
-	wire	fifo_empty, fifo_full;
-	wire	wb_reset_n  = !wb_reset;
-	wire	pix_reset_n = !pix_reset;
-	atxfifo	#(.DSIZE(BUSW),.ASIZE(FAW))
-		fifo(i_clk, wb_reset_n,
-			// Incoming (write) data
-			(o_wb_cyc)&&(i_wb_ack)&&(!wb_reset), i_wb_data,
-			fifo_full, fifo_fill,
-			// Outgoing (read) data
-			i_pixclk, pix_reset_n, (i_rd)&&(!pix_reset), o_word, fifo_empty);
+	atxfifo	#(
+		// {{{
+		.DSIZE(BUSW),.ASIZE(FAW)
+		// }}}
+	) fifo(
+		// {{{
+		i_clk, wb_reset_n,
+		// Incoming (write) data
+		(o_wb_cyc)&&(i_wb_ack)&&(!wb_reset), i_wb_data,
+		fifo_full, fifo_fill,
+		// Outgoing (read) data
+		i_pixclk, pix_reset_n, (i_rd)&&(!pix_reset), o_word, fifo_empty
+		// }}}
+	);
 
 	assign	o_err = (o_wb_cyc)&&(i_wb_ack)&&(fifo_full);
 	assign	o_valid = (!fifo_empty);
-
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 `ifdef	IMGFIFO
 `define	ASSUME	assume
@@ -418,4 +427,5 @@ assume property(i_nlines    == 1080);
 		assert({ 1'b0, fifo_availability} > {1'b0,f_remaining});
 
 `endif
+// }}}
 endmodule

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	axi_tb.cpp
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	This is the main test bench class for the AXI-based demonstrator
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -29,14 +29,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
@@ -46,12 +46,18 @@
 #include <verilated_vcd_c.h>
 
 #include "verilated.h"
-#ifdef	HDMI
-#include "Vaxihdmi.h"
-#define	VCORE	Vaxihdmi
+#ifdef	SPRITETB
+  #include "Vspritedemo.h"
+  #define	VCORE	Vspritedemo
+  #ifndef	HDMI
+    #define	HDMI
+  #endif
+#elif	defined(HDMI)
+  #include "Vaxihdmi.h"
+  #define	VCORE	Vaxihdmi
 #else
-#include "Vaxidemo.h"
-#define	VCORE	Vaxidemo
+  #include "Vaxidemo.h"
+  #define	VCORE	Vaxidemo
 #endif
 
 
@@ -94,7 +100,7 @@ public:
 
 	//
 	// opentrace()
-	//
+	// {{{
 	// Useful for beginning a (VCD) trace.  To open such a trace, just call
 	// opentrace() with the name of the VCD file you'd like to trace
 	// everything into
@@ -108,19 +114,21 @@ public:
 			m_paused_trace = false;
 		}
 	}
+	// }}}
 
 	//
 	// trace()
-	//
+	// {{{
 	// A synonym for opentrace() above.
 	//
 	void	trace(const char *vcdname) {
 		opentrace(vcdname);
 	}
+	// }}}
 
 	//
 	// pausetrace(pause)
-	//
+	// {{{
 	// Set/clear a flag telling us whether or not to write to the VCD trace
 	// file.  The default is to write to the file, but this can be changed
 	// by calling pausetrace.  pausetrace(false) will resume tracing,
@@ -131,20 +139,22 @@ public:
 		m_paused_trace = pausetrace;
 		return m_paused_trace;
 	}
+	// }}}
 
 	//
 	// pausetrace()
-	//
+	// {{{
 	// Like pausetrace(bool) above, except that pausetrace() will return
 	// the current status of the pausetrace flag above.  Specifically, it
 	// will return true if the trace has been paused or false otherwise.
 	virtual	bool	pausetrace(void) {
 		return m_paused_trace;
 	}
+	// }}}
 
 	//
 	// closetrace()
-	//
+	// {{{
 	// Closes the open trace file.  No more information will be written
 	// to it
 	virtual	void	closetrace(void) {
@@ -154,10 +164,11 @@ public:
 			m_trace = NULL;
 		}
 	}
+	// }}}
 
 	//
 	// eval()
-	//
+	// {{{
 	// This is a synonym for Verilator's eval() function.  It evaluates all
 	// of the logic within the design.  AutoFPGA based designs shouldn't
 	// need to be calling this, they should call tick() instead.  However,
@@ -167,10 +178,11 @@ public:
 	virtual	void	eval(void) {
 		m_core->eval();
 	}
+	// }}}
 
 	//
 	// tick()
-	//
+	// {{{
 	// tick() is the main entry point into this helper core.  In general,
 	// tick() will advance the clock by one clock tick.  In a multiple clock
 	// design, this will advance the clocks up until the nearest clock
@@ -211,22 +223,28 @@ public:
 			sim_pixclk_tick();
 		}
 	}
+	// }}}
 
 	virtual	void	sim_clk_tick(void) {
+		// {{{
 		// AutoFPGA will override this method within main_tb.cpp if any
 		// @SIM.TICK key is present within a design component also
 		// containing a @SIM.CLOCK key identifying this clock.  That
 		// component must also set m_changed to true.
 		m_changed = false;
 	}
+	// }}}
 	virtual	void	sim_pixclk_tick(void) {
+		// {{{
 		// AutoFPGA will override this method within main_tb.cpp if any
 		// @SIM.TICK key is present within a design component also
 		// containing a @SIM.CLOCK key identifying this clock.  That
 		// component must also set m_changed to true.
 		m_changed = false;
 	}
+	// }}}
 	virtual bool	done(void) {
+		// {{{
 		if (m_done)
 			return true;
 
@@ -235,10 +253,11 @@ public:
 
 		return m_done;
 	}
+	// }}}
 
 	//
 	// reset()
-	//
+	// {{{
 	// Sets the i_reset input for one clock tick.  It's really just a
 	// function for the capabilies shown below.  You'll want to reset any
 	// external input values before calling this though.
@@ -248,6 +267,7 @@ public:
 		m_core->i_reset = 0;
 		// printf("RESET\n");
 	}
+	// }}}
 };
 
 #ifdef	HDMI
@@ -265,10 +285,15 @@ public:
 
 // No particular "parameters" need definition or redefinition here.
 class	TESTBENCH : public AXITESTB<VCORE> {
+	// Variable declarations
+	// {{{
 private:
 	unsigned long	m_tx_busy_count;
 	bool		m_done, m_test;
 	int		m_state;
+#ifdef	SPRITETB
+	unsigned	m_frame_timer;
+#endif
 public:
 #ifdef	HDMI
 	HDMIWIN		m_win;
@@ -276,8 +301,9 @@ public:
 	VGAWIN		m_win;
 #endif
 private:
-
+	// }}}
 	void	init(void) {
+		// {{{
 		m_core->i_reset = 1;
 		m_state = 0;
 		//
@@ -285,27 +311,37 @@ private:
 
 		Glib::signal_idle().connect(sigc::mem_fun((*this),&TESTBENCH::on_tick));
 	}
+	// }}}
 public:
 
 	TESTBENCH(void) : m_win(1280, 1024) {
+		// {{{
 		init();
 	}
+	// }}}
 
 	TESTBENCH(int hres, int vres) : m_test(false), m_win(hres, vres) {
+		// {{{
 		init();
 	}
+	// }}}
 
 	void	trace(const char *vcd_trace_file_name) {
+		// {{{
 		fprintf(stderr, "Opening TRACE(%s)\n", vcd_trace_file_name);
 		opentrace(vcd_trace_file_name);
 	}
+	// }}}
 
 	void	close(void) {
+		// {{{
 		// TESTB<BASECLASS>::closetrace();
 		m_done = true;
 	}
+	// }}}
 
 	void	tick(void) {
+		// {{{
 		if (m_done)
 			return;
 
@@ -324,8 +360,10 @@ public:
 
 		AXITESTB<VCORE>::tick();
 	}
+	// }}}
 
 	void	issue_write(unsigned addr, unsigned val) {
+		// {{{
 		m_core->S_AXI_AWVALID = 1;
 		m_core->S_AXI_AWADDR  = addr & (unsigned)(-3);
 		m_core->S_AXI_WVALID = 1;
@@ -333,8 +371,10 @@ public:
 		m_core->S_AXI_WSTRB  = 0x0f;
 		m_core->S_AXI_BREADY = 1;
 	}
+	// }}}
 
 	virtual	void	sim_clk_tick(void) {
+		// {{{
 		if (m_core->S_AXI_AWREADY)
 			m_core->S_AXI_AWVALID = 0;
 		if (m_core->S_AXI_WREADY)
@@ -459,15 +499,48 @@ public:
 			issue_write(0x43c, 0xffffff);
 			m_state++;
 			} break;
+#ifndef	SPRITETB
 		default:
 			if (m_core->S_AXI_BVALID) {
 				printf("INIT SEQUENCE COMPLETE\n");
 			}
 			m_changed = false;
+#else
+		case 32: if (m_core->S_AXI_BVALID) {
+			issue_write(0x8000, 0);
+			m_state++;
+			m_frame_timer = 0;
+			} break;
+		case 33: if (m_core->S_AXI_BVALID)
+				m_state++;
+			m_frame_timer = 0;
+			break;
+		case 34:
+			m_frame_timer++;
+			if (m_frame_timer >= 1000 * 1000) {
+				static int m_xpos = 0, m_ypos = 0;
+				const	int	m_dx = 5;
+				const	int	m_dy = 12;
+				m_xpos = m_xpos + m_dx;
+				m_xpos &= 1023;
+				m_ypos = m_ypos + m_dy;
+				m_xpos &= 1023;
+				issue_write(0x8000, (m_ypos << 16) | m_xpos);
+				m_frame_timer = 0;
+				m_state = 33;
+			} break;
+		default:
+			if (m_core->S_AXI_BVALID) {
+				printf("INIT SEQUENCE COMPLETE\n");
+			}
+			m_changed = false;
+#endif
 		} m_changed = true;
 	}
+	// }}}
 
 	virtual	void	sim_pixclk_tick(void) {
+		// {{{
 #ifdef	HDMI
 		m_win(m_core->o_hdmi_blu,
 			m_core->o_hdmi_grn,
@@ -479,12 +552,15 @@ public:
 			m_core->o_vga_blu);
 #endif
 	}
+	// }}}
 
 	bool	on_tick(void) {
+		// {{{
 		for(int i=0; i<5; i++)
 			tick();
 		return true;
 	}
+	// }}}
 };
 
 TESTBENCH	*tb;

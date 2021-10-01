@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	axisvga.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Converts an AXI-stream pixel stream (with framing information)
@@ -11,9 +11,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,17 +28,17 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
+// }}}
 module	axisvga #(
+		// {{{
 		parameter	HW=12,
 				VW=12,
 		// HDMI *only* works with 24-bit color, using 8-bits per color
@@ -46,7 +46,9 @@ module	axisvga #(
 		localparam	BPC = BITS_PER_COLOR,
 				BITS_PER_PIXEL = 3 * BPC,
 				BPP = BITS_PER_PIXEL
+		// }}}
 	) (
+		// {{{
 		input	wire	i_pixclk,
 		// Verilator lint_off SYNCASYNCNET
 		input	wire			i_reset,
@@ -76,14 +78,14 @@ module	axisvga #(
 		output	reg	[7:0]	o_red,
 		output	reg	[7:0]	o_grn,
 		output	reg	[7:0]	o_blu
+		// }}}
 	);
 
+	// Local declarations
+	// {{{
 	reg	r_newline, r_newframe, lost_sync;
 
 	wire	[BPC-1:0]	i_red, i_grn, i_blu;
-	assign	i_red = i_rgb_pix[3*BPC-1:2*BPC];
-	assign	i_grn = i_rgb_pix[2*BPC-1:  BPC];
-	assign	i_blu = i_rgb_pix[  BPC-1:0];
 
 	reg	[HW-1:0]	hpos;
 	reg	[VW-1:0]	vpos;
@@ -91,6 +93,19 @@ module	axisvga #(
 	reg			first_frame;
 	wire			w_rd;
 
+	assign	i_red = i_rgb_pix[3*BPC-1:2*BPC];
+	assign	i_grn = i_rgb_pix[2*BPC-1:  BPC];
+	assign	i_blu = i_rgb_pix[  BPC-1:0];
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Handle horizontal timing and synchronization
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	// hpos, r_newline, o_sync, hrd
 	initial	hpos       = 0;
 	initial	r_newline  = 0;
 	initial	o_hsync = 1;
@@ -98,12 +113,14 @@ module	axisvga #(
 	always @(posedge i_pixclk)
 	if (i_reset)
 	begin
+		// {{{
 		hpos <= 0;
 		r_newline <= 1'b0;
 		o_hsync <= 1'b1;
 		hrd <= 1;
-	end else
-	begin
+		// }}}
+	end else begin
+		// {{{
 		hrd <= (hpos < i_hm_width-2)
 				||(hpos >= i_hm_raw-2);
 		if (hpos < i_hm_raw-1'b1)
@@ -112,8 +129,11 @@ module	axisvga #(
 			hpos <= 0;
 		r_newline <= (hpos == i_hm_width-3);
 		o_hsync <= (hpos < i_hm_porch-1'b1)||(hpos>=i_hm_synch-1'b1);
+		// }}}
 	end
-
+	// }}}
+	// lost_sync
+	// {{{
 	initial	lost_sync = 1;
 	always @(posedge i_pixclk)
 	if (i_reset)
@@ -131,7 +151,17 @@ module	axisvga #(
 				lost_sync <= 1;
 		end
 	end
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Vertical / frame based timing and synchronization
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	// r_newframe
+	// {{{
 	initial	r_newframe = 0;
 	always @(posedge i_pixclk)
 	if (i_reset)
@@ -140,8 +170,10 @@ module	axisvga #(
 		r_newframe <= 1'b1;
 	else
 		r_newframe <= 1'b0;
+	// }}}
 
-
+	// vpos, o_vsync
+	// {{{
 	initial	vpos = 0;
 	initial	o_vsync = 1'b1;
 	always @(posedge i_pixclk)
@@ -164,25 +196,57 @@ module	axisvga #(
 		// the first pixel clock is valid.
 		o_vsync <= (vpos < i_vm_porch-1'b1)||(vpos>=i_vm_synch-1'b1);
 	end
+	// }}}
 
+	// vrd
+	// {{{
 	initial	vrd = 1'b1;
 	always @(posedge i_pixclk)
 		vrd <= (vpos < i_vm_height)&&(!i_reset);
+	// }}}
 
+	// first_frame
+	// {{{
 	initial	first_frame = 1'b1;
 	always @(posedge i_pixclk)
 	if (i_reset)
 		first_frame <= 1'b1;
 	else if (r_newframe)
 		first_frame <= 1'b0;
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// AXI-stream incoming ready generation
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	//
+	// This really needs a skid buffer to be properly AXI stream compliant
+	//
+
+	// w_rd -- true if we are reading a pixel
 	assign	w_rd = (hrd)&&(vrd)&&(!first_frame);
+
+	// o_ready -- Incoming AXI stream signal, indicating we are ready to
+	// receive a pixel
+	// {{{
 	always @(*)
 	if (lost_sync)
 		o_ready = (!i_vlast || !i_hlast) || (r_newframe && w_rd);
 	else
 		o_ready = w_rd;
-
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Outgoing pixel generation
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	always @(posedge i_pixclk)
 	if (w_rd)
 	begin
@@ -201,15 +265,24 @@ module	axisvga #(
 		o_grn <= 0;
 		o_blu <= 0;
 	end
+	// }}}
 
+	// Make Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0 };
 	// Verilator lint_on  UNUSED
-
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Formal properties for verification purposes
-//
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 	reg		f_past_valid;
 	wire	[47:0]	f_vmode, f_hmode;
@@ -326,5 +399,6 @@ module	axisvga #(
 			assert(!r_newframe);
 	end
 `endif
+// }}}
 endmodule
 

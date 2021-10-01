@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename:	bench/cpp/Makefile
-##
+## {{{
 ## Project:	vgasim, a Verilator based VGA simulator demonstration
 ##
 ## Purpose:	To direct the Verilator build of the VGA simulation sources.
@@ -19,17 +19,24 @@
 ##		some confidence that both VGASOURCE and VGASIM components are
 ##		working.
 ##
+##	hdmicheck
+##		The same as simcheck, but using an HDMI source and display.
+##
 ##	axi_tb
 ##		An AXI demonstrator.  This demo configures an AXI Video source,
 ##		and then feeds the result into the VGA (or HDMI) simulator.
+##
+##	sprite_tb
+##		The AXI demonstrator, modified to include the hardware sprite
+##		generator.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2017-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2017-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -44,13 +51,14 @@
 ## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	GPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/gpl.html
 ##
 ################################################################################
 ##
-##
+## }}}
 .PHONY: all
 # Make certain the "all" target is the first and therefore the default target
 all:
@@ -78,12 +86,11 @@ SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
-all:	main_tb
 
-SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp
-HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h videomode.h image.cpp
+SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
+HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp
 #
-PROGRAMS := main_tb simcheck axi_tb hdmi_tb
+PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb sprite_tb # hdmicam_tb
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -100,7 +107,14 @@ $(OBJDIR)/hdmi_tb.o: axi_tb.cpp
 	$(mk-objdir)
 	$(CXX) -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
 
+$(OBJDIR)/sprite_tb.o: axi_tb.cpp
+	$(mk-objdir)
+	$(CXX) -DSPRITETB -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
+
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
+
+hdmicheck: $(OBJDIR)/hdmicheck.o $(OBJDIR)/hdmisim.o $(OBJDIR)/hdmisource.o
 	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
@@ -111,9 +125,17 @@ AXIOBJS := $(OBJDIR)/axi_tb.o
 axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
 	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
 
+SPRITEOBJS := $(OBJDIR)/sprite_tb.o
+sprite_tb: $(SPRITEOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vspritedemo__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vspritedemo__ALL.a $(GFXLIBS) -o $@
+
 HDMIOBJS := $(OBJDIR)/hdmi_tb.o
 hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxihdmi__ALL.a $(GFXLIBS) -o $@
+
+REPEATEROBJS := $(OBJDIR)/axirepeater_tb.o $(OBJDIR)/hdmisource.o
+axirepeater_tb: $(REPEATEROBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxirepeater__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxirepeater__ALL.a $(GFXLIBS) -o $@
 
 .PHONY: clean
 clean:
