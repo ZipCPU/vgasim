@@ -793,11 +793,11 @@ module	axissprite #(
 		assign	alpha  =  spritepix[3*SBPC +: ALPHA_BITS];
 		assign	alphan = ~spritepix[3*SBPC +: ALPHA_BITS];
 		assign	sr = spritepix[2*SBPC +: SBPC];
-		assign	sg = spritepix[0*SBPC +: SBPC];
-		assign	sb = spritepix[1*SBPC +: SBPC];
-		assign	pr = p_data[BPC +: BPC];
-		assign	pg = p_data[BPC +: BPC];
-		assign	pb = p_data[BPC +: BPC];
+		assign	sg = spritepix[1*SBPC +: SBPC];
+		assign	sb = spritepix[0*SBPC +: SBPC];
+		assign	pr = p_data[2*BPC +: BPC];
+		assign	pg = p_data[1*BPC +: BPC];
+		assign	pb = p_data[0*BPC +: BPC];
 `ifdef	FORMAL
 		(* anyseq *) reg	[SBPC+ALPHA_BITS-1:0]	f_rsp,  f_gsp,  f_bsp;
 		(* anyseq *) reg	[BPC + ALPHA_BITS-1:0]	f_rdat, f_gdat, f_bdat;
