@@ -1,0 +1,30 @@
+[tasks]
+prf
+cvr
+
+[options]
+prf: mode prove
+cvr: mode cover
+prf: depth 5
+
+[engines]
+smtbmc
+
+[script]
+read -formal vid_waterfall_r.v
+read -formal fwb_master.v
+read -formal faxivideo.v
+read -formal sfifo.v
+read -formal afifo.v
+--pycode-begin--
+cmd = "hierarchy -top vid_waterfall_r"
+output(cmd)
+--pycode-end--
+prep -top vid_waterfall_r
+
+[files]
+fwb_master.v
+faxivideo.v
+../../rtl/gfx/vid_waterfall_r.v
+../../rtl/sfifo.v
+../../rtl/afifo.v

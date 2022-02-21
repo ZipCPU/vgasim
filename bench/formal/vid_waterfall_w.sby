@@ -1,0 +1,31 @@
+[tasks]
+prf
+cvr
+
+[options]
+prf: mode prove
+cvr: mode cover
+prf: depth 9
+cvr: depth 90
+
+[engines]
+smtbmc
+
+[script]
+read -formal sfifo.v
+read -formal faxivideo.v
+read -formal fwb_master.v
+read -formal vid_waterfall_w.v
+--pycode-begin--
+cmd = "hierarchy -top vid_waterfall_w"
+if ("cvr" in tags):
+	cmd += " -chparam LGBURST 3"
+output(cmd)
+--pycode-end--
+prep -top vid_waterfall_w
+
+[files]
+fwb_master.v
+faxivideo.v
+../../rtl/sfifo.v
+../../rtl/gfx/vid_waterfall_w.v

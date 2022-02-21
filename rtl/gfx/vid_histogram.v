@@ -60,7 +60,7 @@ module	vid_histogram #(
 		// }}}
 	) (
 		// {{{
-		input	wire	S_AXI_ACLK, S_AXI_ARESETN,
+		input	wire		S_AXI_ACLK, S_AXI_ARESETN,
 		// Input data
 		input	wire		S_AXIS_TVALID,
 		output	wire		S_AXIS_TREADY,
@@ -90,14 +90,14 @@ module	vid_histogram #(
 	reg			swap_banks, clearing_bank, initial_clearing,
 				swap_pipe;
 
-	reg	[LGHIST:0]	rd_mem_counts, new_mem_counts, skip_counts,
-				total_counts;
+	reg	[LGHIST:0]	rd_mem_counts_raw, new_mem_counts, total_counts;
+	wire	[LGHIST:0]	rd_mem_counts;
 	reg	[LGMEM-1:0]	rd_mem_addr, new_mem_addr;
-	reg			wr_mem, skip_valid, rd_mem_valid;
+	reg			wr_mem, rd_mem_valid;
 
 	///////
 	reg				h_valid, vs_valid, th_valid;
-	reg				h_ready, vs_ready, th_ready;
+	wire				h_ready, vs_ready, th_ready;
 	reg				heol, vs_eol, th_eol, px_eof;
 	reg	[LGDIM-1:0]		hpos, px_vpos;
 	reg	[LGDIM:0]		ovcount, th_overflows;
@@ -111,8 +111,10 @@ module	vid_histogram #(
 	reg	[PW-1:0]		px_pixel;
 
 	reg				M_VID_VLAST, M_VID_HLAST;
-	// }}}
 
+	reg			bypass_active;
+	reg	[LGHIST:0]	bypass_value;
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////
 	// Generate the histogram
@@ -126,21 +128,32 @@ module	vid_histogram #(
 	if (!S_AXI_ARESETN)
 		rd_mem_valid <= 1;
 	else
-		rd_mem_valid <= S_AXIS_TVALID;
+		rd_mem_valid <= S_AXIS_TVALID && (!clearing_bank && !swap_pipe);
 
 	always @(posedge S_AXI_ACLK)
 	if (S_AXIS_TVALID)
-		rd_mem_counts <= mem[{ write_bank, S_AXIS_TDATA }];
+		rd_mem_counts_raw <= mem[{ write_bank, S_AXIS_TDATA }];
 
 	always @(posedge S_AXI_ACLK)
 	if (S_AXIS_TVALID)
-	begin
 		rd_mem_addr   <= { write_bank, S_AXIS_TDATA };
-		skip_valid  <= wr_mem
+	else
+		rd_mem_addr[LGMEM-1] <= write_bank;
+
+	// Bypass--make registered reads act like combinatorial ones
+	// {{{
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		bypass_active <= 0;
+	else
+		bypass_active <= wr_mem
 			&& (new_mem_addr == { write_bank, S_AXIS_TDATA });
-		skip_counts <= new_mem_counts;
-	end else
-		skip_valid <= 0;
+
+	always @(posedge S_AXI_ACLK)
+		bypass_value <= new_mem_counts;
+
+	assign	rd_mem_counts = (bypass_active ? bypass_value : rd_mem_counts_raw);
+	// }}}
 
 	assign	S_AXIS_TREADY = 1'b1;
 	// }}}
@@ -150,28 +163,36 @@ module	vid_histogram #(
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN || swap_banks)
 	begin
+		// {{{
 		wr_mem <= S_AXI_ARESETN && swap_banks;
 		new_mem_addr   <= 0;
+		if (S_AXI_ARESETN)
+			new_mem_addr[LGMEM-1] <= write_bank;
 		new_mem_counts <= 0;
 		total_counts   <= 0;
+		// }}}
 	end else if (clearing_bank)
 	begin
+		// {{{
 		wr_mem <= 1;
-		new_mem_addr   <= new_mem_addr + 1;
+		if (wr_mem)
+			new_mem_addr   <= new_mem_addr + 1;
+		if (wr_mem && !initial_clearing)
+			new_mem_addr[LGMEM-1] <= write_bank;
 		new_mem_counts <= 0;
 		total_counts   <= 0;
+		// }}}
 	end else if (!OPT_LOWPOWER || (rd_mem_valid && !total_counts[LGHIST]))
 	begin
+		// {{{
 		wr_mem <= rd_mem_valid && !total_counts[LGHIST];
 		new_mem_addr <= rd_mem_addr;
 		if (rd_mem_valid && !total_counts[LGHIST])
 			total_counts <= total_counts + 1;
-		if (wr_mem && rd_mem_addr == new_mem_addr)
+		new_mem_counts <= rd_mem_counts + 1;
+		if (wr_mem && new_mem_addr == rd_mem_addr)
 			new_mem_counts <= new_mem_counts + 1;
-		else if (skip_valid)
-			new_mem_counts <= skip_counts + 1;
-		else
-			new_mem_counts <= rd_mem_counts + 1;
+		// }}}
 	end else if (OPT_LOWPOWER)
 		wr_mem <= 0;
 	// }}}
@@ -191,7 +212,8 @@ module	vid_histogram #(
 	////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////
 
-	// 1.
+	// 1. h*
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		h_valid <= 0;
@@ -233,30 +255,41 @@ module	vid_histogram #(
 		h_data <= mem[ { read_bank, haddr[HEXTRA +: (LGMEM-1)] } ];
 
 	assign	h_ready = !vs_valid || vs_ready;
+	// }}}
 
-	// 2. vscale, the histogram value scaled
+	// 2. vs_*, the histogram value scaled
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		vs_valid <= 0;
 	else if (!vs_valid || vs_ready)
 		vs_valid <= h_valid;
 
+`ifdef	FORMAL
+	(* anyseq *) wire	[2*LGHIST:0]		f_vs_product;
+	always @(posedge S_AXI_ACLK)
+	if (!vs_valid || th_ready)
+		vs_product <= f_vs_product;
+`else
 	always @(posedge S_AXI_ACLK)
 	if (!vs_valid || th_ready)
 		vs_product <= h_data * vs_scale;
+`endif
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		vs_eol <= 0;
-	else if (!vs_valid || th_ready)
+	else if (!vs_valid || vs_ready)
 		vs_eol  <= heol;
 
 	assign	vs_value = (vs_product[2*LGHIST] ? -1
 				: vs_product[2*LGHIST - 1: 2*LGHIST-LGDIM]);
 
 	assign	vs_ready = !th_valid || th_ready;
+	// }}}
 
-	// 3.
+	// 3. th_*, thresholded
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		th_valid <= 0;
@@ -319,8 +352,10 @@ module	vid_histogram #(
 	end
 
 	assign	th_ready = !M_VID_VALID || M_VID_READY;
+	// }}}
 
-	// 4.
+	// 4. M_VID_*, the outgoing channel
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 	begin
@@ -334,23 +369,30 @@ module	vid_histogram #(
 		M_VID_VLAST <= th_eol && px_eof;
 	end
 
+`ifdef	FORMAL
+	wire	m_vid_sof;
+`endif
 	generate if (OPT_TUSER_IS_SOF)
-	begin
+	begin : GEN_SOF
 		reg	M_VID_SOF;
 
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			M_VID_SOF <= 1'b0;
+			M_VID_SOF <= 1'b1;
 		else if (M_VID_VALID && M_VID_READY)
 			M_VID_SOF <= M_VID_HLAST && M_VID_VLAST;
-		else if (M_VID_READY)
-			M_VID_SOF <= 1'b0;
 
 		assign	M_VID_USER = M_VID_SOF;
 		assign	M_VID_LAST = M_VID_HLAST;
+`ifdef	FORMAL
+		assign	m_vid_sof = M_VID_SOF;
+`endif
 	end else begin
 		assign	M_VID_USER = M_VID_HLAST;
 		assign	M_VID_LAST = M_VID_VLAST;
+`ifdef	FORMAL
+		assign	m_vid_sof = 1'b0;
+`endif
 	end endgenerate
 
 	always @(posedge S_AXI_ACLK)
@@ -385,7 +427,7 @@ module	vid_histogram #(
 	assign	M_VID_DATA = px_pixel;
 
 	//	pxeof <= (vnow >= i_height-1)
-	//	eof <= (pxeof && (heol || vseol || theol);
+	//	eof <= (pxeof && (heol || vs_eol || theol);
 	//
 	//	if (pxeof && theol)
 	//	begin
@@ -393,6 +435,8 @@ module	vid_histogram #(
 	//			vscale <= vscale - 1;
 	//	end
 	//
+
+	// }}}
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -405,15 +449,18 @@ module	vid_histogram #(
 
 	assign	read_bank = !write_bank;
 
+	// swap_banks, write_bank, swap_pipe
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 	begin
 		swap_banks <= 0;
-		write_bank <= 0;
+		write_bank <= 1;
 	end else if (h_valid && vs_ready && total_counts[LGHIST])
 	begin
 		swap_banks <= 1'b1;
-		write_bank <= !write_bank;
+		if (!swap_banks)
+			write_bank <= !write_bank;
 	end else if (wr_mem && swap_pipe)
 		swap_banks <= 1'b0;
 
@@ -422,30 +469,35 @@ module	vid_histogram #(
 		swap_pipe <= 0;
 	else
 		swap_pipe <= clearing_bank;
+	// }}}
 
+	// initial_clearing, clearing_bank
+	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 	begin
 		initial_clearing <= 1;
-		clearing_bank    <= 0;
+		clearing_bank    <= 1;
 	end else if (swap_banks)
 	begin
 		clearing_bank    <= 1;
 		// initial_clearing stays constant
 	end else if (clearing_bank && wr_mem && swap_pipe)
 	begin
-		if (&new_mem_addr[LGMEM-2:0])
+		if (&new_mem_addr[LGMEM-2:1])
 		begin
 			if (initial_clearing)
 			begin
-				clearing_bank <= !new_mem_addr[LGMEM-1];
-				initial_clearing <= 1'b0;
+				// clearing_bank <= 1; // Should still be 1
+				if (new_mem_addr[0])
+					initial_clearing <= 1'b0;
 			end else
 				clearing_bank <= 0;
 		end
 	end
 	// }}}
 
+	// }}}
 	// Keep Verilator happy
 	// {{{
 	// Verilator lint_off UNUSED
@@ -462,5 +514,343 @@ module	vid_histogram #(
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+	// Local declarations
+	// {{{
+	reg			f_past_valid;
+	wire			fh_hlast, fh_vlast, fh_sof, fh_known_height;
+	wire	[LGDIM-1:0]	fh_xpos, fh_ypos;
+	wire			fvs_hlast, fvs_vlast, fvs_sof, fvs_known_height;
+	wire	[LGDIM-1:0]	fvs_xpos, fvs_ypos;
+	wire			fth_hlast, fth_vlast, fth_sof, fth_known_height;
+	wire	[LGDIM-1:0]	fth_xpos, fth_ypos;
+	wire			f_hlast, f_vlast, f_sof, f_known_height;
+	wire	[LGDIM-1:0]	f_xpos, f_ypos;
+
+	(* anyconst *)	reg [LGMEM-1:0]	fc_addr;
+	wire	[LGHIST:0]	f_data;
+	reg	[LGHIST:0]	f_counts;
+
+
+	initial	f_past_valid = 0;
+	always @(posedge S_AXI_ACLK)
+		f_past_valid <= 1;
+
+	always @(*)
+	if (!f_past_valid)
+		assume(!S_AXI_ARESETN);
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Input stream assumptions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN)
+	begin
+		assume($stable(i_width));
+		assume($stable(i_height));
+
+		assume(i_width  > 2);
+		assume(i_height > 2);
+	end
+
+
+	always @(posedge S_AXI_ACLK)
+	if (!f_past_valid)
+	begin end else if ($past(!S_AXI_ARESETN))
+	begin
+		assume(!S_AXIS_TVALID);
+	end else if ($past(S_AXIS_TVALID && !S_AXIS_TREADY))
+	begin
+		assume(S_AXIS_TVALID);
+		assume($stable(S_AXIS_TDATA));
+	end
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Outgoing video stream properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(PW), .LGDIM(LGDIM), .OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fvid (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+		//
+		.S_VID_TVALID(M_VID_VALID), .S_VID_TREADY(M_VID_READY),
+		.S_VID_TDATA(M_VID_DATA), .S_VID_TLAST(M_VID_LAST),
+		.S_VID_TUSER(M_VID_USER),
+		//
+		.i_width(i_width), .i_height(i_height),
+		.o_xpos(f_xpos), .o_ypos(f_ypos),
+		.f_known_height(f_known_height),
+		.o_hlast(f_hlast), .o_vlast(f_vlast), .o_sof(f_sof)
+		// }}}
+	);
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN)
+	begin
+		if (M_VID_VALID)
+		begin
+			if (f_hlast)
+			begin
+				assert(fth_xpos == 0);
+				if (f_vlast)
+				begin
+					assert(fth_ypos == 0);
+				end else
+					assert(f_ypos + 1 == fth_ypos);
+			end else begin
+				assert(f_xpos + 1 == fth_xpos);
+				assert(f_ypos == fth_ypos);
+			end
+		end else begin
+			assert(f_xpos == fth_xpos);
+			assert(f_ypos == fth_ypos);
+		end
+
+		assert(M_VID_HLAST == f_hlast);
+		assert(M_VID_VLAST == (f_vlast && f_hlast));
+		if (OPT_TUSER_IS_SOF)
+			assert(m_vid_sof == (f_xpos == 0 && f_ypos == 0));
+	end
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Internal h* video stream properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(PW), .LGDIM(LGDIM), .OPT_TUSER_IS_SOF(1'b0)
+		// }}}
+	) fvid_h (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+		//
+		.S_VID_TVALID(h_valid), .S_VID_TREADY(h_ready),
+		.S_VID_TDATA(haddr), .S_VID_TLAST(heol&& fh_ypos == i_height-1),
+		.S_VID_TUSER(heol),
+		//
+		.i_width(i_width), .i_height(i_height),
+		.o_xpos(fh_xpos), .o_ypos(fh_ypos),
+		.f_known_height(fh_known_height),
+		.o_hlast(fh_hlast), .o_vlast(fh_vlast), .o_sof(fh_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (S_AXI_ARESETN)
+	begin
+		assert(fh_xpos == hpos);
+		assert(fh_hlast == heol);
+	end
+
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Internal vs_* (vertical scale) video stream properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(PW), .LGDIM(LGDIM), .OPT_TUSER_IS_SOF(1'b0)
+		// }}}
+	) fvid_vs (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+		//
+		.S_VID_TVALID(vs_valid), .S_VID_TREADY(vs_ready),
+		.S_VID_TDATA(vs_product),
+				.S_VID_TLAST(vs_eol&& fvs_ypos == i_height-1),
+		.S_VID_TUSER(vs_eol),
+		//
+		.i_width(i_width), .i_height(i_height),
+		.o_xpos(fvs_xpos), .o_ypos(fvs_ypos),
+		.f_known_height(fvs_known_height),
+		.o_hlast(fvs_hlast), .o_vlast(fvs_vlast), .o_sof(fvs_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (S_AXI_ARESETN)
+		assert(vs_eol == fvs_hlast);
+
+	always @(*)
+	if (S_AXI_ARESETN && vs_valid)
+	begin
+		if (vs_eol)
+			assert(hpos == 0);
+		else
+			assert(hpos == fvs_xpos + 1);
+	end else if (S_AXI_ARESETN)
+		assert(hpos == fvs_xpos);
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Internal th_* (threshold stage) video stream properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(PW), .LGDIM(LGDIM), .OPT_TUSER_IS_SOF(1'b0)
+		// }}}
+	) fvid_th (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+		//
+		.S_VID_TVALID(th_valid), .S_VID_TREADY(th_ready),
+		.S_VID_TDATA(th_value),
+				.S_VID_TLAST(th_eol&& fth_ypos == i_height-1),
+		.S_VID_TUSER(th_eol),
+		//
+		.i_width(i_width), .i_height(i_height),
+		.o_xpos(fth_xpos), .o_ypos(fth_ypos),
+		.f_known_height(fth_known_height),
+		.o_hlast(fth_hlast), .o_vlast(fth_vlast), .o_sof(fth_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (S_AXI_ARESETN)
+		assert(th_eol == fth_hlast);
+
+	always @(*)
+	if (S_AXI_ARESETN && th_valid)
+	begin
+		if (th_eol)
+			assert(fvs_xpos == 0);
+		else
+			assert(fvs_xpos == fth_xpos + 1);
+	end else if (S_AXI_ARESETN)
+		assert(fvs_xpos == fth_xpos);
+
+	always @(*)
+	if (S_AXI_ARESETN)
+	begin
+		assert(px_eof   == fth_vlast);
+		assert(px_vpos  == fth_ypos);
+	end
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Histogram contract properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	assign	f_data = mem[fc_addr];
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN && initial_clearing)
+		assert(clearing_bank);
+
+	always @(posedge S_AXI_ACLK)
+	if (f_past_valid && $fell(initial_clearing || clearing_bank)
+				&& new_mem_addr[LGMEM-1] == fc_addr[LGMEM-1])
+	begin
+		if (wr_mem && new_mem_addr == fc_addr)
+		begin
+			// Might still be writing a last value
+			assert(new_mem_counts == 0);
+		end else
+			assert(f_data == 0);
+	end
+
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN || !$past(S_AXI_ARESETN))
+	begin end
+	else if (f_past_valid && initial_clearing && !fc_addr[LGMEM-1])
+	begin
+		assert(!new_mem_addr[LGMEM-1]);
+		if (new_mem_addr[LGMEM-2:0] > fc_addr[LGMEM-2:0])
+			assert(f_data == 0);
+	end else if (clearing_bank && fc_addr[LGMEM-1] == new_mem_addr[LGMEM-1])
+	begin
+		if (new_mem_addr[LGMEM-2:0] > fc_addr[LGMEM-2:0])
+			assert(f_data == 0);
+	end
+
+	always @(*)
+	if (S_AXI_ARESETN && clearing_bank)
+		assert(wr_mem || new_mem_addr == 0);
+
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN || ((initial_clearing || clearing_bank)
+				&& new_mem_addr[LGMEM-1] == fc_addr[LGMEM-1]))
+		f_counts <= 0;
+	else if (!total_counts[LGHIST]
+			&& rd_mem_valid && rd_mem_addr == fc_addr)
+		f_counts <= f_counts + 1;
+
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+	begin end
+	else if (clearing_bank)
+	begin
+		if (!swap_banks)
+		casez({ initial_clearing, new_mem_addr[LGMEM-1],
+			fc_addr[LGMEM-1],
+			((new_mem_addr[LGMEM-2]>fc_addr[LGMEM-2])? 1'b1:1'b0) })
+		4'b0000: assert(f_counts == 0);
+		4'b0001: assert(f_counts == 0 && f_data == 0);
+		4'b001?: assert(f_counts == f_data);
+		4'b010?: assert(f_counts == f_data);
+		4'b0110: begin end // assert(f_counts == 0);
+		4'b0111: assert(f_counts == 0 && f_data == 0);
+		//
+		4'b1000: assert(f_counts == 0);
+		4'b1001: assert(f_counts == 0 && f_data == 0);
+		4'b101?: begin end
+		4'b11??: assert(0);
+		endcase
+	end else if (wr_mem && new_mem_addr == fc_addr)
+	begin
+		assert(new_mem_counts == f_counts);
+	end else if (write_bank == fc_addr[LGMEM-1]
+			&& (!swap_banks || clearing_bank))
+	begin
+		assert(f_counts == f_data);
+	end
+
+	always @(*)
+	if (S_AXI_ARESETN && initial_clearing)
+		assert(write_bank);
+
+	always @(*)
+	if (S_AXI_ARESETN && !initial_clearing && !swap_banks)
+		assert(write_bank == new_mem_addr[LGMEM-1]);
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN && write_bank == fc_addr[LGMEM-1]
+				&& !swap_banks && !clearing_bank)
+		assert(f_counts <= total_counts);
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN)
+		assert(total_counts <= (1<<LGHIST));
+	// }}}
+
 // }}}
 endmodule

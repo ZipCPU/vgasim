@@ -48,11 +48,15 @@ module	vid_waterfall_r #(
 		parameter	LGBURST =  LGFIFO-1,
 		parameter [0:0]	OPT_MSB_FIRST = 1'b1,
 		parameter [0:0]	OPT_TUSER_IS_SOF = 1'b1,
-		parameter [0:0]	OPT_ASYNC_CLOCKS = 1'b1
+		parameter [0:0]	OPT_ASYNC_CLOCKS = 1'b0
 		// }}}
 	) (
 		// {{{
+`ifdef	FORMAL
+		input	wire		i_clk,
+`else
 		input	wire		i_clk, i_pixclk,
+`endif
 		// Verilator lint_off SYNCASYNCNET
 		input	wire		i_reset,
 		// Verilator lint_on  SYNCASYNCNET
@@ -60,8 +64,8 @@ module	vid_waterfall_r #(
 		// {{{
 		input	wire	[LGFRAME-1:0]	i_height, i_width,
 		input	wire	[AW-1:0]	i_baseaddr,
+						i_lastaddr,
 						i_first_line,
-						i_last_line,
 		// }}}
 		// Wishbone bus master
 		// {{{
@@ -89,6 +93,9 @@ module	vid_waterfall_r #(
 
 	// Local declarations
 	// {{{
+	wire			wb_reset;
+	assign	wb_reset = i_reset || (o_wb_cyc && i_wb_err);
+
 	reg			last_ack, last_request;
 	reg	[LGBURST:0]	wb_outstanding;
 
@@ -102,6 +109,14 @@ module	vid_waterfall_r #(
 	reg	[DW-1:0]		px_data;
 	reg	[LGFRAME-1:0]		m_hpos, m_vpos;
 	reg				M_VID_HLAST, M_VID_VLAST;
+
+	reg			wb_hlast, wb_vlast;
+	reg	[LGFRAME-1:0]	wb_hpos, wb_vpos, line_step;
+	reg	[AW-1:0]	line_addr;
+
+`ifdef	FORMAL
+	wire	i_pixclk = i_clk;
+`endif
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -115,8 +130,9 @@ module	vid_waterfall_r #(
 
 	// o_wb_cyc, o_wb_stb
 	// {{{
+	initial { o_wb_cyc, o_wb_stb } = 2'b00;
 	always @(posedge i_clk)
-	if (i_reset || (o_wb_cyc && i_wb_err))
+	if (wb_reset)
 		{ o_wb_cyc, o_wb_stb } <= 2'b00;
 	else if (o_wb_cyc)
 	begin
@@ -124,9 +140,9 @@ module	vid_waterfall_r #(
 			o_wb_stb <= !last_request;
 
 		if (i_wb_ack && (!o_wb_stb || !i_wb_stall)
-					&& !last_request && last_ack)
+					&& last_request && last_ack)
 			o_wb_cyc <= 1'b0;
-	end else if (!fifo_fill[LGBURST])
+	end else if (fifo_fill[LGFIFO:LGBURST] == 0)
 		{ o_wb_cyc, o_wb_stb } <= 2'b11;
 	// }}}
 
@@ -165,25 +181,19 @@ module	vid_waterfall_r #(
 	always @(posedge i_clk)
 	if (i_reset || !o_wb_cyc)
 		last_request <= 0;
-	else if (wb_outstanding[LGBURST])
+	else if (wb_outstanding+(o_wb_stb ? 1:0) >= { 1'b0, {(LGBURST){1'b1}} })
 		last_request <= 1;
-	else if (wb_outstanding + fifo_fill + (o_wb_stb ? 1:0) >= (1<<LGFIFO))
-		last_request <= 0;
-	else
+	else if (wb_outstanding + fifo_fill + 1 + (o_wb_stb ? 1:0) >= (1<<LGFIFO))
 		last_request <= 1;
 	// }}}
 
-	reg			wb_hlast, wb_vlast;
-	reg	[LGFRAME-1:0]	wb_hpos, wb_vpos, line_step;
-	reg	[AW-1:0]	line_addr;
-
 	always @(posedge i_clk)
-		line_step <= (i_width + DW-1) >> $clog2(DW/PW);
+		line_step <= (i_width*PW + DW-1) >> $clog2(DW);
 
 	// o_wb_addr
 	// {{{
 	always @(posedge i_clk)
-	if (i_reset)
+	if (wb_reset)
 	begin
 		// {{{
 		wb_hpos <= 0;
@@ -193,7 +203,7 @@ module	vid_waterfall_r #(
 
 		o_wb_addr  <= i_baseaddr;
 		// Verilator lint_off WIDTH
-		line_addr<= i_baseaddr - line_step;
+		line_addr<= i_lastaddr - line_step;
 		// Verilator lint_on  WIDTH
 		// }}}
 	end else if (o_wb_stb && !i_wb_stall)
@@ -201,26 +211,36 @@ module	vid_waterfall_r #(
 		// {{{
 		wb_hpos <= wb_hpos + 1;
 		o_wb_addr <= o_wb_addr + 1;
-		wb_hlast <= (i_width <= 1) || (wb_hpos + 2 >= i_width);
-		if ((line_addr < i_first_line)||(line_addr >= i_last_line))
-			line_addr <= i_last_line;
+		wb_hlast <= (wb_hpos + 2 >= line_step);
+		// if ((line_addr < i_baseaddr)||(line_addr >= i_lastaddr))
+		//	line_addr <= i_lastaddr - line_step;
 
 		if (wb_hlast)
 		begin
+			wb_hlast<= 0;
 			wb_hpos <= 0;
 			wb_vpos <= wb_vpos + 1;
 
 			o_wb_addr <= line_addr;
 			// Verilator lint_off WIDTH
-			line_addr <= line_addr - line_step;
+			if (line_addr < i_baseaddr + line_step)
+				line_addr <= i_lastaddr - line_step;
+			else
+				line_addr <= line_addr - line_step;
+
 			// Verilator lint_on  WIDTH
-			wb_vlast <= (i_height <= 1) || (wb_vpos + 2>= i_height);
+			wb_vlast <= (wb_vpos + 2>= i_height);
 			if (wb_vlast)
 			begin
 				// Verilator lint_off WIDTH
-				line_addr <= i_baseaddr - line_step;
+				if (i_first_line < i_baseaddr + line_step)
+					line_addr <= i_lastaddr - line_step;
+				else
+					line_addr <= i_first_line - line_step;
 				// Verilator lint_on  WIDTH
-				o_wb_addr   <= i_baseaddr;
+				o_wb_addr   <= i_first_line;
+				wb_vlast    <= 0;
+				wb_vpos     <= 0;
 			end
 		end
 		// }}}
@@ -365,7 +385,7 @@ module	vid_waterfall_r #(
 	assign	M_VID_TVALID = px_valid;
 
 	generate if (OPT_MSB_FIRST)
-	begin
+	begin : MSB
 		assign M_VID_TDATA = px_data[DW-PW +: PW];
 	end else begin
 		assign M_VID_TDATA = px_data[0 +: PW];
@@ -403,7 +423,7 @@ module	vid_waterfall_r #(
 	// M_VID_TUSER, M_VID_TLAST
 	// {{{
 	generate if (OPT_TUSER_IS_SOF)
-	begin
+	begin : GEN_SOF
 		reg	sof;
 
 		always @(posedge pix_clk)
@@ -416,10 +436,11 @@ module	vid_waterfall_r #(
 
 		assign	M_VID_TLAST = M_VID_HLAST;
 		assign	M_VID_TUSER = sof;
-	end else begin
+	end else begin : NO_SOF
 		assign	M_VID_TLAST = M_VID_HLAST && M_VID_VLAST;
 		assign	M_VID_TUSER = M_VID_HLAST;
 	end endgenerate
+	// }}}
 	// }}}
 
 	// Keep Verilator happy
@@ -439,6 +460,222 @@ module	vid_waterfall_r #(
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+	// Local declarations
+	// {{{
+	reg	f_past_valid;
+	localparam	F_LGDEPTH = LGBURST+2;
+	wire	[LGFRAME-1:0]	f_xpos, f_ypos;
+	wire			f_known_height;
+	wire			f_hlast, f_vlast, f_sof;
+	wire	[LGFRAME-1:0]	fwb_xpos, fwb_ypos;
+	wire			fwb_known_height;
+	wire			fwb_hlast, fwb_vlast, fwb_sof;
+	wire	[F_LGDEPTH-1:0]	fwb_nreqs, fwb_nacks, fwb_outstanding;
+	wire	[F_LGDEPTH:0]	f_committed;
+	reg	[AW-1:0]	this_line;
+
+	initial	f_past_valid = 0;
+	always @(posedge i_clk)
+		f_past_valid <= 1;
+
+	always @(*)
+	if (!f_past_valid)
+		assume(i_reset);
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Wishbone
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	fwb_master #(
+		// {{{
+		.AW(AW), .DW(DW), .F_LGDEPTH(F_LGDEPTH)
+		// }}}
+	) fwb (
+		// {{{
+		.i_clk(i_clk), .i_reset(i_reset),
+		//
+		.i_wb_cyc(o_wb_cyc), .i_wb_stb(o_wb_stb), .i_wb_we(o_wb_we),
+		.i_wb_addr(o_wb_addr), .i_wb_data(o_wb_data),
+			.i_wb_sel(o_wb_sel),
+		.i_wb_stall(i_wb_stall), .i_wb_ack(i_wb_ack),
+			.i_wb_idata(i_wb_data), .i_wb_err(i_wb_err),
+		.f_nreqs(fwb_nreqs), .f_nacks(fwb_nacks),
+			.f_outstanding(fwb_outstanding)
+		// }}}
+	);
+
+	assign	f_committed = fifo_fill + fwb_outstanding;
+
+	always @(*)
+	if (!i_reset && o_wb_cyc)
+	begin
+		assert(wb_outstanding == fwb_outstanding);
+		if (wb_outstanding >= (1<<LGBURST))
+			assert(!o_wb_stb);
+		if (wb_outstanding >= (1<<LGBURST)-1)
+			assert(last_request);
+		assert(fwb_outstanding <= (1<<LGBURST));
+		assert(f_committed + (o_wb_stb ? 1:0)
+			+ (last_request ? 0:1) <= (1<<LGFIFO));
+	end
+
+	// always @(*)
+	// if (!i_reset && o_wb_cyc) assert(last_ack == (fwb_outstanding == 0));
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// (Wishbone) Video interface properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(AW),
+		.LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(1'b0),
+		.OPT_SOURCE(1'b0)
+		// }}}
+	) fvidwb (
+		// {{{
+		.i_clk(i_clk), .i_reset_n(!i_reset && !(o_wb_cyc && i_wb_err)),
+		.S_VID_TVALID(o_wb_stb), .S_VID_TREADY(!i_wb_stall),
+		.S_VID_TDATA(o_wb_addr), .S_VID_TLAST(wb_vlast && wb_hlast),
+		.S_VID_TUSER(wb_hlast),
+		.i_width(line_step), .i_height(i_height),
+		.o_xpos(fwb_xpos), .o_ypos(fwb_ypos),
+		.f_known_height(fwb_known_height),
+		.o_hlast(fwb_hlast), .o_vlast(fwb_vlast), .o_sof(fwb_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (!wb_reset)
+	begin
+		assert(wb_vlast == fwb_vlast);
+		assert(wb_hlast == fwb_hlast);
+
+		assert(wb_hpos == fwb_xpos);
+		assert(wb_vpos == fwb_ypos);
+
+		assume(line_step > 2);
+	end
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Video interface properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	always @(*)
+	if (!i_reset)
+	begin
+		assume(i_width  > 2*(DW/PW));
+		assume(i_height > 2);
+	end
+
+	faxivideo #(
+		// {{{
+		.PW(PW),
+		.LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF),
+		.OPT_SOURCE(1'b0)
+		// }}}
+	) fvid (
+		// {{{
+		.i_clk(i_clk), .i_reset_n(!i_reset),
+		.S_VID_TVALID(M_VID_TVALID), .S_VID_TREADY(M_VID_TREADY),
+		.S_VID_TDATA(M_VID_TDATA), .S_VID_TLAST(M_VID_TLAST),
+		.S_VID_TUSER(M_VID_TUSER),
+		.i_width(i_width), .i_height(i_height),
+		.o_xpos(f_xpos), .o_ypos(f_ypos),
+		.f_known_height(f_known_height),
+		.o_hlast(f_hlast), .o_vlast(f_vlast), .o_sof(f_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (!i_reset)
+	begin
+		assert(m_hpos == f_xpos);
+		assert(m_vpos == f_ypos);
+		assert(M_VID_VLAST == f_vlast);
+		assert(M_VID_HLAST == f_hlast);
+		if (OPT_TUSER_IS_SOF)
+			assert(M_VID_TUSER == f_sof);
+	end
+
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Mode assumptions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	always @(posedge i_clk)
+	if (!i_reset)
+	begin
+		assume($stable(i_baseaddr));
+		assume($stable(i_lastaddr));
+		assume($stable(line_step));
+
+		assume(i_baseaddr < i_lastaddr);
+		assume(i_first_line >= i_baseaddr);
+		assume(i_first_line <  i_lastaddr);
+		assume({ 1'b0, i_first_line } + { 1'b0, line_step } <= { 1'b0, i_lastaddr });
+		assume(i_baseaddr + { 1'b0, line_step } <= (1<<AW));
+		assume(i_baseaddr + (line_step << 4) <= { 4'h0, i_lastaddr });
+
+		if (i_first_line != i_baseaddr)
+		begin
+			assume(i_first_line >= i_baseaddr + line_step);
+		end
+		if (i_first_line != $past(i_first_line))
+		begin
+			assume((i_first_line == i_baseaddr)
+				|| (i_first_line == $past(i_first_line) + line_step));
+		end
+	end
+	// }}}
+
+	always @(*)
+		this_line = o_wb_addr - wb_hpos;
+
+	always @(posedge i_clk)
+	if (!i_reset)
+	begin
+		assert(line_addr >= i_baseaddr);	// !!! (Induction)
+		assert(line_addr <  i_lastaddr);
+		assert({ 1'b0, line_addr } + line_step <= { 1'b0, i_lastaddr });
+	end
+
+	always @(posedge i_clk)
+	if (!i_reset)
+	begin
+		assert(o_wb_addr >= i_baseaddr);
+		assert(o_wb_addr <  i_lastaddr);
+		assert({ 1'b0, this_line } + { 1'b0, line_step } <= { 1'b0, i_lastaddr });
+
+		if (wb_hlast)
+		begin
+			assert(line_addr >= i_baseaddr);
+			assert(line_addr <  i_lastaddr);
+		end
+
+		assert(wb_vlast == (wb_vpos == i_height-1));
+	end
 `endif
 // }}}
 endmodule

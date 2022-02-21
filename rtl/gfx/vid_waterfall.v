@@ -79,7 +79,7 @@ module	vid_waterfall #(
 		input	wire			i_pixclk,
 		// Control wires
 		// {{{
-		input	wire	[AW-1:0]	i_baseaddr, i_last_line,
+		input	wire	[AW-1:0]	i_baseaddr, i_lastaddr,
 		input	wire [LGFRAME-1:0]	i_width, i_height,
 		// }}}
 		// Incoming data stream
@@ -182,7 +182,8 @@ module	vid_waterfall #(
 		.S_AXI_TLAST(S_AXIS_TLAST),
 		//
 		.i_height(i_height), .i_width(i_width),
-		.i_baseaddr(i_baseaddr), .o_first_addr(w_first_addr),
+		.i_baseaddr(i_baseaddr), .o_first_line(w_first_addr),
+			.i_lastaddr(i_lastaddr),
 		//
 		.o_wb_cyc(wr_cyc), .o_wb_stb(wr_stb), .o_wb_we(wr_we),
 			.o_wb_addr(wr_addr), .o_wb_data(wr_data),
@@ -206,7 +207,7 @@ module	vid_waterfall #(
 		//
 		.i_height(i_height), .i_width(i_width),
 		.i_baseaddr(i_baseaddr), .i_first_line(w_first_addr),
-			.i_last_line(i_last_line),
+			.i_lastaddr(i_lastaddr),
 		//
 		.o_wb_cyc(rd_cyc), .o_wb_stb(rd_stb), .o_wb_we(rd_we),
 			.o_wb_addr(rd_addr), .o_wb_data(rd_data),

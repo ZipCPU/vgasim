@@ -11,3 +11,6 @@ axisvga_*/
 axisvoverlay_*/
 pix2stream_*/
 vidstream2pix_*/
+vid_histogram_*/
+vid_waterfall_r_*/
+vid_waterfall_w_*/
