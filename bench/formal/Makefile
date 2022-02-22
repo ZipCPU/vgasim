@@ -40,7 +40,7 @@
 ##
 all:
 ## }}}
-GFX := vid_waterfall_r vid_waterfall_w
+GFX := vid_waterfall_r vid_waterfall_w vid_histogram
 TESTS := llvga axissprite axishdmi pix2stream atxfifo vidstream2pix $(GFX) # imgfifo
 all: $(TESTS)
 
@@ -57,6 +57,7 @@ PIX2STREAM := pix2stream
 VID2PIX  := vidstream2pix
 WFALLW   := vid_waterfall_w
 WFALLR   := vid_waterfall_r
+HSGRAM   := vid_histogram
 
 MASTER   := fwb_master.v
 # SLAVE  := $(RTL)/ex/fwb_slave.v
@@ -151,6 +152,14 @@ $(WFALLR)_prf/PASS: $(WFALLR).sby $(RTL)/gfx/$(WFALLR).v $(RTL)/sfifo.v faxivide
 	sby -f $(WFALLR).sby prf
 ## }}}
 
+.PHONY: $(HSGRAM) histogram
+## {{{
+histogram: $(HSGRAM)
+$(HSGRAM): $(HSGRAM)_prf/PASS
+$(HSGRAM)_prf/PASS: $(HSGRAM).sby $(RTL)/gfx/$(HSGRAM).v faxivideo.v
+	sby -f $(HSGRAM).sby prf
+## }}}
+
 .PHONY: clean
 ## {{{
 clean:
@@ -159,4 +168,5 @@ clean:
 	rm -rf $(ATXFIFO)_*/
 	rm -rf $(VID2PIX)_*/
 	rm -rf $(WFALLW)_*/ $(WFALLR)_*/
+	rm -rf $(HSGRAM)_*/
 ## }}}
