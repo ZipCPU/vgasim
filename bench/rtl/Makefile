@@ -40,16 +40,18 @@ all:	test
 FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTL   := ../../rtl
+DEMOS := demo axidemo axihdmi axirepeater spritedemo histdemo
+.PHONY: $(DEMOS)
 
 .DELETE_ON_ERROR:
 
-.PHONY: demo
-test: demo axidemo axihdmi axirepeater spritedemo
+test: demo axidemo axihdmi axirepeater spritedemo histdemo
 demo:        $(VDIRFB)/Vdemo__ALL.a
 axidemo:     $(VDIRFB)/Vaxidemo__ALL.a
 axihdmi:     $(VDIRFB)/Vaxihdmi__ALL.a
 axirepeater: $(VDIRFB)/Vaxirepeater__ALL.a
 spritedemo:  $(VDIRFB)/Vspritedemo__ALL.a
+histdemo:    $(VDIRFB)/Vhistdemo__ALL.a
 
 VOBJ := obj_dir
 SUBMAKE := $(MAKE) --no-print-directory --directory=$(VOBJ) -f
@@ -60,16 +62,8 @@ VERILATOR := $(VERILATOR_ROOT)/bin/verilator
 endif
 VFLAGS := -Wall --MMD -O3 --trace -y ../../rtl -cc
 
-# $(VDIRFB)/Vdemo.h: $(VDIRFB)/Vdemo.h
-# $(VDIRFB)/Vdemo.mk: $(VDIRFB)/Vdemo.cpp
-$(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.mk
-$(VDIRFB)/Vdemo.h: demo.v
-
-$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.h
-$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.cpp
-$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.mk
-$(VDIRFB)/Vaxidemo.h: axidemo.v
-
+## Generic rules
+## {{{
 # $(VDIRFB)/V%.cpp $(VDIRFB)/V%.h $(VDIRFB)/V%.mk: $(FBDIR)/%.v
 $(VDIRFB)/V%.h:  $(VDIRFB)/V%.cpp
 $(VDIRFB)/V%.cpp: $(VDIRFB)/V%.mk
@@ -78,18 +72,51 @@ $(VDIRFB)/V%.mk: $(FBDIR)/%.v
 
 $(VDIRFB)/V%__ALL.a: $(VDIRFB)/V%.mk
 	$(SUBMAKE) V$*.mk
+## }}}
+
+## Vdemo
+## {{{
+# $(VDIRFB)/Vdemo.h: $(VDIRFB)/Vdemo.h
+# $(VDIRFB)/Vdemo.mk: $(VDIRFB)/Vdemo.cpp
+$(VDIRFB)/Vdemo__ALL.a: $(VDIRFB)/Vdemo.mk
+$(VDIRFB)/Vdemo.h: demo.v
+## }}}
+
+## axidemo
+## {{{
+$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.h
+$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.cpp
+$(VDIRFB)/Vaxidemo__ALL.a: $(VDIRFB)/Vaxidemo.mk
+$(VDIRFB)/Vaxidemo.h: axidemo.v
 
 $(VDIRFB)/Vaxidemo.cpp $(VDIRFB)/Vaxidemo.mk: axidemo.v demofull.v $(RTL)/axivdisplay.v
 	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/hdmi -cc axidemo.v
 
+## }}}
+
+## axihdmi
+## {{{
 $(VDIRFB)/Vaxihdmi.cpp $(VDIRFB)/Vaxihdmi.mk: axidemo.v demofull.v $(RTL)/axivdisplay.v $(RTL)/axishdmi.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi --prefix Vaxihdmi -cc axidemo.v
+## }}}
 
+## axirepeater
+## {{{
 $(VDIRFB)/Vaxirepeater.cpp $(VDIRFB)/Vaxirepeater.mk: axirepeater.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc axirepeater.v
+## }}}
 
+## spritedemo
+## {{{
 $(VDIRFB)/Vspritedemo.cpp $(VDIRFB)/Vspritedemo.mk: spritedemo.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc spritedemo.v
+## }}}
+
+## histdemo
+## {{{
+$(VDIRFB)/Vhistdemo.cpp $(VDIRFB)/Vhistdemo.mk: histdemo.v sintable.v $(RTL)/axishdmi.v $(RTL)/sfifo.v $(RTL)/gfx/vid_histogram.v $(RTL)/hdmi/tmdsencode.v
+	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/gfx -y $(RTL)/hdmi -cc histdemo.v
+## }}}
 
 ## CLEAN
 ## {{{

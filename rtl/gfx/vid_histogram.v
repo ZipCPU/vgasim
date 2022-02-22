@@ -82,7 +82,7 @@ module	vid_histogram #(
 
 	// Local definitions
 	// {{{
-	localparam	HEXTRA = 4;
+	localparam	HEXTRA = 4, VEXTRA = 4;
 
 	reg	[LGHIST:0]	mem	[0:(1<<LGMEM)-1];
 	reg			write_bank;
@@ -102,9 +102,9 @@ module	vid_histogram #(
 	reg	[LGDIM-1:0]		hpos, px_vpos;
 	reg	[LGDIM:0]		ovcount, th_overflows;
 	reg	[LGHIST:0]		h_data;
-	reg	[LGMEM+HEXTRA:0]	haddr, hdelta;
-	reg	[2*LGHIST:0]		vs_product;
-	reg	[LGDIM-1:0]		vs_scale;
+	reg	[LGMEM+HEXTRA-1:0]	haddr, hdelta;
+	reg	[LGHIST+LGDIM+VEXTRA-1:0]	vs_product;
+	reg	[LGDIM+VEXTRA-1:0]		vs_scale;
 	wire	[LGDIM-1:0]		vs_value;
 	reg	[LGDIM-1:0]		th_value, th_line_max, th_maxvalue;
 
@@ -231,20 +231,30 @@ module	vid_histogram #(
 	begin
 		heol  <= (hpos == i_width -2);
 		hpos  <= hpos + 1;
-		haddr <= haddr + hdelta;
+		if (!haddr[LGMEM+HEXTRA-1])
+			haddr <= haddr + hdelta;
 
-		if (heol)
+		if (heol) // && px_eof
 		begin
 			hpos  <= 0;
 
-			if (haddr[LGMEM+HEXTRA])
-				hdelta <= hdelta - 1;
-			else if (haddr + 4 * hdelta < (1<<(LGMEM + HEXTRA)))
-				hdelta <= hdelta + 4;
-			else if (haddr + 2 * hdelta < (1<<(LGMEM + HEXTRA)))
-				hdelta <= hdelta + 2;
-			else if (haddr +     hdelta < (1<<(LGMEM + HEXTRA)))
-				hdelta <= hdelta + 1;
+			if (px_eof)
+			begin
+				// Verilator lint_off WIDTH
+				if (haddr[LGMEM+HEXTRA-1])
+					hdelta <= hdelta - 1;
+				else if (haddr + i_width >= (1<<(LGMEM + HEXTRA-1)))
+				begin end
+				else if (haddr + 4 * hdelta < (1<<(LGMEM + HEXTRA-1)))
+					hdelta <= hdelta + 4;
+				else if (haddr + 2 * hdelta < (1<<(LGMEM + HEXTRA-1)))
+					hdelta <= hdelta + 2;
+				else if (haddr +     hdelta < (1<<(LGMEM + HEXTRA-1)))
+					hdelta <= hdelta + 1;
+				// Verilator lint_on  WIDTH
+
+				// $display("HADDR: %6d, HDELTA: %5d", haddr, hdelta);
+			end
 
 			haddr <= 0;
 		end
@@ -282,8 +292,8 @@ module	vid_histogram #(
 	else if (!vs_valid || vs_ready)
 		vs_eol  <= heol;
 
-	assign	vs_value = (vs_product[2*LGHIST] ? -1
-				: vs_product[2*LGHIST - 1: 2*LGHIST-LGDIM]);
+	assign	vs_value = (|vs_product[VEXTRA+LGDIM+LGHIST-1:(LGDIM+LGHIST)]) ? -1
+					: vs_product[LGHIST +: LGDIM];
 
 	assign	vs_ready = !th_valid || th_ready;
 	// }}}
@@ -333,14 +343,20 @@ module	vid_histogram #(
 			th_overflows <= ovcount;
 	end
 
+	//
+	// Want to multiply value * (height / max_value)
+	//	value * (0.. LGDIM-1) / (0..LGHIST)
+	//	Want value == 1 to be able to be mapped to height
+	//		So (height / max_value) = (height / 1) = max_height
+	//
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		vs_scale <= 1;
+		vs_scale <= 4096;
 	else if (M_VID_VALID && M_VID_READY && M_VID_VLAST && M_VID_HLAST)
 	begin
 		if (th_overflows > 0)
 			vs_scale <= (vs_scale > 1) ? vs_scale - 1 : vs_scale;
-		else if (th_overflows == 0)
+		else if (th_overflows == 0 && !(|vs_scale[LGDIM+VEXTRA-1:2]))
 		begin
 			if (th_maxvalue < i_height / 8)
 				vs_scale <= vs_scale + 4;
@@ -349,6 +365,8 @@ module	vid_histogram #(
 			else if (th_maxvalue < i_height / 2)
 				vs_scale <= vs_scale + 1;
 		end
+
+		// $display("VS-SCALE: %4d, H-DELTA: %4d", vs_scale, hdelta);
 	end
 
 	assign	th_ready = !M_VID_VALID || M_VID_READY;
@@ -418,7 +436,7 @@ module	vid_histogram #(
 	begin
 		if (px_vpos == th_value)
 			px_pixel <= LINE_PIXEL;
-		else if (px_vpos < th_value)
+		else if (px_vpos > th_value)
 			px_pixel <= ACTIVE_PIXEL;
 		else // if (px_vpos > th_value)
 			px_pixel <= BACKGROUND_PIXEL;
@@ -456,7 +474,8 @@ module	vid_histogram #(
 	begin
 		swap_banks <= 0;
 		write_bank <= 1;
-	end else if (h_valid && vs_ready && total_counts[LGHIST])
+	end else if (M_VID_VALID && M_VID_READY && M_VID_VLAST
+			&& total_counts[LGHIST])
 	begin
 		swap_banks <= 1'b1;
 		if (!swap_banks)
@@ -502,7 +521,7 @@ module	vid_histogram #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0 };
+	assign	unused = &{ 1'b0, vs_product };
 	// Verilator lint_on  UNUSED
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
@@ -514,6 +533,7 @@ module	vid_histogram #(
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
+`ifdef	FORMAL
 	// Local declarations
 	// {{{
 	reg			f_past_valid;
@@ -851,6 +871,6 @@ module	vid_histogram #(
 	if (S_AXI_ARESETN)
 		assert(total_counts <= (1<<LGHIST));
 	// }}}
-
+`endif
 // }}}
 endmodule

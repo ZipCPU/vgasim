@@ -90,7 +90,7 @@ VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
 SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
 HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp
 #
-PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb sprite_tb # hdmicam_tb
+PROGRAMS := main_tb simcheck hdmicheck axi_tb hdmi_tb sprite_tb hist_tb # hdmicam_tb
 # Now the return to the "all" target, and fill in some details
 all:	$(PROGRAMS)
 
@@ -136,6 +136,11 @@ hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
 REPEATEROBJS := $(OBJDIR)/axirepeater_tb.o $(OBJDIR)/hdmisource.o
 axirepeater_tb: $(REPEATEROBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxirepeater__ALL.a
 	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxirepeater__ALL.a $(GFXLIBS) -o $@
+
+HISTOBJS := $(OBJDIR)/hist_tb.o
+hist_tb: $(HISTOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vhistdemo__ALL.a
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vhistdemo__ALL.a $(GFXLIBS) -o $@
+
 
 .PHONY: clean
 clean:
