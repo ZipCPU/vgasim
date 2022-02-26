@@ -70,6 +70,8 @@ module	faxivideo #(
 	if (!f_past_valid)
 		assume(!i_reset_n);
 
+	// Stability
+	// {{{
 	always @(posedge i_clk)
 	if (!f_past_valid || !i_reset_n)
 	begin end else if ($past(!i_reset_n))
@@ -82,7 +84,13 @@ module	faxivideo #(
 		assert($stable(S_VID_TLAST));
 		assert($stable(S_VID_TUSER));
 	end
+	// }}}
 
+	// Calculate X & Y positions
+	// {{{
+	initial	o_xpos = 0;
+	initial	o_ypos = 0;
+	initial	f_known_height = 0;
 	always @(posedge i_clk)
 	if (!i_reset_n)
 	begin
@@ -106,11 +114,14 @@ module	faxivideo #(
 				o_ypos <= o_ypos + 1;
 		end
 	end
+	// }}}
 
 	assign	o_hlast = (o_xpos == i_width  - 1);
 	assign	o_vlast = (o_ypos == i_height - 1);
 	assign	o_sof   = (o_xpos == 0 && o_ypos == 0);
 
+	// Height/Width assumptions
+	// {{{
 	always @(posedge i_clk)
 	if (f_past_valid && $past(i_reset_n) && i_reset_n)
 	begin
@@ -123,6 +134,7 @@ module	faxivideo #(
 			assume(i_height > 2);
 		end
 	end
+	// }}}
 
 	always @(posedge i_clk)
 	if (f_past_valid && $past(i_reset_n) && i_reset_n)

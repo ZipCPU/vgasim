@@ -105,9 +105,11 @@ $(SPRITE)_cvr/PASS: $(SPRITE).sby $(RTL)/axissprite.v
 
 .PHONY: $(AXISHDMI)
 ## {{{
-$(AXISHDMI) : $(AXISHDMI)_prf/PASS
-$(AXISHDMI)_prf/PASS: $(AXISHDMI).sby $(RTL)/$(AXISHDMI).v
+$(AXISHDMI) : $(AXISHDMI)_prf/PASS $(AXISHDMI)_prfrs/PASS
+$(AXISHDMI)_prf/PASS: $(AXISHDMI).sby $(RTL)/$(AXISHDMI).v faxivideo.v
 	sby -f $(AXISHDMI).sby prf
+$(AXISHDMI)_prfrs/PASS: $(AXISHDMI).sby $(RTL)/$(AXISHDMI).v faxivideo.v
+	sby -f $(AXISHDMI).sby prfrs
 ## }}}
 
 .PHONY: $(PIX2STREAM)
