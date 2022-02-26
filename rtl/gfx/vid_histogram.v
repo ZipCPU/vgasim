@@ -238,18 +238,18 @@ module	vid_histogram #(
 		begin
 			hpos  <= 0;
 
-			if (px_eof)
+			if (1)
 			begin
 				// Verilator lint_off WIDTH
 				if (haddr[LGMEM+HEXTRA-1])
 					hdelta <= hdelta - 1;
-				else if (haddr + i_width >= (1<<(LGMEM + HEXTRA-1)))
+				else if ((&hdelta) || (haddr + i_width > (1<<(LGMEM + HEXTRA-1))))
 				begin end
-				else if (haddr + 4 * hdelta < (1<<(LGMEM + HEXTRA-1)))
-					hdelta <= hdelta + 4;
-				else if (haddr + 2 * hdelta < (1<<(LGMEM + HEXTRA-1)))
-					hdelta <= hdelta + 2;
-				else if (haddr +     hdelta < (1<<(LGMEM + HEXTRA-1)))
+				else if (haddr[HEXTRA +: LGMEM] + (i_width<<2) < (1<<(LGMEM-1)))
+					hdelta <= hdelta + (4<<HEXTRA);
+				else if (haddr[HEXTRA +: LGMEM] + i_width < (1<<(LGMEM-1)))
+					hdelta <= hdelta + (1<<HEXTRA);
+				else // if (haddr < (1<<(LGMEM + HEXTRA-1)))
 					hdelta <= hdelta + 1;
 				// Verilator lint_on  WIDTH
 

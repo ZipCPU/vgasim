@@ -18,6 +18,7 @@ read -formal sfifo.v
 read -formal afifo.v
 --pycode-begin--
 cmd = "hierarchy -top vid_waterfall_r"
+cmd += " -chparam OPT_ASYNC_CLOCKS 0"
 output(cmd)
 --pycode-end--
 prep -top vid_waterfall_r

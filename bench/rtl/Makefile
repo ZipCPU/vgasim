@@ -40,18 +40,19 @@ all:	test
 FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTL   := ../../rtl
-DEMOS := demo axidemo axihdmi axirepeater spritedemo histdemo
+DEMOS := demo axidemo axihdmi axirepeater spritedemo histdemo tracedemo
 .PHONY: $(DEMOS)
 
 .DELETE_ON_ERROR:
 
-test: demo axidemo axihdmi axirepeater spritedemo histdemo
+test: demo axidemo axihdmi axirepeater spritedemo histdemo tracedemo
 demo:        $(VDIRFB)/Vdemo__ALL.a
 axidemo:     $(VDIRFB)/Vaxidemo__ALL.a
 axihdmi:     $(VDIRFB)/Vaxihdmi__ALL.a
 axirepeater: $(VDIRFB)/Vaxirepeater__ALL.a
 spritedemo:  $(VDIRFB)/Vspritedemo__ALL.a
 histdemo:    $(VDIRFB)/Vhistdemo__ALL.a
+tracedemo:   $(VDIRFB)/Vtracedemo__ALL.a
 
 VOBJ := obj_dir
 SUBMAKE := $(MAKE) --no-print-directory --directory=$(VOBJ) -f
@@ -116,6 +117,12 @@ $(VDIRFB)/Vspritedemo.cpp $(VDIRFB)/Vspritedemo.mk: spritedemo.v demofull.v $(RT
 ## {{{
 $(VDIRFB)/Vhistdemo.cpp $(VDIRFB)/Vhistdemo.mk: histdemo.v sintable.v $(RTL)/axishdmi.v $(RTL)/sfifo.v $(RTL)/gfx/vid_histogram.v $(RTL)/hdmi/tmdsencode.v
 	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/gfx -y $(RTL)/hdmi -cc histdemo.v
+## }}}
+
+## tracedemo
+## {{{
+$(VDIRFB)/Vtracedemo.cpp $(VDIRFB)/Vtracedemo.mk: tracedemo.v sintable.v $(RTL)/axishdmi.v $(RTL)/sfifo.v $(RTL)/gfx/vid_trace.v $(RTL)/hdmi/tmdsencode.v
+	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/gfx -y $(RTL)/hdmi -cc tracedemo.v
 ## }}}
 
 ## CLEAN

@@ -48,7 +48,7 @@ module	vid_waterfall_r #(
 		parameter	LGBURST =  LGFIFO-1,
 		parameter [0:0]	OPT_MSB_FIRST = 1'b1,
 		parameter [0:0]	OPT_TUSER_IS_SOF = 1'b1,
-		parameter [0:0]	OPT_ASYNC_CLOCKS = 1'b0
+		parameter [0:0]	OPT_ASYNC_CLOCKS = 1'b1
 		// }}}
 	) (
 		// {{{
