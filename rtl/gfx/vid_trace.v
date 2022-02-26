@@ -62,20 +62,34 @@
 // }}}
 module vid_trace #(
 		// {{{
+		// LGFRAME: the number of bits required to represent either
+		// the width or the height of the video
 		parameter	LGFRAME = 11,
 		parameter	LGLEN = 10, // Max number of samples per trace
-		localparam	LGMEM = LGLEN+1,
+		localparam	LGMEM = LGLEN+1,	// Memory size
 		parameter	IW = 12,	// Bits per input sample
 		parameter	PW = 2,		// Bits per pixel
 		parameter [0:0] OPT_TUSER_IS_SOF = 1'b0,
+		// OPT_TRIGGER: True if we want to pause the trace on an
+		// external trigger event of some type.
 		parameter [0:0] OPT_TRIGGER      = 1'b0,
+		// OPT_FRAMED: True if incoming data has a frame to it, so that
+		// it must always be displayed in the correct order.  (Think
+		// FFT data ...)
+		parameter [0:0] OPT_FRAMED       = 1'b0,
+		// OPT_UNSIGNED: True if the incoming data is unsigned, and
+		// should be plotted bottom to top, with zero at the bottom
+		// instead of the middle.
+		parameter [0:0] OPT_UNSIGNED     = 1'b0,
 		parameter [PW-1:0]	BACKGROUND_COLOR = 0,
+		parameter [PW-1:0]	AXIS_COLOR =  0,
 		parameter [PW-1:0]	LINE_COLOR = -1,
+		// HEXTRA is the number of extra (fractional) bits used to
+		// divide the width by.  This allows for non-uniform stepping.
 		parameter	HEXTRA = 4
 		// Optional parameters I may wish to someday incorporate
 		// localparam [0:0] OPT_LOWPOWER = 1'b0,
 		// localparam [0:0] OPT_SKIDBUFFER = 1'b0,
-		// localparam [0:0] OPT_TRIGGER = 1'b0
 		// }}}
 	) (
 		// {{{
@@ -89,6 +103,7 @@ module vid_trace #(
 		input	wire		S_AXIS_TVALID,
 		output	wire		S_AXIS_TREADY,
 		input	wire [IW-1:0]	S_AXIS_TDATA,
+		input	wire		S_AXIS_TLAST,
 		// }}}
 		// The outgoing video stream (Video AXI-stream format)
 		// {{{
@@ -111,6 +126,7 @@ module vid_trace #(
 	reg	[LGMEM-1:0]	wr_addr;
 	reg	[LGMEM-2:0]	axis_wraddr, axis_rdaddr;
 	reg	[LGMEM-1:0]	wr_page_fill;
+	wire			frame_syncd;
 
 	reg			rd_vid_flag, rd_valid, rd_eol, rd_vlast, rd_mem,
 				mem_eol, mem_vlast;
@@ -127,7 +143,7 @@ module vid_trace #(
 	wire			copy_ready;
 	reg	[LGMEM-2:0]	copy_addr;
 	reg	[IW-1:0]	rd_alt, cp_alt;
-	wire	signed [IW-1:0]	rd_value, cp_value;
+	wire	[IW-1:0]	rd_value, cp_value;
 	wire			rd_ready;
 
 
@@ -135,11 +151,9 @@ module vid_trace #(
 	reg	[LGFRAME-1:0]	vs_xpos, vs_ypos;
 	wire			vs_ready;
 
-	reg	signed [LGFRAME+IW-1:0]	vs_product;
-	wire	signed [LGFRAME-1:0]	vs_value;
-	wire	signed	[LGFRAME:0]	sgn_scale;
+	wire	[LGFRAME-1:0]	vs_value;
 	reg	[LGFRAME-1:0]	vs_scale, vs_min_goal;
-	wire	[LGFRAME:0]	vs_posn, vs_abs, vs_neg;
+	wire	[LGFRAME:0]	vs_posn, vs_abs;
 
 
 	reg			yp_valid, yp_eol, yp_vlast, yp_sof,
@@ -262,9 +276,9 @@ module vid_trace #(
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN || wr_swap_pages)
 		wr_mem <= 0;
-	else if (S_AXIS_TVALID && S_AXIS_TREADY)
+	else if (S_AXIS_TVALID && S_AXIS_TREADY && (!OPT_FRAMED || frame_syncd))
 		wr_mem <= 1;
-	else if (copy_valid && !wr_page_fill[LGMEM-1])
+	else if (!OPT_FRAMED && copy_valid && !wr_page_fill[LGMEM-1])
 		wr_mem <= 1;
 	else
 		wr_mem <= 0;
@@ -273,18 +287,18 @@ module vid_trace #(
 	// wr_data : Data value to write to memory
 	// {{{
 	always @(posedge S_AXI_ACLK)
-	if (S_AXIS_TVALID && S_AXIS_TREADY)
+	if (S_AXIS_TVALID && S_AXIS_TREADY && (!OPT_FRAMED || frame_syncd))
 		wr_data <= S_AXIS_TDATA;
-	else if (copy_valid && !wr_page_fill[LGMEM-1])
+	else if (!OPT_FRAMED && copy_valid && !wr_page_fill[LGMEM-1])
 		wr_data <= cp_value;
 	// }}}
 
 	// wr_addr : Where do we write to memory on this sample?
 	// {{{
 	always @(posedge S_AXI_ACLK)
-	if (S_AXIS_TVALID && S_AXIS_TREADY)
+	if (S_AXIS_TVALID && S_AXIS_TREADY && (!OPT_FRAMED || frame_syncd))
 		wr_addr <= { wr_page, axis_wraddr };
-	else if (copy_valid)
+	else if (!OPT_FRAMED && copy_valid)
 		wr_addr <= { wr_page, copy_addr };
 	// }}}
 
@@ -310,7 +324,7 @@ module vid_trace #(
 		// Unlike the histogram, we never need to wait for a full
 		// page before swapping.
 		axis_wraddr <= 0;
-	else if (S_AXIS_TVALID && S_AXIS_TREADY)
+	else if (S_AXIS_TVALID && S_AXIS_TREADY && (!OPT_FRAMED || frame_syncd))
 		axis_wraddr <= axis_wraddr + 1;
 	// }}}
 
@@ -321,9 +335,11 @@ module vid_trace #(
 		axis_rdaddr <= 0;
 	else if (wr_swap_pages)
 		axis_rdaddr <= 0;
-	else if (!wr_page_fill[LGMEM-1] && copy_valid && copy_ready)
+	else if (!OPT_FRAMED && !wr_page_fill[LGMEM-1]
+				&& copy_valid && copy_ready)
 		axis_rdaddr <= axis_rdaddr - 1;
-	else if (wr_page_fill[LGMEM-1] && S_AXIS_TVALID && S_AXIS_TREADY)
+	else if (wr_page_fill[LGMEM-1] && S_AXIS_TVALID && S_AXIS_TREADY
+				&& !OPT_FRAMED)
 		axis_rdaddr <= axis_rdaddr + 1;
 	// }}}
 
@@ -334,13 +350,64 @@ module vid_trace #(
 		wr_page_fill <= 0;
 	else if (!wr_page_fill[LGMEM-1])
 	begin
-		if ((S_AXIS_TVALID && S_AXIS_TREADY)
-				|| (copy_valid && copy_ready))
+		if ((S_AXIS_TVALID && S_AXIS_TREADY
+					&& (!OPT_FRAMED || frame_syncd))
+				|| (!OPT_FRAMED && copy_valid && copy_ready))
 			wr_page_fill <= wr_page_fill + 1;
 	end
 	// }}}
 
 	assign	copy_ready = (!S_AXIS_TVALID || !S_AXIS_TREADY);
+
+	// frame_syncd
+	// {{{
+	generate if (OPT_FRAMED)
+	begin : GEN_SYNC
+		// The goal here is that the first sample of any data frame
+		// should be the sample immediately following TLAST.  If we
+		// swap at some time other than TLAST, then we need to wait for
+		// and skip all samples up to and including the TLAST sample.
+		// Once we receive TLAST, we are then synchronized again.
+		reg	r_syncd, r_last;
+
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			r_last <= 1;
+		else if (S_AXIS_TVALID && S_AXIS_TREADY)
+			r_last <= S_AXIS_TLAST;
+
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			r_syncd <= 1;
+		else if (S_AXIS_TVALID && S_AXIS_TREADY && S_AXIS_TLAST)
+			r_syncd <= 1;
+		else begin
+			// Here's the only time we can lose sync--if we swap
+			// pages having not just seen TLAST.  In this case,
+			// we'll need to wait for TLAST before we start
+			// sampling again.
+			if (wr_swap_pages && !r_last)
+				r_syncd <= 0;
+			//
+			// TLAST may show up while the page is filling, that
+			// is okay, and won't cause us to lose sync unless
+			// we swap pages (above) without being syncd.
+			//
+			// However, once we fill up, we can't continue to
+			// write anymore without losing sync.  That's handled
+			// above.
+		end
+
+		assign	frame_syncd = r_syncd;
+	end else begin : NO_SYNC
+		assign	frame_syncd = 1'b1;
+
+		// Verilator lint_off UNUSED
+		wire	unused_frame;
+		assign	unused_frame = &{ 1'b0, S_AXIS_TLAST, frame_syncd };
+		// Verilator lint_on  UNUSED
+	end endgenerate
+	// }}}
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -444,7 +511,8 @@ module vid_trace #(
 			rd_rdaddr <= rd_line_addr;
 		end
 		// }}}
-	end else if ((!copy_valid || copy_ready) && !wr_page_fill[LGMEM-1])
+	end else if (!OPT_FRAMED && (!copy_valid || copy_ready)
+						&& !wr_page_fill[LGMEM-1])
 	begin // if copy_cycle
 		// {{{
 		rd_mem <= 1;
@@ -488,15 +556,6 @@ module vid_trace #(
 	always @(posedge S_AXI_ACLK)
 	if (rd_mem)
 		mem_value <= mem[rd_rdaddr];
-
-	/*
-	always @(posedge S_AXI_ACLK)
-	if (rd_mem)
-	begin
-		mem_addr <= rd_rdaddr;
-		mem_src  <= rd_vid_flag;
-	end
-	*/
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -559,13 +618,13 @@ module vid_trace #(
 	// }}}
 
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN || wr_swap_pages)
+	if (!S_AXI_ARESETN || wr_swap_pages || OPT_FRAMED)
 		copy_valid <= 1'b0;
 	else if (!copy_valid || copy_ready)
 		copy_valid <= rd_mem && !rd_vid_flag && !wr_page_fill[LGMEM-1];
 
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || OPT_FRAMED)
 		copy_addr <= 0;
 	else if ((!copy_valid || copy_ready) && rd_mem && !rd_vid_flag)
 		copy_addr <= rd_rdaddr[LGMEM-2:0];
@@ -608,19 +667,54 @@ module vid_trace #(
 	end // else if (yp_ready)
 	//	vs_valid <= 1'b0;
 
-	// vs_product, vs_value
+	// vs_value = read value times our vertical scale
 	// {{{
-	assign	sgn_scale = { 1'b0, vs_scale };
-	always @(posedge S_AXI_ACLK)
-	if (S_AXI_ARESETN && (!vs_valid || vs_ready))
-		vs_product <= rd_value * sgn_scale;
+	generate if (OPT_UNSIGNED)
+	begin
+		wire	[LGFRAME:0]	us_scale;
+		wire	[IW-1:0]	us_value;
+		reg	[LGFRAME+IW:0]	us_product;
 
-	assign	vs_value = vs_product[IW + LGFRAME -1 : IW];
+		assign	us_scale = { 1'b0, vs_scale };
+		assign	us_value = rd_value;
+
+		always @(posedge S_AXI_ACLK)
+		if (S_AXI_ARESETN && (!vs_valid || vs_ready))
+			us_product <= us_value * us_scale;
+
+		assign	vs_value = us_product[IW + LGFRAME -1 : IW];
+
+		// Verilator lint_off UNUSED
+		wire	unused_product;
+		assign	unused_product = &{ 1'b0, us_product[IW+LGFRAME], us_product[IW-1:0] };
+		// Verilator lint_on  UNUSED
+	end else begin
+		wire	signed	[LGFRAME:0]	sgn_scale;
+		wire	signed	[IW-1:0]	sgn_value;
+		reg	signed	[LGFRAME+IW:0]	sgn_product;
+
+		assign	sgn_scale = { 1'b0, vs_scale };
+		assign	sgn_value = rd_value;
+
+		always @(posedge S_AXI_ACLK)
+		if (S_AXI_ARESETN && (!vs_valid || vs_ready))
+			sgn_product <= sgn_value * sgn_scale;
+
+		assign	vs_value = sgn_product[IW + LGFRAME -1 : IW];
+
+		// Verilator lint_off UNUSED
+		wire	unused_product;
+		assign	unused_product = &{ 1'b0, sgn_product[IW+LGFRAME], sgn_product[IW-1:0] };
+		// Verilator lint_on  UNUSED
+	end endgenerate
 	// }}}
 
 	// vs_scale tracking
 	// {{{
 	always @(posedge S_AXI_ACLK)
+	if (OPT_UNSIGNED)
+		vs_min_goal <= (i_height>>1) + (i_height >> 2);
+	else
 		vs_min_goal <= (i_height>>2) + (i_height >> 3);
 
 	always @(posedge S_AXI_ACLK)
@@ -628,8 +722,8 @@ module vid_trace #(
 		vs_scale <= { 3'b001, {(LGFRAME-3){1'b0}} };
 	else if (vs_valid && vs_ready && vs_eol && vs_vlast)
 	begin
-		// $display("YP-MAX: %5d, CLIPPED: %5d, VS-SCALE: %5d", yp_max,
-		//	num_clipped, vs_scale);
+		$display("YP-MAX: %5d, CLIPPED: %5d, VS-SCALE: %5d", yp_max,
+			num_clipped, vs_scale);
 		if (num_clipped == 0)
 		begin
 			if (vs_scale < (1<<LGFRAME)-4)
@@ -641,7 +735,9 @@ module vid_trace #(
 				else if (yp_max < vs_min_goal)
 					vs_scale <= vs_scale + 1;
 			end
-		end else if (vs_scale > 0 && yp_max > i_height/2 - 1)
+		end else if (vs_scale > 0
+				&& ((!OPT_UNSIGNED && yp_max > i_height/2 - 1)
+				  || (OPT_UNSIGNED && yp_max > i_height - 1)))
 			vs_scale <= vs_scale - 1;
 	end
 	// }}}
@@ -705,10 +801,22 @@ module vid_trace #(
 		yp_sof <= yp_vlast && yp_eol;
 	// }}}
 
-	assign			vs_posn = { 1'b0, i_height }/2
-					- { vs_value[LGFRAME-1], vs_value };
-	assign			vs_neg = -{ vs_value[LGFRAME-1], vs_value };
-	assign			vs_abs = vs_value[LGFRAME-1] ? vs_neg: { 1'b0, vs_value };
+	// vs_posn, vs_abs
+	// {{{
+	generate if (OPT_UNSIGNED)
+	begin
+
+		assign	vs_posn = i_height-1 - vs_value;
+		assign	vs_abs =  { 1'b0, vs_value };
+
+	end else begin
+		wire	[LGFRAME:0]	vs_neg;
+
+		assign	vs_neg = -{ vs_value[LGFRAME-1], vs_value };
+		assign	vs_posn = { 1'b0, i_height }/2 + vs_neg;
+		assign	vs_abs = vs_value[LGFRAME-1] ? vs_neg: { 1'b0, vs_value };
+	end endgenerate
+	// }}}
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -733,15 +841,20 @@ module vid_trace #(
 
 		// yp_value -- clip any overflow to the maximum value
 		// {{{
-		if (!vs_posn[LGFRAME-1] && vs_posn > i_height - 1)
+		if (!OPT_UNSIGNED && vs_posn[LGFRAME:LGFRAME-1] != 2'b00)
 		begin
-			yp_value   <= i_height - 1;
-			yp_clipped <= 1;
-		end else if (vs_posn[LGFRAME-1])
-		begin
+			// Clipped negative, position was to be too low
 			yp_value   <= 0;
 			yp_clipped <= 1;
+
+			// OPT_UNSIGNED will (should) *never* be negative
+		end else if (vs_posn > i_height - 1)
+		begin
+			// Position was too high
+			yp_value   <= i_height - 1;
+			yp_clipped <= 1;
 		end else begin
+			// Just right --- keep it
 			yp_value    <= vs_posn[LGFRAME-1:0];
 			yp_clipped  <= 0;
 		end
@@ -803,6 +916,10 @@ module vid_trace #(
 	else if (!M_VID_VALID || M_VID_READY)
 	begin
 		M_VID_DATA <= BACKGROUND_COLOR;
+		if (OPT_UNSIGNED && yp_vlast)
+			M_VID_DATA <= AXIS_COLOR;
+		if (!OPT_UNSIGNED && yp_ypos == i_height/2)
+			M_VID_DATA <= AXIS_COLOR;
 		if (yp_ypos == yp_value)
 			M_VID_DATA <= LINE_COLOR;
 	end
@@ -831,7 +948,7 @@ module vid_trace #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, yp_xpos, vs_product, vs_abs[LGFRAME] };
+	assign	unused = &{ 1'b0, yp_xpos, vs_abs[LGFRAME] };
 	// Verilator lint_on  UNUSED
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
