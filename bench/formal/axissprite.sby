@@ -21,6 +21,7 @@ smtbmc
 read -formal skidbuffer.v
 read -formal axissprite.v
 read -formal faxil_slave.v
+read -formal faxivideo.v
 --pycode-begin--
 cmd = "hierarchy -top axissprite"
 cmd += " -chparam OPT_SKIDBUFFER   %d" % (1 if "opt_skidbuffer" in tags else 0)
@@ -33,3 +34,4 @@ prep -top axissprite
 ../../rtl/skidbuffer.v
 ../../rtl/axissprite.v
 faxil_slave.v
+faxivideo.v

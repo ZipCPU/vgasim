@@ -40,7 +40,7 @@
 ##
 all:
 ## }}}
-GFX := vid_waterfall_r vid_waterfall_w vid_histogram vid_empty
+GFX := vid_waterfall_r vid_waterfall_w vid_histogram vid_trace vid_empty
 TESTS := llvga axissprite axishdmi pix2stream atxfifo vidstream2pix $(GFX) # imgfifo
 all: $(TESTS)
 
@@ -59,6 +59,7 @@ WFALLW   := vid_waterfall_w
 WFALLR   := vid_waterfall_r
 EMPTY    := vid_empty
 HSGRAM   := vid_histogram
+TRACE    := vid_trace
 
 MASTER   := fwb_master.v
 # SLAVE  := $(RTL)/ex/fwb_slave.v
@@ -91,15 +92,15 @@ $(IFIFO)/PASS: $(RTL)/atxfifo.v $(MASTER)
 $(SPRITE) : $(SPRITE)_prf/PASS    $(SPRITE)_prfns/PASS
 $(SPRITE) : $(SPRITE)_prfsof/PASS $(SPRITE)_prfsofns/PASS
 $(SPRITE) : $(SPRITE)_cvr/PASS
-$(SPRITE)_prf/PASS: $(SPRITE).sby $(RTL)/axissprite.v
+$(SPRITE)_prf/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby prf
-$(SPRITE)_prfns/PASS: $(SPRITE).sby $(RTL)/axissprite.v
+$(SPRITE)_prfns/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby prfns
-$(SPRITE)_prfsof/PASS: $(SPRITE).sby $(RTL)/axissprite.v
+$(SPRITE)_prfsof/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby prfsof
-$(SPRITE)_prfsofns/PASS: $(SPRITE).sby $(RTL)/axissprite.v
+$(SPRITE)_prfsofns/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby prfsofns
-$(SPRITE)_cvr/PASS: $(SPRITE).sby $(RTL)/axissprite.v
+$(SPRITE)_cvr/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby cvr
 ## }}}
 
@@ -161,6 +162,14 @@ histogram: $(HSGRAM)
 $(HSGRAM): $(HSGRAM)_prf/PASS
 $(HSGRAM)_prf/PASS: $(HSGRAM).sby $(RTL)/gfx/$(HSGRAM).v faxivideo.v
 	sby -f $(HSGRAM).sby prf
+## }}}
+
+.PHONY: $(TRACE) trace
+## {{{
+trace: $(TRACE)
+$(TRACE): $(TRACE)_prf/PASS
+$(TRACE)_prf/PASS: $(TRACE).sby $(RTL)/gfx/$(TRACE).v faxivideo.v
+	sby -f $(TRACE).sby prf
 ## }}}
 
 .PHONY: $(EMPTY) empty
