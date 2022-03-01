@@ -42,7 +42,7 @@ module	axishdmi #(
 		// {{{
 		parameter	HW=12,
 				VW=12,
-		parameter [0:0]	OPT_RESYNC_ON_VLAST = 1'b1,
+		parameter [0:0]	OPT_RESYNC_ON_VLAST = 1'b0,
 		// HDMI *only* works with 24-bit color, using 8-bits per color
 		localparam	BITS_PER_COLOR = 8,
 		localparam	BPC = BITS_PER_COLOR,
