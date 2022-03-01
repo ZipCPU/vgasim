@@ -81,6 +81,9 @@ module vid_trace #(
 		// should be plotted bottom to top, with zero at the bottom
 		// instead of the middle.
 		parameter [0:0] OPT_UNSIGNED     = 1'b0,
+		// OPT_LINE: True if you wish to draw lines rather than points
+		// to the video
+		parameter [0:0] OPT_LINE         = 1'b1,
 		parameter [PW-1:0]	BACKGROUND_COLOR = 0,
 		parameter [PW-1:0]	AXIS_COLOR =  0,
 		parameter [PW-1:0]	LINE_COLOR = -1,
@@ -162,6 +165,7 @@ module vid_trace #(
 				yp_max, yp_value, clip_count;
 	wire			yp_ready;
 
+	reg	[LGFRAME-1:0]	m_value;
 	reg	M_VID_VLAST, M_VID_HLAST, M_VID_SOF;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -722,8 +726,8 @@ module vid_trace #(
 		vs_scale <= { 3'b001, {(LGFRAME-3){1'b0}} };
 	else if (vs_valid && vs_ready && vs_eol && vs_vlast)
 	begin
-		$display("YP-MAX: %5d, CLIPPED: %5d, VS-SCALE: %5d", yp_max,
-			num_clipped, vs_scale);
+		// $display("YP-MAX: %5d, CLIPPED: %5d, VS-SCALE: %5d", yp_max,
+		//	num_clipped, vs_scale);
 		if (num_clipped == 0)
 		begin
 			if (vs_scale < (1<<LGFRAME)-4)
@@ -912,15 +916,41 @@ module vid_trace #(
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
+		m_value <= 0;
+	else if (yp_valid && yp_ready)
+		m_value <= yp_value;
+
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
 		M_VID_DATA <= 0;
 	else if (!M_VID_VALID || M_VID_READY)
 	begin
+		// Unless told otherwise, everything will be in the background
+		// color.
 		M_VID_DATA <= BACKGROUND_COLOR;
-		if (OPT_UNSIGNED && yp_vlast)
-			M_VID_DATA <= AXIS_COLOR;
-		if (!OPT_UNSIGNED && yp_ypos == i_height/2)
-			M_VID_DATA <= AXIS_COLOR;
-		if (yp_ypos == yp_value)
+
+		// Plot a y-axis baseline.  To skip this logic,
+		// simply set AXIS_COLOR to BACKGROUND_COLOR
+		if (OPT_UNSIGNED)
+		begin
+			if (yp_vlast)
+				M_VID_DATA <= AXIS_COLOR;
+		end else begin // if !OPT_UNSIGNED
+			if (yp_ypos == i_height/2)
+				M_VID_DATA <= AXIS_COLOR;
+		end
+
+		if (OPT_LINE)
+		begin
+			if (yp_ypos == yp_value)
+				M_VID_DATA <= LINE_COLOR;
+			if (!M_VID_HLAST)
+			begin
+				if ((yp_ypos >= yp_value && yp_ypos < m_value)
+				  ||(yp_ypos <= yp_value && yp_ypos > m_value))
+					M_VID_DATA <= LINE_COLOR;
+			end
+		end else if (yp_ypos == yp_value) // && !OPT_HLINE
 			M_VID_DATA <= LINE_COLOR;
 	end
 
@@ -948,7 +978,7 @@ module vid_trace #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, yp_xpos, vs_abs[LGFRAME] };
+	assign	unused = &{ 1'b0, yp_xpos, vs_abs[LGFRAME], m_value };
 	// Verilator lint_on  UNUSED
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
