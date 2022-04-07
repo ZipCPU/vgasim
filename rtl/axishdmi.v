@@ -146,16 +146,20 @@ module	axishdmi #(
 	always @(posedge i_pixclk)
 	if (pix_reset)
 	begin
+		// {{{
 		hpos <= 0;
 		r_newline <= 1'b0;
 		hsync <= 1'b0;
 		hrd <= 1;
+		// }}}
 	end else if (w_external_sync)
 	begin
 		hpos      <= i_hm_width;
 		r_newline <= 0;
 		hrd       <= 0;
+		hsync <= 1'b0;
 	end else begin
+		// {{{
 		hrd <= (hpos < i_hm_width-2)
 				||(hpos >= i_hm_raw-2);
 		if (hpos < i_hm_raw-1'b1)
@@ -164,6 +168,7 @@ module	axishdmi #(
 			hpos <= 0;
 		r_newline <= (hpos == i_hm_width-3);
 		hsync <= (hpos >= i_hm_porch-1'b1)&&(hpos<i_hm_synch-1'b1);
+		// }}}
 	end
 	// }}}
 
@@ -195,7 +200,7 @@ module	axishdmi #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Vertical line counting
+	// Vertical / frame based timing and synchronization
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//

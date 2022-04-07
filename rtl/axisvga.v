@@ -55,13 +55,16 @@ module	axisvga #(
 		// Verilator lint_on SYNCASYNCNET
 		//
 		// AXI Stream interface
+		// {{{
 		input	wire		i_valid,
 		output	reg		o_ready,
 		input	wire		i_hlast,
 		input	wire		i_vlast,
 		input	wire [BPP-1:0]	i_rgb_pix,
+		// }}}
 		//
 		// Video mode information
+		// {{{
 		input	wire [HW-1:0]	i_hm_width,
 		input	wire [HW-1:0]	i_hm_porch,
 		input	wire [HW-1:0]	i_hm_synch,
@@ -71,6 +74,7 @@ module	axisvga #(
 		input	wire [VW-1:0]	i_vm_porch,
 		input	wire [VW-1:0]	i_vm_synch,
 		input	wire [VW-1:0]	i_vm_raw,
+		// }}}
 		//
 		// VGA connections
 		output	reg		o_vsync,
@@ -99,6 +103,21 @@ module	axisvga #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
+	// Synchronize the reset release
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	initial	{ pix_reset, pix_reset_pipe } = -1;
+	always @(posedge i_pixclk, posedge i_reset)
+	if (i_reset)
+		{ pix_reset, pix_reset_pipe } <= -1;
+	else
+		{ pix_reset, pix_reset_pipe } <= { pix_reset_pipe, 1'b0 };
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
 	// Handle horizontal timing and synchronization
 	// {{{
 	////////////////////////////////////////////////////////////////////////
@@ -106,12 +125,13 @@ module	axisvga #(
 	//
 
 	// hpos, r_newline, o_sync, hrd
+	// {{{
 	initial	hpos       = 0;
 	initial	r_newline  = 0;
 	initial	o_hsync = 1;
 	initial	hrd = 1;
 	always @(posedge i_pixclk)
-	if (i_reset)
+	if (pix_reset)
 	begin
 		// {{{
 		hpos <= 0;
@@ -132,11 +152,12 @@ module	axisvga #(
 		// }}}
 	end
 	// }}}
-	// lost_sync
+
+	// lost_sync detection
 	// {{{
 	initial	lost_sync = 1;
 	always @(posedge i_pixclk)
-	if (i_reset)
+	if (pix_reset)
 		lost_sync <= 1;
 	else if (w_rd)
 	begin
@@ -152,6 +173,7 @@ module	axisvga #(
 		end
 	end
 	// }}}
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Vertical / frame based timing and synchronization
@@ -164,7 +186,7 @@ module	axisvga #(
 	// {{{
 	initial	r_newframe = 0;
 	always @(posedge i_pixclk)
-	if (i_reset)
+	if (pix_reset)
 		r_newframe <= 1'b0;
 	else if ((hpos == i_hm_width - 3)&&(vpos == i_vm_height-1))
 		r_newframe <= 1'b1;
@@ -177,7 +199,7 @@ module	axisvga #(
 	initial	vpos = 0;
 	initial	o_vsync = 1'b1;
 	always @(posedge i_pixclk)
-	if (i_reset)
+	if (pix_reset)
 	begin
 		vpos <= 0;
 		o_vsync <= 1'b1;
@@ -202,14 +224,14 @@ module	axisvga #(
 	// {{{
 	initial	vrd = 1'b1;
 	always @(posedge i_pixclk)
-		vrd <= (vpos < i_vm_height)&&(!i_reset);
+		vrd <= (vpos < i_vm_height)&&(!pix_reset);
 	// }}}
 
 	// first_frame
 	// {{{
 	initial	first_frame = 1'b1;
 	always @(posedge i_pixclk)
-	if (i_reset)
+	if (pix_reset)
 		first_frame <= 1'b1;
 	else if (r_newframe)
 		first_frame <= 1'b0;
@@ -217,7 +239,7 @@ module	axisvga #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// AXI-stream incoming ready generation
+	// AXI-stream Ready generation
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -228,7 +250,9 @@ module	axisvga #(
 	//
 
 	// w_rd -- true if we are reading a pixel
+	// {{{
 	assign	w_rd = (hrd)&&(vrd)&&(!first_frame);
+	// }}}
 
 	// o_ready -- Incoming AXI stream signal, indicating we are ready to
 	// receive a pixel
@@ -239,6 +263,7 @@ module	axisvga #(
 	else
 		o_ready = w_rd;
 	// }}}
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
