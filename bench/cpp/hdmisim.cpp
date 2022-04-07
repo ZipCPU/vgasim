@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	hdmisim.cpp
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	This is the main simulator source code file.  It uses gtkmm
@@ -17,9 +17,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2022, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -34,14 +34,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -49,6 +49,13 @@
 
 #include "hdmisim.h"
 #include "image.cpp"
+
+const int VIDEO_GUARD = 0,
+	VIDEO_DATA  = 1,
+	CTL_PERIOD  = 2,
+	DATA_GUARD  = 3,
+	DATA_ISLAND = 4,
+	HDMI_LOST   = 5;
 
 int	gbl_nframes = 0;
 const	int	HDMISIM::CLOCKS_PER_PIXEL = 1,
@@ -92,6 +99,7 @@ void	HDMISIM::get_preferred_height_for_width_vfunc(int w,
 #define	DATA_ISLAND	4
 
 int	HDMISIM::bitreverse(int val) {
+	// {{{
 	int	result = 0, tmp = val;
 
 	for(int k=0; k<10; k++) {
@@ -102,14 +110,18 @@ int	HDMISIM::bitreverse(int val) {
 
 	return result;
 }
+// }}}
 
 bool	HDMISIM::isguard(int val) {
+	// {{{
 	if ((val == 0x2cc)||(val == 0x133))
 		return true;
 	return false;
 }
+// }}}
 
 int	HDMISIM::ctldata(int val) {
+	// {{{
 	switch(val) {
 	case 0x354:	return 0;
 	case 0x0ab:	return 1;
@@ -118,8 +130,10 @@ int	HDMISIM::ctldata(int val) {
 	default:	return -1;
 	}
 }
+// }}}
 
 int	HDMISIM::pktdata(int val) {
+	// {{{
 	switch(val) {
 	case 0x29c:	return 0;
 	case 0x263:	return 1;
@@ -143,8 +157,10 @@ int	HDMISIM::pktdata(int val) {
 	default:	return -1;
 	}
 }
+// }}}
 
 int	HDMISIM::pixeldata(int val) {
+	// {{{
 	int	midp, result = 0;
 
 	midp = val & 0x3ff;
@@ -160,8 +176,10 @@ int	HDMISIM::pixeldata(int val) {
 	result = bitreverse(midp);
 	return result;
 }
+// }}}
 
 void	HDMISIM::operator()(const int blu, const int grn, const int red) {
+	// {{{
 	int	brblu, brgrn, brred, r=0, g=0, b=0, hsync, vsync, s;
 	int	xv, yv;
 
@@ -174,6 +192,10 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 	// bool	video_preamble, data_preamble;
 
 	video_guard = ((isguard(brblu))&&(isguard(brgrn))&&(isguard(brred)));
+	if (brblu != brred)
+		video_guard = false;
+	else if (brblu == brgrn)
+		video_guard = false;
 
 	/*
 	video_preamble = ((ctldata(brblu)==0)
@@ -339,16 +361,16 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 			// On the first hsync pulse, we start counting pixels.
 			// There should be exactly raw_width() pixels per line.
 			if ((m_hsync_count != m_mode.raw_width()-1)&&(!m_out_of_sync)) {
-				m_hsync_count = 0;
 				printf("H-RESYNC\n");
 				printf("\n%30s (%d,%d)\n","H-RESYNC (Wrong #)", m_hsync_count, m_mode.raw_width());
+				m_hsync_count = 0;
 				m_out_of_sync = true;
 			}
 
 			m_hsync_count = 0;
 		} else if (hsync) {
-			// During the horizontal sync, we expect m_mode.sync_pixels()
-			// pixels with the hsync low.
+			// During the horizontal sync, we expect
+			// m_mode.sync_pixels() pixels with the hsync low.
 			if (m_hsync_count < m_mode.sync_pixels() - 1)
 				m_hsync_count++;
 			else {
@@ -453,8 +475,10 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 	m_last_g     = g;
 	m_last_b     = b;
 }
+// }}}
 
 bool	HDMISIM::on_draw(CONTEXT &gc) {
+	// {{{
 	// printf("ON-DRAW\n");
 	gc->save();
 	// gc->rectangle(0,0,VGA_WIDTH, VGA_HEIGHT);
@@ -465,20 +489,24 @@ bool	HDMISIM::on_draw(CONTEXT &gc) {
 
 	return true;
 }
+// }}}
 
 void	HDMIWIN::init(void) {
-
+	// {{{
 	m_hdmisim->set_size_request(SIMWIN::width(),SIMWIN::height());
 	set_border_width(0);
 	add(*m_hdmisim);
 	show_all();
 	Gtk::Window::set_title(Glib::ustring("HDMI Simulator"));
 };
+// }}}
 
 HDMIWIN::HDMIWIN(void) : SIMWIN(640,480) {
+	//  {{{
 	m_hdmisim = new HDMISIM(640, 480);
 	init();
 }
+// }}}
 
 HDMIWIN::HDMIWIN(const int w, const int h) : SIMWIN(w,h) {
 	m_hdmisim = new HDMISIM(w, h);

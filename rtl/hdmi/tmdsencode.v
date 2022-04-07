@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	tmdsencode.v
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Take pixel/packet data, and encode them into a TMDS signal
@@ -11,9 +11,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,23 +28,23 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
-module	tmdsencode(i_clk, i_dtype, i_ctl, i_aux, i_data, o_word);
-	input	wire		i_clk;
-	input	wire	[1:0]	i_dtype;
-	input	wire	[1:0]	i_ctl;
-	input	wire	[3:0]	i_aux;
-	input	wire	[7:0]	i_data;
-	output	wire	[9:0]	o_word;
+// }}}
+module	tmdsencode (
+		input	wire		i_clk,
+		input	wire	[1:0]	i_dtype,
+		input	wire	[1:0]	i_ctl,
+		input	wire	[3:0]	i_aux,
+		input	wire	[7:0]	i_data,
+		output	wire	[9:0]	o_word
+	);
 
 	parameter [1:0]	CHANNEL = 2'b00;
 
@@ -137,8 +137,8 @@ module	tmdsencode(i_clk, i_dtype, i_ctl, i_aux, i_data, o_word);
 	begin
 		ones_counter = 0;
 		for(k=0; k<8; k=k+1)
-			if (i_data[k])
-				ones_counter = ones_counter + 1;
+		if (i_data[k])
+			ones_counter = ones_counter + 1;
 		ones = ones_counter;
 	end
 
@@ -146,8 +146,8 @@ module	tmdsencode(i_clk, i_dtype, i_ctl, i_aux, i_data, o_word);
 	begin
 		qm_ones_counter = 0;
 		for(k=0; k<8; k=k+1)
-			if (q_m[k])
-				qm_ones_counter = qm_ones_counter + 1;
+		if (q_m[k])
+			qm_ones_counter = qm_ones_counter + 1;
 		qm_ones = ones_counter;
 	end
 
@@ -183,21 +183,6 @@ module	tmdsencode(i_clk, i_dtype, i_ctl, i_aux, i_data, o_word);
 		q_mp[7] = q_mp[6] ^ i_data[7];
 		q_mp[8] = 1'b1;
 	end
-
-/*
-	(* keep *) wire	[7:0]	brv_pix;
-	always @(*)
-	begin
-		brv_pix[0] = i_data[7];
-		brv_pix[1] = i_data[6];
-		brv_pix[2] = i_data[5];
-		brv_pix[3] = i_data[4];
-		brv_pix[4] = i_data[3];
-		brv_pix[5] = i_data[2];
-		brv_pix[6] = i_data[1];
-		brv_pix[7] = i_data[0];
-	end
-*/
 
 	always @(posedge i_clk)
 		q_m <= q_mp;

@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	hdmisim.h
-//
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2022, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,14 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #ifndef	HDMISIM_H
 #define	HDMISIM_H
 
@@ -42,15 +42,6 @@
 #include "image.h"
 #include "videomode.h"
 #include "simwin.h"
-
-#define	VIDEO_GUARD	0
-#define	VIDEO_DATA	1
-#define	CTL_PERIOD	2
-#define	DATA_GUARD	3
-#define	DATA_ISLAND	4
-#define	HDMI_LOST	5
-
-extern	int	gbl_nframes;
 
 class	HDMISIM : public Gtk::DrawingArea {
 public:
@@ -84,7 +75,7 @@ public:
 		Widget::set_can_focus(false);
 		set_size_request(m_mode.width(), m_mode.height());
 
-		m_state = CTL_PERIOD;
+		m_state = 2; // CTL_PERIOD;
 		m_state_counter = 0;
 
 		m_out_of_sync = true;
