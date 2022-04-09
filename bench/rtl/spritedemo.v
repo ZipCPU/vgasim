@@ -477,6 +477,7 @@ module	spritedemo #(
 		// {{{
 		.XSIZE(64), .YSIZE(64),
 		.INITIAL_MEM(SPRITE_FILE),
+		.ALPHA_BITS(8),	// Our SPRITE_FILE requires 8bit alpha
 		.OPT_TUSER_IS_SOF(1'b0)
 		// }}}
 	) u_sprite (

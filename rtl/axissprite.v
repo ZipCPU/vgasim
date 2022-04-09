@@ -1167,11 +1167,21 @@ module	axissprite #(
 				M_AXIS_TUSER = M_AXIS_SOF;
 			always @(*)
 				M_AXIS_TLAST = M_AXIS_HLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_VLAST };
+			// Verilator lint_on  UNUSED
 		end else begin
 			always @(*)
 				M_AXIS_TUSER = M_AXIS_HLAST;
 			always @(*)
 				M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_SOF };
+			// Verilator lint_on  UNUSED
 		end
 
 		// M_AXIS_TDATA
@@ -1191,8 +1201,8 @@ module	axissprite #(
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
-				if (in_sprite && spritepix[3*BPP])
-					M_AXIS_TDATA <= spritepix[3*BPP-1:0];
+				if (in_sprite && spritepix[BPP])
+					M_AXIS_TDATA <= spritepix[BPP-1:0];
 				else
 					M_AXIS_TDATA <= p_data;
 			end
@@ -1926,7 +1936,7 @@ module	axissprite #(
 		if (fM_known)
 		begin
 			assert(fp_known);
-		else if (fp_known)
+		end else if (fp_known)
 		begin
 			assert(M_AXIS_TVALID
 				&& (M_AXIS_XPOS == f_pixels_per_line-1)

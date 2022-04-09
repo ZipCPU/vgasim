@@ -87,6 +87,8 @@ module	axisvga #(
 
 	// Local declarations
 	// {{{
+	reg	pix_reset, pix_reset_pipe;
+
 	reg	r_newline, r_newframe, lost_sync;
 
 	wire	[BPC-1:0]	i_red, i_grn, i_blu;
@@ -108,7 +110,6 @@ module	axisvga #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-
 	initial	{ pix_reset, pix_reset_pipe } = -1;
 	always @(posedge i_pixclk, posedge i_reset)
 	if (i_reset)
