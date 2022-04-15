@@ -36,14 +36,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 `default_nettype	none
-//
-module	tmdsencode(i_clk, i_dtype, i_ctl, i_aux, i_data, o_word);
-	input	wire		i_clk;
-	input	wire	[1:0]	i_dtype;
-	input	wire	[1:0]	i_ctl;
-	input	wire	[3:0]	i_aux;
-	input	wire	[7:0]	i_data;
-	output	wire	[9:0]	o_word;
+// }}}
+module	tmdsencode (
+		input	wire		i_clk,
+		input	wire	[1:0]	i_dtype,
+		input	wire	[1:0]	i_ctl,
+		input	wire	[3:0]	i_aux,
+		input	wire	[7:0]	i_data,
+		output	wire	[9:0]	o_word
+	);
 
 	parameter [1:0]	CHANNEL = 2'b00;
 

@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// Copyright (C) 2020-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -56,8 +56,8 @@ module	sync2stream #(
 		output	reg				M_AXIS_TVALID,
 		input	wire				M_AXIS_TREADY,
 		output	reg	[24-1:0]		M_AXIS_TDATA,	// Color
-		output	reg				M_AXIS_TLAST,	// Vsync
-		output	reg				M_AXIS_TUSER,	// Hsync
+		output	wire				M_AXIS_TLAST,	// Vsync
+		output	wire				M_AXIS_TUSER,	// Hsync
 		//
 		output	reg	[15:0]			o_width,
 		output	reg	[15:0]			o_hfront,
@@ -69,7 +69,7 @@ module	sync2stream #(
 		output	reg	[15:0]			o_vsync,
 		output	reg	[15:0]			o_raw_height,
 		//
-		output	reg				o_locked
+		output	wire				o_locked
 		// }}}
 	);
 
@@ -298,8 +298,7 @@ module	sync2stream #(
 			vlocked <= 0;
 	end
 
-	always @(*)
-		o_locked = vlocked;
+	assign	o_locked = vlocked;
 	// }}}
 
 	// }}}
@@ -338,21 +337,21 @@ module	sync2stream #(
 	// (I've chosen the former, Xilinx chose the latter)
 	generate if (OPT_TUSER_IS_SOF)
 	begin : XILINXS_ENCODING
+		reg	sof;
 
-		always @(*)
-			M_AXIS_TLAST = M_AXIS_HLAST;
+		assign	M_AXIS_TLAST = M_AXIS_HLAST;
 
 		always @(posedge i_clk)
 		if (M_AXIS_TVALID)
-			M_AXIS_TUSER <= M_AXIS_VLAST;
+			sof <= M_AXIS_VLAST;
+
+		assign	M_AXIS_TUSER = sof;
 
 	end else begin : VLAST_IS_TLAST
 
-		always @(*)
-			M_AXIS_TLAST = M_AXIS_VLAST;
+		assign	M_AXIS_TLAST = M_AXIS_VLAST;
 
-		always @(*)
-			M_AXIS_TUSER = M_AXIS_HLAST;
+		assign	M_AXIS_TUSER = M_AXIS_HLAST;
 
 	end endgenerate
 	// }}}

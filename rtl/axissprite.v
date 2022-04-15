@@ -30,7 +30,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2021, Gisselquist Technology, LLC
+// Copyright (C) 2020-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -68,7 +68,7 @@ module	axissprite #(
 		localparam	BPC = BITS_PER_COLOR,
 		localparam	BPP = 3 * BITS_PER_COLOR,
 		localparam	SBPC = (BPC > 8) ? 8 : BPC,
-		parameter	ALPHA_BITS = 8,
+		parameter	ALPHA_BITS = 1,
 		localparam	LGMEMSZ = $clog2(XSIZE*YSIZE),
 		parameter	C_AXI_ADDR_WIDTH = 1+2+LGMEMSZ,
 		// All AXI-lite interfaces have 32-bit data paths
@@ -175,7 +175,7 @@ module	axissprite #(
 	wire			vskd_valid, vskd_ready, vskd_hlast, vskd_vlast,
 				vskd_sof;
 	wire	[BPP-1:0]		vskd_data;
-	reg			s_hlast, s_vlast, s_sof;
+	wire			s_hlast, s_vlast, s_sof;
 	reg	[LGFRAME-1:0]		frame_x, frame_y;
 	reg	[LGMEMSZ-1:0]	sprite_x, sprite_y;
 	reg			in_sprite, in_sprite_x, in_sprite_y;
@@ -194,16 +194,18 @@ module	axissprite #(
 	wire	[7:0]	alpha_byte;
 	reg	[31:0]	bus_memword;
 `ifdef	FORMAL
-	// {{
+	// {{{
 	(* gclk *)	reg	gbl_clk;
 	reg	f_past_valid, f_past_valid_vid, f_past_valid_bus;
-	reg			f_vlast_locked, f_vskd_locked,
-				fp_vlast_locked, fm_vlast_locked;
+	wire			f_vlast_locked, f_vskd_locked, fp_vlast_locked;
+	reg			fm_vlast_locked;
 	wire	[LGFRAME-1:0]	f_vskd_xpos, f_vskd_ypos;
-	reg	[LGFRAME-1:0]	S_AXIS_XPOS, S_AXIS_YPOS;
+	wire	[LGFRAME-1:0]	S_AXIS_XPOS, S_AXIS_YPOS;
+	wire			fs_vlast, fs_hlast, fs_sof, fs_known;
 
-
-	reg	[LGFRAME-1:0]	f_p_xpos, f_p_ypos, M_AXIS_XPOS, M_AXIS_YPOS;
+	wire			fM_vlast, fM_hlast, fM_sof, fM_known;
+	wire	[LGFRAME-1:0]	fp_xpos, fp_ypos;
+	wire	[LGFRAME-1:0]	M_AXIS_XPOS, M_AXIS_YPOS;
 	(* anyconst *) reg	[LGFRAME-1:0]	f_lines_per_frame,
 						f_pixels_per_line;
 	// }}}
@@ -517,7 +519,6 @@ module	axissprite #(
 		reg	[LGFRAME-1:0]	line_count, lines_per_frame;
 		reg		vlast;
 
-
 		initial	vlast  = 0;
 		initial	lines_per_frame = 0;
 		initial	line_count  = 0;
@@ -529,14 +530,17 @@ module	axissprite #(
 			vlast           <= 0;
 		end else if (S_AXIS_TVALID && S_AXIS_TREADY)
 		begin
+			vlast <= (line_count + 1 == lines_per_frame);
+
 			if (S_AXIS_SOF)
 			begin
 				line_count <= 0;
 				lines_per_frame <= line_count;
 			end else if (S_AXIS_HLAST)
+			begin
 				line_count <= line_count + 1;
-
-			vlast <= (line_count + 1 == lines_per_frame);
+				vlast <= (line_count + 2 == lines_per_frame);
+			end
 			if (S_AXIS_SOF)
 				vlast <= 1'b0;
 		end
@@ -546,13 +550,32 @@ module	axissprite #(
 		assign	S_AXIS_VLAST = S_AXIS_HLAST && vlast;
 `ifdef	FORMAL
 		// {{{
-		always @(*)
-			f_vlast_locked = (lines_per_frame != 0);
+		assign	f_vlast_locked = (lines_per_frame != 0);
 		always @(*)
 			assert(line_count <= f_lines_per_frame);
+
+		always @(*)
+		if (fs_sof && fs_known)
+		begin
+			assert(line_count == f_lines_per_frame);
+		end else
+			assert(line_count == S_AXIS_YPOS);
+
 		always @(*)
 		if (lines_per_frame != 0)
 			assert(lines_per_frame == f_lines_per_frame);
+		always @(*)
+		if (lines_per_frame == 0 && fs_known)
+		begin
+			assert(line_count == f_lines_per_frame);
+			assert(S_AXIS_YPOS == 0 && S_AXIS_XPOS == 0);
+		end else if (!fs_known)
+			assert(lines_per_frame == 0);
+		always @(*)
+		if (f_vlast_locked)
+			assert(vlast == (S_AXIS_YPOS == lines_per_frame-1));
+		else
+			assert(!vlast);
 		// }}}
 `endif
 		// }}}
@@ -571,6 +594,9 @@ module	axissprite #(
 			sof <= S_AXIS_VLAST;
 
 		assign	S_AXIS_SOF = sof;
+`ifdef	FORMAL
+		assign	f_vlast_locked = 1;
+`endif
 		// }}}
 	end endgenerate
 	// }}}
@@ -617,12 +643,9 @@ module	axissprite #(
 
 	// s_hlast, s_vlast, s_sof
 	// {{{
-	always @(*)
-		s_hlast = vskd_hlast;
-	always @(*)
-		s_vlast = vskd_vlast;
-	always @(*)
-		s_sof   = vskd_sof;
+	assign	s_hlast = vskd_hlast;
+	assign	s_vlast = vskd_vlast;
+	assign	s_sof   = vskd_sof;
 	// }}}
 
 	always @(posedge S_AXI_ACLK)
@@ -745,7 +768,10 @@ module	axissprite #(
 	// {{{
 	initial	{ p_sof, p_vlast, p_hlast } = { OPT_TUSER_IS_SOF, 2'b00 };
 	always @(posedge S_VID_ACLK)
+	if (!S_VID_ARESETN)
 	begin
+		{ p_sof, p_vlast, p_hlast } <= { OPT_TUSER_IS_SOF, 2'b00 };
+	end else begin
 		if (vskd_valid && vskd_ready)
 			{ p_sof, p_vlast, p_hlast } <= { s_sof, s_vlast, s_hlast };
 
@@ -973,8 +999,8 @@ module	axissprite #(
 			f_a1_ypos <= 0;
 		end else if (a1_valid && a1_step)
 		begin
-			f_a1_xpos <= f_p_xpos;
-			f_a1_ypos <= f_p_ypos;
+			f_a1_xpos <= fp_xpos;
+			f_a1_ypos <= fp_ypos;
 		end
 
 		always @(*)
@@ -997,16 +1023,16 @@ module	axissprite #(
 		always @(*)
 		if (!a1_valid) // && !vskd_valid)
 		begin
-			assert(f_a1_xpos == f_p_xpos);
-			assert(f_a1_ypos == f_p_ypos);
-		end else if (f_p_xpos > 0)
+			assert(f_a1_xpos == fp_xpos);
+			assert(f_a1_ypos == fp_ypos);
+		end else if (fp_xpos > 0)
 		begin
-			assert(f_a1_xpos + 1 == f_p_xpos);
-			assert(f_a1_ypos == f_p_ypos);
-		end else if (f_p_ypos > 0)
+			assert(f_a1_xpos + 1 == fp_xpos);
+			assert(f_a1_ypos == fp_ypos);
+		end else if (fp_ypos > 0)
 		begin
 			assert(f_a1_xpos == f_pixels_per_line-1);
-			assert(f_a1_ypos + 1 == f_p_ypos);
+			assert(f_a1_ypos + 1 == fp_ypos);
 		end else begin
 			assert(f_a1_xpos == f_pixels_per_line-1);
 			assert(f_a1_ypos == f_lines_per_frame-1);
@@ -1101,8 +1127,8 @@ module	axissprite #(
 
 			assert(f_vskd_xpos == 0);
 			assert(f_vskd_ypos == 0);
-			assert(f_p_xpos    == 0);
-			assert(f_p_ypos    == 0);
+			assert(fp_xpos    == 0);
+			assert(fp_ypos    == 0);
 			assert(f_a1_xpos   == 0);
 			assert(f_a1_ypos   == 0);
 			assert(f_a2_xpos   == 0);
@@ -1135,6 +1161,29 @@ module	axissprite #(
 			{ M_AXIS_SOF, M_AXIS_HLAST, M_AXIS_VLAST } <= { p_sof, p_hlast, p_vlast };
 		// }}}
 
+		if (OPT_TUSER_IS_SOF)
+		begin
+			always @(*)
+				M_AXIS_TUSER = M_AXIS_SOF;
+			always @(*)
+				M_AXIS_TLAST = M_AXIS_HLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_VLAST };
+			// Verilator lint_on  UNUSED
+		end else begin
+			always @(*)
+				M_AXIS_TUSER = M_AXIS_HLAST;
+			always @(*)
+				M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_SOF };
+			// Verilator lint_on  UNUSED
+		end
+
 		// M_AXIS_TDATA
 		// {{{
 		if (ALPHA_BITS == 0)
@@ -1152,8 +1201,8 @@ module	axissprite #(
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
-				if (in_sprite && spritepix[3*BPP])
-					M_AXIS_TDATA <= spritepix[3*BPP-1:0];
+				if (in_sprite && spritepix[BPP])
+					M_AXIS_TDATA <= spritepix[BPP-1:0];
 				else
 					M_AXIS_TDATA <= p_data;
 			end
@@ -1189,16 +1238,16 @@ module	axissprite #(
 		begin
 			if (!M_AXIS_TVALID)
 			begin
-				assert(f_p_xpos == M_AXIS_XPOS);
-				assert(f_p_ypos == M_AXIS_YPOS);
-			end else if (f_p_xpos != 0)
+				assert(fp_xpos == M_AXIS_XPOS);
+				assert(fp_ypos == M_AXIS_YPOS);
+			end else if (fp_xpos != 0)
 			begin
-				assert(f_p_xpos == M_AXIS_XPOS + 1);
-				assert(f_p_ypos == M_AXIS_YPOS);
-			end else if (f_p_ypos > 0)
+				assert(fp_xpos == M_AXIS_XPOS + 1);
+				assert(fp_ypos == M_AXIS_YPOS);
+			end else if (fp_ypos > 0)
 			begin
 				assert(M_AXIS_XPOS == f_pixels_per_line-1);
-				assert(f_p_ypos == M_AXIS_YPOS + 1);
+				assert(fp_ypos == M_AXIS_YPOS + 1);
 			end else begin
 				assert(M_AXIS_XPOS == f_pixels_per_line-1);
 				assert(M_AXIS_YPOS == f_lines_per_frame-1);
@@ -1217,8 +1266,8 @@ module	axissprite #(
 
 			assert(f_vskd_xpos == 0);
 			assert(f_vskd_ypos == 0);
-			assert(f_p_xpos    == 0);
-			assert(f_p_ypos    == 0);
+			assert(fp_xpos    == 0);
+			assert(fp_ypos    == 0);
 			assert(M_AXIS_XPOS == 0);
 			assert(M_AXIS_YPOS == 0);
 		end
@@ -1254,6 +1303,10 @@ module	axissprite #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	reg	fp_locked;
+	wire	fp_known, fp_hlast, fp_vlast, fp_sof;
+
+
 	initial	f_past_valid = 0;
 	always @(posedge gbl_clk)
 		f_past_valid <= 1;
@@ -1593,91 +1646,127 @@ module	axissprite #(
 
 	// Count S_AXIS_XPOS and S_AXIS_YPOS
 	// {{{
-	initial	S_AXIS_XPOS = 0;
-	initial	S_AXIS_YPOS = 0;
-	always @(posedge S_VID_ACLK)
-	if (!S_VID_ARESETN)
-	begin
-		S_AXIS_XPOS <= 0;
-		S_AXIS_YPOS <= 0;
-	end else if (S_AXIS_TVALID && S_AXIS_TREADY)
-	begin
-		S_AXIS_XPOS <= S_AXIS_XPOS + 1;
-		if (S_AXIS_XPOS + 1 >= f_pixels_per_line)
-		begin
-			S_AXIS_XPOS <= 0;
-			S_AXIS_YPOS <= S_AXIS_YPOS + 1;
-			if (S_AXIS_YPOS +1 >= f_lines_per_frame)
-				S_AXIS_YPOS <= 0;
-		end
-	end
+	faxivideo #(
+		.LGDIM(LGFRAME), .PW(BPP), .OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+	) fSVID (
+		// {{{
+		.i_clk(S_VID_ACLK), .i_reset_n(S_VID_ARESETN),
+		//
+		.S_VID_TVALID(S_AXIS_TVALID), .S_VID_TREADY(S_AXIS_TREADY),
+		.S_VID_TDATA(S_AXIS_TDATA), .S_VID_TLAST(S_AXIS_TLAST),
+			.S_VID_TUSER(S_AXIS_TUSER),
+		//
+		.i_width(f_pixels_per_line), .i_height(f_lines_per_frame),
+		.o_xpos(S_AXIS_XPOS), .o_ypos(S_AXIS_YPOS),
+			.f_known_height(fs_known),
+		.o_hlast(fs_hlast), .o_vlast(fs_vlast), .o_sof(fs_sof)
+		// }}}
+	);
 
 	always @(*)
 	begin
-		assert(S_AXIS_XPOS < f_pixels_per_line);
-		assert(S_AXIS_YPOS < f_lines_per_frame);
-		assume(!S_AXIS_TVALID
-		|| S_AXIS_HLAST == (S_AXIS_XPOS == f_pixels_per_line-1));
-
+		assume(!S_AXIS_TVALID || S_AXIS_HLAST == fs_hlast);
 
 		if (OPT_TUSER_IS_SOF)
-			assume(!S_AXIS_TVALID || S_AXIS_SOF == (S_AXIS_XPOS == 0 && S_AXIS_YPOS == 0));
-		else
-			assume(!S_AXIS_TVALID || S_AXIS_VLAST == (S_AXIS_HLAST
-				&& S_AXIS_YPOS == f_lines_per_frame-1));
+		begin
+			assume(!S_AXIS_TVALID || S_AXIS_SOF == fs_sof);
+		end else begin
+			assume(!S_AXIS_TVALID || S_AXIS_VLAST == (fs_vlast && fs_hlast));
+		end
+	end
 
+	always @(posedge S_VID_ACLK)
+	begin
 		if (!OPT_TUSER_IS_SOF)
 			assert(S_AXIS_SOF == (S_AXIS_XPOS == 0 && S_AXIS_YPOS == 0));
+
+		if (fs_known && (S_AXIS_XPOS != 0 || S_AXIS_YPOS != 0))
+			assert(f_vlast_locked);
 	end
 	// }}}
 
 	// Count f_vskd_xpos, and f_vskd_ypos
 	// {{{
+	wire	fvskd_known, fvskd_sof;
 	generate if (OPT_SKIDBUFFER)
 	begin : GEN_VSKD_COUNTS
 		// {{{
-		reg	[LGFRAME-1:0]	r_vskd_xpos, r_vskd_ypos;
+		wire			fvskd_vlast, fvskd_hlast;
 
-		initial	r_vskd_xpos = 0;
-		initial	r_vskd_ypos = 0;
-		always @(posedge S_VID_ACLK)
-		if (!S_VID_ARESETN)
-		begin
-			r_vskd_xpos <= 0;
-			r_vskd_ypos <= 0;
-		end else if (vskd_valid && vskd_ready)
-		begin
-			r_vskd_xpos <= f_vskd_xpos + 1;
-			if (f_vskd_xpos +1 >= f_pixels_per_line)
-			begin
-				r_vskd_xpos <= 0;
-				r_vskd_ypos  <= f_vskd_ypos + 1;
-				if (f_vskd_ypos + 1 >= f_lines_per_frame)
-					r_vskd_ypos <= 0;
-			end
-		end
-
-		assign	f_vskd_xpos = r_vskd_xpos;
-		assign	f_vskd_ypos = r_vskd_ypos;
+		faxivideo #(
+			// {{{
+			.LGDIM(LGFRAME), .PW(BPP),
+			.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+			// }}}
+		) fvskd (
+			// {{{
+			.i_clk(S_VID_ACLK), .i_reset_n(S_VID_ARESETN),
+			//
+			.S_VID_TVALID(vskd_valid), .S_VID_TREADY(vskd_ready),
+			.S_VID_TDATA(vskd_data),
+				.S_VID_TLAST(OPT_TUSER_IS_SOF ? vskd_hlast : (vskd_hlast && vskd_vlast)),
+				.S_VID_TUSER((OPT_TUSER_IS_SOF) ? vskd_sof : vskd_hlast),
+			//
+			.i_width(f_pixels_per_line), .i_height(f_lines_per_frame),
+			.o_xpos(f_vskd_xpos), .o_ypos(f_vskd_ypos),
+				.f_known_height(fvskd_known),
+			.o_hlast(fvskd_hlast), .o_vlast(fvskd_vlast),
+				.o_sof(fvskd_sof)
+			// }}}
+		);
 
 		// Bounds checking on f_vskd*, vskd_hlast and vskd_sof checks
 		// {{{
-		always @(*)
+		always @(posedge S_VID_ACLK)
+		if (S_AXI_ARESETN)
 		begin
-			assert(f_vskd_xpos < f_pixels_per_line);
-			assert(f_vskd_ypos < f_lines_per_frame);
-			assert(!vskd_valid || vskd_hlast == (f_vskd_xpos == f_pixels_per_line-1));
-			assert(!vskd_valid || vskd_sof == (f_vskd_xpos == 0 && f_vskd_ypos == 0));
-			if (vskd_valid && f_vskd_locked)
-				assert(vskd_vlast == (vskd_hlast
-					&& f_vskd_ypos == f_lines_per_frame-1));
-			else if (vskd_valid)
+			assert(!vskd_valid || vskd_hlast == fvskd_hlast);
+			assert(!vskd_valid || vskd_sof   == fvskd_sof);
+			assert(!vskd_valid || !f_vskd_locked
+				|| vskd_vlast == (fvskd_vlast && fvskd_hlast));
+			if (f_vskd_locked)
+			begin
+				if (!fvskd_vlast)
+				begin
+					assert(!vskd_vlast || !vskd_valid);
+				end else if (vskd_hlast)
+					assert(vskd_vlast == fvskd_hlast || !vskd_valid);
+			end else if (vskd_valid)
 				assert(!vskd_vlast);
 		end
 		// }}}
 
 		// Related f_vskd_* to S_AXIS_*
 		// {{{
+		always @(posedge gbl_clk)
+		if (S_VID_ARESETN)
+		begin
+			if (fvskd_known)
+			begin
+				assert(fs_known);
+			end
+
+			if (f_vskd_locked)
+			begin
+				assert(fvskd_known);
+			end else if (fvskd_known)
+			begin
+				assert(f_vskd_xpos <= 2);
+				assert(f_vskd_ypos == 0);
+			end
+
+			if (vskd_valid&& !S_AXIS_TREADY && (S_AXIS_XPOS == 0)
+						&& (S_AXIS_YPOS==0))
+				assert(fs_known);
+
+			if (fs_known && !fvskd_known)
+			begin
+				assert(vskd_valid);
+				assert(fvskd_hlast);
+				assert(fvskd_vlast);
+			end
+		end
+		
 		always @(*)
 		if (S_AXIS_TREADY)
 		begin
@@ -1700,100 +1789,174 @@ module	axissprite #(
 	end else begin
 		assign	f_vskd_xpos = S_AXIS_XPOS;
 		assign	f_vskd_ypos = S_AXIS_YPOS;
+		assign	fvskd_known = fs_known;
+		assign	fvskd_sof   = fs_sof;
+
+		always @(posedge S_VID_ACLK)
+		if (S_AXI_ARESETN && vskd_valid)
+		begin
+			assert(vskd_hlast == fs_hlast);
+			if (OPT_TUSER_IS_SOF)
+			begin
+				assert(vskd_sof   == fs_sof);
+			end else if (f_vskd_locked)
+			begin
+				assert(vskd_vlast == (fs_vlast && fs_hlast));
+			end
+		end
 	end endgenerate
 	// }}}
 
-	// Count f_p_xpos, and f_p_ypos
+	// Count fp_xpos, and fp_ypos
 	// {{{
-	initial	f_p_xpos = 0;
-	initial	f_p_ypos = 0;
-	always @(posedge S_VID_ACLK)
-	if (!S_VID_ARESETN)
-	begin
-		f_p_xpos <= 0;
-		f_p_ypos <= 0;
-	end else if (p_valid && p_step)
-	begin
-		f_p_xpos <= f_vskd_xpos;
-		f_p_ypos <= f_vskd_ypos;
-	end
+	faxivideo #(
+		.LGDIM(LGFRAME), .PW(BPP), .OPT_TUSER_IS_SOF(1'b0)
+	) fpvid (
+		// {{{
+		.i_clk(S_VID_ACLK), .i_reset_n(S_VID_ARESETN),
+		//
+		.S_VID_TVALID(p_valid), .S_VID_TREADY(p_step),
+		.S_VID_TDATA(p_data), .S_VID_TLAST(
+			(fp_known) ? (p_hlast && p_vlast)
+				: ((fp_xpos == f_pixels_per_line-1)
+					&&(fp_ypos == f_lines_per_frame-1))),
+			.S_VID_TUSER(p_hlast),
+		//
+		.i_width(f_pixels_per_line), .i_height(f_lines_per_frame),
+		.o_xpos(fp_xpos), .o_ypos(fp_ypos),
+			.f_known_height(fp_known),
+		.o_hlast(fp_hlast), .o_vlast(fp_vlast), .o_sof(fp_sof)
+		// }}}
+	);
 
-	always @(*)
+	always @(posedge gbl_clk)
+	if (S_VID_ARESETN)
 	begin
-		assert(f_p_xpos < f_pixels_per_line);
-		assert(f_p_ypos < f_lines_per_frame);
-		assert(!p_valid || p_hlast == (f_p_xpos == f_pixels_per_line-1));
+		assert(!p_valid || p_hlast == fp_hlast);
+		assert(!p_valid || !fp_known || p_sof == fp_sof);
 
-		assert(!p_valid || p_sof == (f_p_xpos == 0 && f_p_ypos == 0));
+		if (fp_known)
+		begin
+			assert(fvskd_known);
+		end else if (fvskd_known)
+		begin
+			assert(fvskd_sof || (p_valid && p_sof));
+			assert(fp_vlast && fp_hlast);
+			assert(!OPT_TUSER_IS_SOF || !fp_vlast_locked);
+		end else begin
+			assert(fp_ypos <= f_vskd_ypos);
+		end
+
+		if (fp_vlast_locked) // || !OPT_TUSER_IS_SOF is implied
+		begin
+			assert(f_vskd_locked);
+		end else if (f_vskd_locked)
+		begin
+			assert(fp_xpos == 1); // Was (p_valid ? 0:1));
+			assert(fp_ypos == 0);
+			assert(fp_known);
+		end
+
+		/*
+		if (OPT_TUSER_IS_SOF)
+		begin
+			if (fp_vlast_locked)
+			begin
+				assert(fp_known);
+			end else if (fp_known)
+			begin
+				assert(fp_ypos==0);
+				assert(fp_xpos == (p_valid ? 0:1));
+			end
+			// assert(fp_vlast_locked == fp_known);
+		end else
+			assert(fp_vlast_locked);
+		*/
+
+		if (fp_xpos > (p_valid ? 0:1) || fp_ypos != 0)
+			assert(!p_sof);
+
 		if (fp_vlast_locked && p_valid)
 		begin
-			assert(p_vlast == (p_hlast && f_p_ypos == f_lines_per_frame-1));
+			assert(p_vlast == (p_hlast && fp_vlast));
 		end else if (p_valid)
 			assert(!p_vlast);
 	end
 
-	always @(*)
+	always @(posedge gbl_clk)
 	if (!p_valid) // && !vskd_valid)
 	begin
-		assert(f_p_xpos == f_vskd_xpos);
-		assert(f_p_ypos == f_vskd_ypos);
+		assert(fp_xpos == f_vskd_xpos);
+		assert(fp_ypos == f_vskd_ypos);
 	end else if (f_vskd_xpos > 0)
 	begin
-		assert(f_p_xpos + 1 == f_vskd_xpos);
-		assert(f_p_ypos == f_vskd_ypos);
+		assert(fp_xpos + 1 == f_vskd_xpos);
+		assert(fp_ypos == f_vskd_ypos);
 	end else if (f_vskd_ypos > 0)
 	begin
-		assert(f_p_xpos == f_pixels_per_line-1);
-		assert(f_p_ypos + 1 == f_vskd_ypos);
+		assert(fp_xpos == f_pixels_per_line-1);
+		assert(fp_ypos + 1 == f_vskd_ypos);
 	end else begin
-		assert(f_p_xpos == f_pixels_per_line-1);
-		assert(f_p_ypos == f_lines_per_frame-1);
+		assert(fp_xpos == f_pixels_per_line-1);
+		assert(fp_ypos == f_lines_per_frame-1);
 	end
 	// }}}
 
 	// Count M_AXIS_XPOS and M_AXIS_YPOS
 	// {{{
-	initial	M_AXIS_XPOS = 0;
-	initial	M_AXIS_YPOS = 0;
-	always @(posedge S_VID_ACLK)
-	if (!S_VID_ARESETN)
-	begin
-		M_AXIS_XPOS <= 0;
-		M_AXIS_YPOS <= 0;
-	end else if (M_AXIS_TVALID && M_AXIS_TREADY)
-	begin
-		M_AXIS_XPOS <= M_AXIS_XPOS + 1;
-		if (M_AXIS_XPOS + 1 >= f_pixels_per_line)
-		begin
-			M_AXIS_XPOS <= 0;
-			M_AXIS_YPOS <= M_AXIS_YPOS + 1;
-			if (M_AXIS_YPOS +1 >= f_lines_per_frame)
-				M_AXIS_YPOS <= 0;
-		end
-	end
+	faxivideo #(
+		.LGDIM(LGFRAME), .PW(BPP), .OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+	) fMVID (
+		// {{{
+		.i_clk(S_VID_ACLK), .i_reset_n(S_VID_ARESETN),
+		//
+		.S_VID_TVALID(M_AXIS_TVALID), .S_VID_TREADY(M_AXIS_TREADY),
+		.S_VID_TDATA(M_AXIS_TDATA), .S_VID_TLAST(M_AXIS_TLAST),
+			.S_VID_TUSER(M_AXIS_TUSER),
+		//
+		.i_width(f_pixels_per_line), .i_height(f_lines_per_frame),
+		.o_xpos(M_AXIS_XPOS), .o_ypos(M_AXIS_YPOS),
+			.f_known_height(fM_known),
+		.o_hlast(fM_hlast), .o_vlast(fM_vlast), .o_sof(fM_sof)
+		// }}}
+	);
 
 	// Limits, and M_AXIS_HLAST, M_AXIS_SOF
 	// {{{
-	wire	F_AXIS_HLAST;
-	assign	F_AXIS_HLAST = (OPT_TUSER_IS_SOF) ? M_AXIS_TLAST : M_AXIS_TUSER;
-
-	always @(*)
-	if (S_VID_ARESETN)
+	always @(posedge gbl_clk)
+	if (S_VID_ARESETN && M_AXIS_TVALID && !OPT_TUSER_IS_SOF)
 	begin
-		assert(M_AXIS_XPOS < f_pixels_per_line);
-		assert(M_AXIS_YPOS < f_lines_per_frame);
-		assert(!M_AXIS_TVALID
-			|| F_AXIS_HLAST == (M_AXIS_XPOS == f_pixels_per_line-1));
-		if (M_AXIS_TVALID)
+		if (!fm_vlast_locked)
+			assert(!M_AXIS_TLAST);
+	end
+
+	always @(posedge gbl_clk)
+	if (S_VID_ARESETN && OPT_TUSER_IS_SOF)
+	begin
+		if (fM_known)
 		begin
-			if (OPT_TUSER_IS_SOF)
-			begin
-				assert(M_AXIS_TUSER == (M_AXIS_XPOS == 0 && M_AXIS_YPOS == 0));
-			end else if (fm_vlast_locked)
-			begin
-				assert(M_AXIS_TLAST == (F_AXIS_HLAST && M_AXIS_YPOS == f_lines_per_frame-1));
-			end else
-				assert(!M_AXIS_TLAST);
+			assert(fp_known);
+		end else if (fp_known)
+		begin
+			assert(M_AXIS_TVALID
+				&& (M_AXIS_XPOS == f_pixels_per_line-1)
+				&& (M_AXIS_YPOS == f_lines_per_frame-1));
+		end
+
+		if (fM_known)
+			assert(fm_vlast_locked || ((M_AXIS_XPOS <= (M_AXIS_TVALID ? 0:1)) && (M_AXIS_YPOS == 0)));
+		if (!fM_known && M_AXIS_XPOS > (M_AXIS_TVALID ? 0:1))
+			assert(!M_AXIS_TUSER);
+
+		if (fm_vlast_locked)
+		begin
+			assert(fM_known);
+			assert(fp_vlast_locked);
+		end else if (fp_vlast_locked)
+		begin
+			assert(fM_known);
+			assert(M_AXIS_YPOS == 0);
+			assert(M_AXIS_XPOS <= 2);
 		end
 	end
 	// }}}
@@ -1801,101 +1964,119 @@ module	axissprite #(
 
 	// frame_x and frame_y
 	// {{{
-	always @(*)
+	always @(posedge gbl_clk)
 	begin
-		if (OPT_TUSER_IS_SOF)
-		begin
-			assert(frame_y <= f_lines_per_frame);
-		end else
+		if (!OPT_TUSER_IS_SOF || fp_locked)
 			assert(frame_y < f_lines_per_frame);
 
 		assert(frame_x < f_pixels_per_line);
 		assert(frame_x == f_vskd_xpos);
-		if (!OPT_TUSER_IS_SOF || f_vskd_locked)
-		begin
+		if (OPT_TUSER_IS_SOF && f_vskd_locked)
+			assert(fs_known);
+		if (fp_locked)
 			assert(frame_y == f_vskd_ypos);
-		end else if (frame_x != 0)
-		begin
-			assert(frame_y == f_vskd_ypos);
-		end else if (frame_y != 0)
-		begin
-			if (frame_y != f_vskd_ypos)
-			begin
-				assert(f_vskd_ypos == 0);
-				assert(frame_y == f_lines_per_frame);
-				assert(frame_x == 0);
-			end
-		end else
-			assert(f_vskd_ypos == 0 && f_vskd_xpos == 0);
 	end
 	// }}}
 
 	generate if (OPT_TUSER_IS_SOF)
 	begin : CHECK_VLAST
 		// {{{
+		reg	r_vskd_locked, p_vlast_locked, vlast_locked;
 
-
-		// always @(*)
-		// if (GENERATE_VLAST.line_count != f_lines_per_frame)
-			// assume(!S_AXIS_SOF);
-
+		// f_vskd_locked
+		// {{{
 		if (OPT_SKIDBUFFER)
 		begin
-			initial	f_vskd_locked = 1'b0;
+			initial	r_vskd_locked = 1'b0;
 			always @(posedge S_VID_ACLK)
 			if (!S_VID_ARESETN)
-				f_vskd_locked <= 1'b0;
-			else if (!vskd_valid || vskd_ready)
-				f_vskd_locked <= f_vlast_locked;
-		end else begin
-			always @(*)
-				f_vskd_locked = f_vlast_locked;
-		end
+				r_vskd_locked <= 1'b0;
+			else if (vskd_valid && vskd_ready)
+				r_vskd_locked <= f_vlast_locked;
 
-		initial	fp_vlast_locked = 1'b0;
+			assign	f_vskd_locked = r_vskd_locked;
+		end else begin
+			assign	f_vskd_locked = f_vlast_locked;
+		end
+		// }}}
+
+		// fp_vlast_locked
+		// {{{
+		initial	p_vlast_locked = 1'b0;
 		always @(posedge S_VID_ACLK)
 		if (!S_VID_ARESETN)
-			fp_vlast_locked <= 1'b0;
+			p_vlast_locked <= 1'b0;
 		else if (vskd_valid && vskd_ready)
-			fp_vlast_locked <= f_vskd_locked;
+			p_vlast_locked <= f_vskd_locked;
 
-		always @(*)
+		assign	fp_vlast_locked = p_vlast_locked;
+		// }}}
+
+		always @(posedge gbl_clk)
+		if (S_VID_ARESETN)
 		case({ f_vlast_locked, f_vskd_locked, fp_vlast_locked, fm_vlast_locked})
 		4'b0000: begin end
-		4'b1000: begin assert(S_AXIS_XPOS == 1 && S_AXIS_YPOS == 0); end
-		4'b1100: begin assert(f_vskd_xpos == 1 && f_vskd_ypos == 0 && p_sof); end
+		4'b1000: begin
+			if (S_AXIS_TREADY || !OPT_SKIDBUFFER)
+			begin
+				assert(S_AXIS_XPOS == 1);
+				assert(f_vskd_xpos == S_AXIS_XPOS);
+			end else begin
+				assert(S_AXIS_XPOS == 2);
+				assert(f_vskd_xpos == 1);
+			end
+			assert(S_AXIS_YPOS == 0);
+			assert(f_vskd_ypos == 0);
+			end
+		4'b1100: begin
+			assert(f_vskd_xpos == 2);
+			assert(f_vskd_ypos == 0);
+			// assert(p_sof);
+			end
 		4'b1110: begin end
 		4'b1111: begin end
 		default: assert(0);
 		endcase
 
 		always @(*)
-			assert(frame_y <= f_lines_per_frame);
-		always @(*)
-		if (f_vlast_locked)
+		if (fp_locked)
 			assert(frame_y < f_lines_per_frame);
 		// }}}
 	end else begin : ASSUME_VLAST_VALID
 		// {{{
-		always @(*)
-		begin
-			f_vlast_locked  = 1'b1;
-			f_vskd_locked   = 1'b1;
-			fp_vlast_locked = 1'b1;
-			// fm_vlast_locked = 1'b1;
-		end
+		assign	f_vlast_locked  = 1'b1;
+		assign	f_vskd_locked   = 1'b1;
+		assign	fp_vlast_locked = 1'b1;
 		// }}}
 	end endgenerate
 
+	initial	fp_locked = !OPT_TUSER_IS_SOF;
+	always @(posedge S_VID_ACLK)
+	if (!S_VID_ARESETN)
+		fp_locked <= !OPT_TUSER_IS_SOF;
+	else if (vskd_valid && vskd_ready && s_vlast)
+		fp_locked <= 1;
+
 	always @(*)
+	if (S_VID_ARESETN)
+	begin
+		if (!OPT_TUSER_IS_SOF)
+		begin
+			assert(fp_locked);
+		end else if (!f_vskd_locked || !fp_vlast_locked)
+			assert(!fp_locked);
+	end
+
+	always @(*)
+	if (S_VID_ARESETN && fp_locked)
 	begin
 		assert(sprite_x <= XSIZE);
 		assert(sprite_y <= YSIZE);
 
 		if (frame_y < this_top)
 		begin
-			assert(!f_vlast_locked || maddr == 0);
-		end else if (f_vskd_locked && in_sprite_y && XSIZE == (1<<$clog2(XSIZE)))
+			assert(maddr == 0);
+		end else if (in_sprite_y && XSIZE == (1<<$clog2(XSIZE)))
 		begin
 			if (frame_x >= this_left + XSIZE)
 			begin
@@ -1917,12 +2098,19 @@ module	axissprite #(
 			assert(sprite_x == 0);
 		end else
 			assert(sprite_x == XSIZE);
+
 		if (in_sprite_y)
 		begin
 			assert(sprite_y == (frame_y - this_top));
-		end else if (!OPT_TUSER_IS_SOF || frame_x > 1 || f_vskd_locked
-				|| frame_y < f_lines_per_frame)
+		end else // if (!OPT_TUSER_IS_SOF)
+		begin
 			assert((sprite_y != 0) ==(frame_y >= this_top + YSIZE));
+		end
+		/*
+		else if (frame_x > 1 || f_vskd_locked
+				|| frame_y < f_lines_per_frame)
+			assert(1 || (sprite_y != 0) ==(frame_y >= this_top + YSIZE));
+		*/
 	end
 
 	always @(*)

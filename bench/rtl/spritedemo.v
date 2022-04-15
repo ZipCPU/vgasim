@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2021, Gisselquist Technology, LLC
+// Copyright (C) 2021-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -477,6 +477,7 @@ module	spritedemo #(
 		// {{{
 		.XSIZE(64), .YSIZE(64),
 		.INITIAL_MEM(SPRITE_FILE),
+		.ALPHA_BITS(8),	// Our SPRITE_FILE requires 8bit alpha
 		.OPT_TUSER_IS_SOF(1'b0)
 		// }}}
 	) u_sprite (

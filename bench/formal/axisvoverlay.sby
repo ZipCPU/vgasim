@@ -1,0 +1,30 @@
+[tasks]
+prf
+prf_vlast   prf opt_vlast
+prflb       prf           opt_linebreak
+prflb_vlast prf opt_vlast opt_linebreak
+# cvr
+
+[options]
+prf: mode prove
+prf: depth 3
+# cvr: mode cover
+# cvr: depth 80
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -formal skidbuffer.v
+read_verilog -formal axisvoverlay.v
+--pycode-begin--
+cmd = "hierarchy -top axisvoverlay"
+cmd += " -chparam OPT_TUSER_IS_SOF %d" % (0 if "opt_vlast" in tags else 1)
+cmd += " -chparam OPT_LINE_BREAK %d" % (1 if "opt_linebreak" in tags else 0)
+output(cmd)
+--pycode-end--
+prep -top axisvoverlay
+
+[files]
+../../rtl/skidbuffer.v
+../../rtl/axisvoverlay.v

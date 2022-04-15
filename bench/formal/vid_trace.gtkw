@@ -1,0 +1,117 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Fri Feb 25 23:20:10 2022
+[*]
+[dumpfile_mtime] "Fri Feb 25 23:18:29 2022"
+[dumpfile_size] 33358
+[timestart] 0
+[size] 1546 600
+[pos] -1 -1
+*-5.061538 130 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 343
+[signals_width] 174
+[sst_expanded] 1
+[sst_vpaned_height] 149
+@28
+vid_trace.S_AXI_ACLK
+vid_trace.S_AXI_ARESETN
+@200
+-
+@22
+vid_trace.i_height[10:0]
+vid_trace.i_width[10:0]
+@200
+-
+@28
+vid_trace.S_AXIS_TVALID
+vid_trace.S_AXIS_TREADY
+@22
+vid_trace.S_AXIS_TDATA[11:0]
+@200
+-
+@800200
+-Mem Read
+@28
+vid_trace.rd_valid
+vid_trace.rd_ready
+@22
+vid_trace.rd_line_addr[10:0]
+@200
+-
+@22
+vid_trace.rd_value[11:0]
+vid_trace.rd_alt[11:0]
+@28
+vid_trace.rd_eol
+vid_trace.rd_mem
+@22
+vid_trace.rd_rdaddr[10:0]
+@28
+vid_trace.rd_src
+vid_trace.rd_vid_flag
+vid_trace.rd_vlast
+@22
+vid_trace.rd_xpos[10:0]
+vid_trace.rd_ypos[10:0]
+@1000200
+-Mem Read
+@22
+vid_trace.mem_value[11:0]
+@c00200
+-VScale
+@28
+vid_trace.vs_valid
+vid_trace.vs_ready
+@22
+vid_trace.vs_product[22:0]
+vid_trace.vs_scale[10:0]
+@28
+vid_trace.vs_eol
+vid_trace.vs_vlast
+@22
+vid_trace.vs_abs[10:0]
+vid_trace.vs_neg[10:0]
+vid_trace.vs_posn[11:0]
+vid_trace.vs_value[10:0]
+vid_trace.vs_xpos[10:0]
+vid_trace.fvs_xpos[10:0]
+vid_trace.vs_ypos[10:0]
+vid_trace.fvs_ypos[10:0]
+@1401200
+-VScale
+@c00200
+-YP
+@28
+vid_trace.yp_valid
+vid_trace.yp_ready
+@22
+vid_trace.yp_value[10:0]
+vid_trace.yp_xpos[10:0]
+[color] 3
+vid_trace.fyp_xpos[10:0]
+vid_trace.yp_ypos[10:0]
+[color] 3
+vid_trace.fyp_ypos[10:0]
+@28
+vid_trace.yp_eol
+vid_trace.yp_vlast
+vid_trace.yp_sof
+vid_trace.yp_clipped
+@22
+vid_trace.yp_max[10:0]
+@1401200
+-YP
+@800200
+-Output video
+@28
+vid_trace.M_VID_VALID
+vid_trace.M_VID_READY
+vid_trace.M_VID_DATA[1:0]
+vid_trace.M_VID_HLAST
+vid_trace.M_VID_LAST
+vid_trace.M_VID_USER
+vid_trace.M_VID_VLAST
+@1000200
+-Output video
+[pattern_trace] 1
+[pattern_trace] 0

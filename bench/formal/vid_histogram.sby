@@ -1,0 +1,24 @@
+[tasks]
+prf
+cvr
+
+[options]
+prf: mode prove
+cvr: mode cover
+prf: depth 7
+
+[engines]
+smtbmc
+
+[script]
+read -formal faxivideo.v
+read -formal vid_histogram.v
+--pycode-begin--
+cmd = "hierarchy -top vid_histogram"
+output(cmd)
+--pycode-end--
+prep -top vid_histogram
+
+[files]
+faxivideo.v
+../../rtl/gfx/vid_histogram.v

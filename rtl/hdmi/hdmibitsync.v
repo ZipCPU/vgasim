@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
+// Copyright (C) 2015-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -46,8 +46,6 @@ module	hdmibitsync (
 		output	wire	[31:0]	o_sync_word
 		// }}}
 	);
-	//
-	//
 
 	// Register/net declarations
 	// {{{

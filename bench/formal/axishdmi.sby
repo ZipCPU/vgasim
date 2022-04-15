@@ -1,9 +1,10 @@
 [tasks]
 prf
+prfrs prf opt_resync
 
 [options]
 prf: mode  prove
-depth 20
+depth 16
 
 [engines]
 smtbmc
@@ -11,8 +12,15 @@ smtbmc
 [script]
 read -formal axishdmi.v
 read -formal tmdsencode.v
+read -formal faxivideo.v
+--pycode-begin--
+cmd = "hierarchy -top axishdmi"
+cmd += " -chparam OPT_RESYNC_ON_VLAST %d" % (1 if "opt_resync" in tags else 0)
+output(cmd)
+--pycode-end--
 prep -top axishdmi
 
 [files]
+faxivideo.v
 ../../rtl/axishdmi.v
 ../../rtl/hdmi/tmdsencode.v

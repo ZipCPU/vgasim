@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2018-2021, Gisselquist Technology, LLC
+// Copyright (C) 2018-2022, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -42,6 +42,7 @@ module	axishdmi #(
 		// {{{
 		parameter	HW=12,
 				VW=12,
+		parameter [0:0]	OPT_RESYNC_ON_VLAST = 1'b0,
 		// HDMI *only* works with 24-bit color, using 8-bits per color
 		localparam	BITS_PER_COLOR = 8,
 		localparam	BPC = BITS_PER_COLOR,
@@ -108,6 +109,7 @@ module	axishdmi #(
 	reg			hrd, vrd;
 	reg		pix_reset;
 	reg	[1:0]	pix_reset_pipe;
+	wire		w_external_sync;
 `ifdef	FORMAL
 	wire	[47:0]		f_vmode, f_hmode;
 `endif
@@ -144,11 +146,20 @@ module	axishdmi #(
 	always @(posedge i_pixclk)
 	if (pix_reset)
 	begin
+		// {{{
 		hpos <= 0;
 		r_newline <= 1'b0;
 		hsync <= 1'b0;
 		hrd <= 1;
+		// }}}
+	end else if (w_external_sync)
+	begin
+		hpos      <= i_hm_width;
+		r_newline <= 0;
+		hrd       <= 0;
+		hsync <= 1'b0;
 	end else begin
+		// {{{
 		hrd <= (hpos < i_hm_width-2)
 				||(hpos >= i_hm_raw-2);
 		if (hpos < i_hm_raw-1'b1)
@@ -157,15 +168,21 @@ module	axishdmi #(
 			hpos <= 0;
 		r_newline <= (hpos == i_hm_width-3);
 		hsync <= (hpos >= i_hm_porch-1'b1)&&(hpos<i_hm_synch-1'b1);
+		// }}}
 	end
 	// }}}
 
 	// lost_sync detection
 	// {{{
+	assign	w_external_sync = (OPT_RESYNC_ON_VLAST && i_valid && o_ready
+			&& i_vlast && i_hlast);
+
 	initial	lost_sync = 1;
 	always @(posedge i_pixclk)
 	if (pix_reset)
 		lost_sync <= 1;
+	else if (w_external_sync)
+		lost_sync <= 0;
 	else if (w_rd)
 	begin
 		if (r_newframe && i_hlast && i_vlast && i_valid)
@@ -183,7 +200,7 @@ module	axishdmi #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Vertical line counting
+	// Vertical / frame based timing and synchronization
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -194,6 +211,8 @@ module	axishdmi #(
 	initial	r_newframe = 0;
 	always @(posedge i_pixclk)
 	if (pix_reset)
+		r_newframe <= 1'b0;
+	else if (w_external_sync)
 		r_newframe <= 1'b0;
 	else if ((hpos == i_hm_width - 3)&&(vpos == i_vm_height-1))
 		r_newframe <= 1'b1;
@@ -210,6 +229,10 @@ module	axishdmi #(
 	begin
 		vpos <= 0;
 		vsync <= 1'b0;
+	end else if (w_external_sync)
+	begin
+		vpos  <= i_vm_height -1;
+		vsync <= 0;
 	end else if (hpos == i_hm_porch-1'b1)
 	begin
 		if (vpos < i_vm_raw-1'b1)
@@ -240,7 +263,9 @@ module	axishdmi #(
 	always @(posedge i_pixclk)
 	if (pix_reset)
 		first_frame <= 1'b1;
-	else if (r_newframe)
+	else if (OPT_RESYNC_ON_VLAST && w_external_sync)
+		first_frame <= 1'b0;
+	else if (!OPT_RESYNC_ON_VLAST && r_newframe)
 		first_frame <= 1'b0;
 	// }}}
 	// }}}
@@ -265,7 +290,9 @@ module	axishdmi #(
 	always @(*)
 	if (lost_sync)
 	begin
-		if (!i_vlast || !i_hlast)
+		if (OPT_RESYNC_ON_VLAST)
+			o_ready = 1'b1;
+		else if (!i_vlast || !i_hlast)
 			// Skip to the end of the incoming frame before
 			// trying again
 			o_ready = 1'b1;
@@ -400,6 +427,10 @@ module	axishdmi #(
 	localparam	[1:0]	DATA_ISLAND = 2'b10;
 	localparam		PREGUARD_CONTROL = 6;
 	reg	f_past_valid;
+	reg	[47:0]	f_last_vmode, f_last_hmode;
+	reg	f_stable_mode;
+	reg	[3:0]	f_ctrl_length;
+	reg	[1:0]	f_video_start, f_packet_start;
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -429,6 +460,110 @@ module	axishdmi #(
 		end
 	end
 
+	generate if (OPT_RESYNC_ON_VLAST)
+	begin : GEN_VIDCHECK
+		// {{{
+		localparam LGFRAME = (HW > VW) ? HW : VW;
+		wire			f_vlast, f_hlast, f_sof, f_known_height;
+		wire	[LGFRAME-1:0]	f_xpos, f_ypos;
+		reg	[LGFRAME-1:0]	f_width, f_height;
+
+		always @(posedge i_pixclk)
+		if (!pix_reset && $past(pix_reset))
+			assume(!i_valid);
+
+		always @(*)
+		begin
+			f_width = 0; f_height = 0;
+			f_width[HW-1:0]  = i_hm_width;
+			f_height[VW-1:0] = i_vm_height;
+		end
+
+		faxivideo #(
+			// {{{
+			.LGDIM(LGFRAME), .PW(BPP), .OPT_TUSER_IS_SOF(1'b0),
+			.OPT_SOURCE(1'b0)
+			// }}}
+		) fvid (
+			// {{{
+			.i_clk(i_pixclk), .i_reset_n(!pix_reset),
+			//
+			.S_VID_TVALID(i_valid && !lost_sync), .S_VID_TREADY(o_ready),
+			.S_VID_TDATA(i_rgb_pix),.S_VID_TLAST(i_hlast&& i_vlast),
+			.S_VID_TUSER(i_hlast),
+			.i_width(f_width), .i_height(f_height),
+			.o_xpos(f_xpos), .o_ypos(f_ypos),
+				.f_known_height(f_known_height),
+			.o_hlast(f_hlast), .o_vlast(f_vlast), .o_sof(f_sof)
+			// }}}
+		);
+
+		always @(posedge i_pixclk)
+		if (!i_reset && !lost_sync)
+		begin
+			if (w_rd)
+				assume(i_valid);
+
+			if (f_xpos != 0)
+			begin
+				assert(hpos == f_xpos - 1);
+				assert(vpos == f_ypos);
+			end else begin
+				assert(hpos <= 1 || hpos >= f_width-1
+					|| vpos >= i_vm_height);
+				if (hpos < i_hm_width)
+				begin
+					assert(hpos == i_hm_width-1
+						|| vpos == f_ypos
+						|| (f_ypos == 0 && vpos >= f_height));	
+				end else if (hpos < i_hm_porch)
+				begin
+					if (vpos < f_height-1)
+					begin
+						assert(vpos + 1== f_ypos);	
+					end else begin
+						assert(f_ypos == 0);
+					end
+				end else begin
+					if (vpos <= f_height-1)
+					begin
+						assert(vpos == f_ypos);
+					end else begin
+						assert(f_ypos == 0);
+					end
+				end
+			end
+
+			if (f_ypos != 0)
+			begin
+			end else
+				assert(vpos == 0 || vpos >= f_height -1);
+		end else if (!i_reset)
+		begin
+			assert(f_xpos == 0);
+			assert(f_ypos == 0);
+		end
+
+		always @(posedge i_pixclk)
+		if (!i_reset && first_frame)
+		begin
+			assert(lost_sync);
+			assert(!f_known_height);
+			assert(f_xpos == 0);
+			assert(f_ypos == 0);
+		end
+
+		always @(*)
+			assume(i_hlast == f_hlast);
+
+		always @(*)
+		if (!f_vlast)
+			assume(!i_vlast);
+		else if (f_hlast)
+			assume(i_vlast == f_hlast);
+		// }}}
+	end endgenerate
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Mode-line assumptions
@@ -450,13 +585,11 @@ module	axishdmi #(
 	assign	f_hmode = { i_hm_width,  i_hm_porch, i_hm_synch, i_hm_raw };
 	assign	f_vmode = { i_vm_height, i_vm_porch, i_vm_synch, i_vm_raw };
 
-	reg	[47:0]	f_last_vmode, f_last_hmode;
 	always @(posedge i_pixclk)
 		f_last_vmode <= f_vmode;
 	always @(posedge i_pixclk)
 		f_last_hmode <= f_hmode;
 
-	reg	f_stable_mode;
 	always @(*)
 		f_stable_mode = (f_last_vmode == f_vmode)&&(f_last_hmode == f_hmode);
 
@@ -481,19 +614,25 @@ module	axishdmi #(
 	if ((f_past_valid)&&(!$past(pix_reset))&&(!pix_reset)
 			&&(f_stable_mode)&&($past(f_stable_mode)))
 	begin
-
-		// The horizontal position counter should increment
-		if ($past(hpos >= i_hm_raw-1'b1))
+		if ($past(w_external_sync))
+		begin
+			assert(hpos == i_hm_width);
+		end else if ($past(hpos >= i_hm_raw-1'b1))
+		begin
 			assert(hpos == 0);
-		else
+		end else
+			// The horizontal position counter should increment
 			assert(hpos == $past(hpos)+1'b1);
 
 		// The vertical position counter should increment
-		if (hpos == i_hm_porch)
+		if ($past(w_external_sync))
+		begin
+		end else if (hpos == i_hm_porch)
 		begin
 			if ($past(vpos >= i_vm_raw-1'b1))
+			begin
 				assert(vpos == 0);
-			else
+			end else
 				assert(vpos == $past(vpos)+1'b1);
 		end else
 			assert(vpos == $past(vpos));
@@ -518,32 +657,38 @@ module	axishdmi #(
 		// i_hm_porch <= hpos < i_hm_sync, invalid at all other times
 		//
 		if (hpos < i_hm_porch)
+		begin
 			assert(!hsync);
-		else if (hpos < i_hm_synch)
+		end else if (hpos < i_hm_synch)
+		begin
 			assert(hsync);
-		else
+		end else
 			assert(!hsync);
 
 		// Same thing for vertical
 		if (vpos < i_vm_porch)
+		begin
 			assert(!vsync);
-		else if (vpos < i_vm_synch)
+		end else if (vpos < i_vm_synch)
+		begin
 			assert(vsync);
-		else
+		end else
 			assert(!vsync);
 
 		// At the end of every horizontal line cycle, we assert
 		// a new line
 		if (hpos == i_hm_width-2)
+		begin
 			assert(r_newline);
-		else
+		end else
 			assert(!r_newline);
 
 		// At the end of every vertical frame cycle, we assert
 		// a new frame, but only on the newline measure
 		if ((vpos == i_vm_height-1'b1)&&(r_newline))
+		begin
 			assert(r_newframe);
-		else
+		end else
 			assert(!r_newframe);
 	end
 
@@ -552,8 +697,6 @@ module	axishdmi #(
 	// HDMI Specific properties
 	//
 	//////////////////////////////
-	reg	[3:0]	f_ctrl_length;
-	reg	[1:0]	f_video_start, f_packet_start;
 
 	always @(posedge i_pixclk)
 	if (pix_reset)
@@ -596,9 +739,12 @@ module	axishdmi #(
 	always @(posedge i_pixclk)
 	if ((f_past_valid)&&(!$past(pix_reset))&&(!pix_reset))
 	begin
-		if ((hpos < i_hm_width)&&(vpos < i_vm_height))
+		if ($past(w_external_sync))
+		begin
+		end else if ((hpos < i_hm_width)&&(vpos < i_vm_height))
+		begin
 			assert(hdmi_type == VIDEO_DATA);
-		else
+		end else
 			assert(hdmi_type != VIDEO_DATA);
 		if (!$past(first_frame))
 			assert($past(w_rd) == (hdmi_type == VIDEO_DATA));
@@ -608,8 +754,9 @@ module	axishdmi #(
 			if (hpos < i_hm_width)
 				assert(hdmi_type == VIDEO_DATA);
 			if (hpos >= (i_hm_raw-GUARD_PIXELS))
+			begin
 				assert(hdmi_type == GUARD);
-			else if (hpos >= (i_hm_raw-GUARD_PIXELS-PREGUARD_CONTROL))
+			end else if (hpos >= (i_hm_raw-GUARD_PIXELS-PREGUARD_CONTROL))
 				assert((hdmi_type == CTL_PERIOD)
 					&&(hdmi_ctl == 4'h1));
 		end
