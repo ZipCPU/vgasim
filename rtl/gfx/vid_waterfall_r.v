@@ -160,6 +160,11 @@ module	vid_waterfall_r #(
 	2'b01: wb_outstanding <= wb_outstanding - 1;
 	default: begin end
 	endcase
+`ifdef	FORMAL
+	always @(*)
+	if (!i_reset && wb_outstanding == 0 && !o_wb_stb)
+		assert(!o_wb_cyc);
+`endif
 	// }}}
 
 	// last_ack
@@ -167,13 +172,9 @@ module	vid_waterfall_r #(
 	always @(posedge i_clk)
 	if (i_reset || !o_wb_cyc || i_wb_err)
 		last_ack <= 0;
-	else if (wb_outstanding >= 2)
-		last_ack <= 0;
-	else if (o_wb_stb && i_wb_stall)
-		last_ack <= 0;
 	else
 		last_ack <= (wb_outstanding + (o_wb_stb ? 1:0)
-						- (i_wb_ack ? 1:0) <= 1);
+				<= 2 +(i_wb_ack ? 1:0));
 	// }}}
 
 	// last_request
@@ -263,7 +264,7 @@ module	vid_waterfall_r #(
 		.i_clk(i_clk), .i_reset(i_reset),
 		.i_wr(i_wb_ack), .i_data(i_wb_data), .o_full(ign_fifo_full),
 			.o_fill(fifo_fill),
-		.i_rd(afifo_read), .o_data(fifo_data), .o_empty(fifo_empty)
+		.i_rd(fifo_read), .o_data(fifo_data), .o_empty(fifo_empty)
 		// }}}
 	);
 
@@ -296,7 +297,7 @@ module	vid_waterfall_r #(
 		) pxfifo (
 			// {{{
 			.i_wclk(i_clk), .i_wr_reset_n(!i_reset),
-			.i_wr(!fifo_read), .i_wr_data(fifo_data),
+			.i_wr(fifo_read), .i_wr_data(fifo_data),
 				.o_wr_full(afifo_full),
 			.i_rclk(i_pixclk), .i_rd_reset_n(!pix_reset),
 			.i_rd(afifo_read), .o_rd_data(afifo_data),
