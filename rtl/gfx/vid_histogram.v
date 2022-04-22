@@ -55,6 +55,7 @@ module	vid_histogram #(
 		parameter		LGDIM = 11,	// 10 bits for scrn dim
 		parameter		IW = 8,
 		parameter		LGMEM = IW+1,
+		parameter [0:0]		OPT_SIGNED = 1'b1,
 		parameter [0:0]		OPT_LOWPOWER = 1'b0,
 		parameter [0:0]		OPT_TUSER_IS_SOF = 1'b1
 		// }}}
@@ -92,7 +93,7 @@ module	vid_histogram #(
 
 	reg	[LGHIST:0]	rd_mem_counts_raw, new_mem_counts, total_counts;
 	wire	[LGHIST:0]	rd_mem_counts;
-	reg	[LGMEM-1:0]	rd_mem_addr, new_mem_addr;
+	reg	[LGMEM-1:0]	wr_data_address, rd_mem_addr, new_mem_addr;
 	reg			wr_mem, rd_mem_valid;
 
 	///////
@@ -130,13 +131,19 @@ module	vid_histogram #(
 	else
 		rd_mem_valid <= S_AXIS_TVALID && (!clearing_bank && !swap_pipe);
 
-	always @(posedge S_AXI_ACLK)
-	if (S_AXIS_TVALID)
-		rd_mem_counts_raw <= mem[{ write_bank, S_AXIS_TDATA }];
+	always @(*)
+	if (OPT_SIGNED)
+		wr_data_address = { write_bank, !S_AXIS_TDATA[IW-1], S_AXIS_TDATA[IW-2:0] };
+	else
+		wr_data_address = { write_bank, S_AXIS_TDATA };
 
 	always @(posedge S_AXI_ACLK)
 	if (S_AXIS_TVALID)
-		rd_mem_addr   <= { write_bank, S_AXIS_TDATA };
+		rd_mem_counts_raw <= mem[wr_data_address];
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXIS_TVALID)
+		rd_mem_addr   <= wr_data_address;
 	else
 		rd_mem_addr[LGMEM-1] <= write_bank;
 
@@ -147,7 +154,7 @@ module	vid_histogram #(
 		bypass_active <= 0;
 	else
 		bypass_active <= wr_mem
-			&& (new_mem_addr == { write_bank, S_AXIS_TDATA });
+			&& (new_mem_addr == wr_data_address);
 
 	always @(posedge S_AXI_ACLK)
 		bypass_value <= new_mem_counts;
