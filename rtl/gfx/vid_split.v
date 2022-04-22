@@ -72,7 +72,7 @@ module	vid_split #(
 		input	wire	[DW-1:0]	i_wb_data,
 		input	wire			i_wb_err,
 		//
-		output	reg			M_VID_VALID,
+		output	wire			M_VID_VALID,
 		input	wire			M_VID_READY,
 		output	wire	[PW-1:0]	M_VID_DATA,
 		output	wire			M_VID_LAST,
@@ -86,6 +86,9 @@ module	vid_split #(
 				trace_xclk_last;
 	wire	[IW-1:0]	trace_xclk_data;
 	wire			xclk_fifo_full, xclk_fifo_empty;
+
+	wire	[LGFRAME-1:0]	pix_width, pix_height, pix_half_height;
+	wire			ign_tfr_valid, ign_tfr_ready;
 
 	wire	trace_data_valid, wfall_data_valid,
 		trace_data_ready, wfall_data_ready,
@@ -171,7 +174,7 @@ module	vid_split #(
 		// {{{
 		.i_clk(i_pixclk), .i_reset(i_pix_reset),
 		//
-		.i_width(i_width), .i_height(i_height),
+		.i_width(pix_width), .i_height(pix_height),
 		//
 		.M_VID_VALID(src_valid), .M_VID_READY(src_ready),
 			.M_VID_DATA( src_data),
@@ -179,8 +182,22 @@ module	vid_split #(
 		// }}}
 	);
 
-	always @(posedge i_pixclk)
+	always @(posedge i_clk)
 		half_height <= { 1'b0, i_height[LGFRAME-1:1] } - 1;
+
+	tfrvalue #(
+		.W(3*LGFRAME), .DEFAULT({ 16'd800, 16'd600, 16'd299 })
+	) u_pixsize (
+		// {{{
+		.i_a_clk(i_clk), .i_a_reset_n(!i_reset),
+		.i_a_valid(1'b1), .o_a_ready(ign_tfr_ready),
+			.i_a_data({ i_width, i_height, half_height }),
+		.i_b_clk(i_pixclk), .i_b_reset_n(!i_pix_reset),
+		.o_b_valid(ign_tfr_valid), .i_b_ready(1'b1),
+			.o_b_data({ pix_width, pix_height, pix_half_height })
+		// }}}
+	);
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -209,7 +226,7 @@ module	vid_split #(
 		//
 		.i_trigger_en(1'b0), .i_trigger(1'b0), .i_trigger_reset(1'b1),
 		//
-		.i_width(i_width), .i_height(half_height),
+		.i_width(pix_width), .i_height(pix_half_height),
 		//
 		.S_AXIS_TVALID(trace_data_valid),
 		.S_AXIS_TREADY(trace_data_ready),
@@ -313,7 +330,7 @@ module	vid_split #(
 		// {{{
 		.ACLK(i_pixclk), .ARESETN(!i_pix_reset),
 		//
-		.i_enable(1'b1), .i_hpos(0), .i_vpos(i_height/2+1),
+		.i_enable(1'b1), .i_hpos(0), .i_vpos(pix_height/2+1),
 			.o_err(bottom_err),
 		//
 		.S_PRI_TVALID(top_valid), .S_PRI_TREADY(top_ready),
@@ -336,7 +353,8 @@ module	vid_split #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, top_err, bottom_err };
+	assign	unused = &{ 1'b0, top_err, bottom_err,
+				ign_tfr_valid, ign_tfr_ready };
 	// Verilator lint_on  UNUSED
 	// }}}
 endmodule

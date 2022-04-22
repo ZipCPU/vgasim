@@ -284,6 +284,7 @@ module	vid_waterfall_r #(
 		// {{{
 		reg		r_pix_reset;
 		reg	[2:0]	r_pix_reset_pipe;
+		wire		afifo_full;
 
 		initial	{ r_pix_reset, r_pix_reset_pipe } = -1;
 		always @(posedge i_pixclk or posedge i_reset)
@@ -304,8 +305,6 @@ module	vid_waterfall_r #(
 				.o_rd_empty(afifo_empty)
 			// }}}
 		);
-
-		wire			afifo_full;
 
 		assign	fifo_read = !fifo_empty && !afifo_full;
 		assign	pix_clk   = i_pixclk;
