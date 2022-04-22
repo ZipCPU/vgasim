@@ -69,6 +69,7 @@ module vid_trace #(
 		localparam	LGMEM = LGLEN+1,	// Memory size
 		parameter	IW = 12,	// Bits per input sample
 		parameter	PW = 2,		// Bits per pixel
+		parameter [LGFRAME-1:0]	DEF_VSCALE = { 3'b001, {(LGFRAME-3){1'b0}} },
 		parameter [0:0] OPT_TUSER_IS_SOF = 1'b0,
 		// OPT_TRIGGER: True if we want to pause the trace on an
 		// external trigger event of some type.
@@ -110,9 +111,9 @@ module vid_trace #(
 		// }}}
 		// The outgoing video stream (Video AXI-stream format)
 		// {{{
-		output	reg		M_VID_VALID,
+		output	wire		M_VID_VALID,
 		input	wire		M_VID_READY,
-		output	reg [PW-1:0]	M_VID_DATA,
+		output	wire [PW-1:0]	M_VID_DATA,
 		output	wire		M_VID_LAST,
 		output	wire		M_VID_USER
 		// }}}
@@ -121,6 +122,8 @@ module vid_trace #(
 
 	// Local declarations
 	// {{{
+	localparam	LGFIFO = 5;
+
 	reg	[IW-1:0]	mem	[0:(1<<LGMEM)-1];
 
 	wire			wr_swap_pages;
@@ -166,7 +169,14 @@ module vid_trace #(
 	wire			yp_ready;
 
 	reg	[LGFRAME-1:0]	m_value;
-	reg	M_VID_VLAST, M_VID_HLAST, M_VID_SOF;
+
+	reg			fif_valid;
+	reg	[PW-1:0]	fif_data;
+	wire			fif_user, fif_last;
+	reg			fif_hlast, fif_sof, fif_vlast;
+	wire			fif_full, fif_empty, fif_ready;
+	wire	[LGFIFO:0]	ign_fif_fill;
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -222,6 +232,12 @@ module vid_trace #(
 				i_trigger };
 		// Verilator lint_on  UNUSED
 	end endgenerate
+
+`ifdef	VERILATOR
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARESETN && wr_swap_pages)
+		$display("Trace: Swapping pages");
+`endif
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////
@@ -723,7 +739,7 @@ module vid_trace #(
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		vs_scale <= { 3'b001, {(LGFRAME-3){1'b0}} };
+		vs_scale <= DEF_VSCALE;
 	else if (vs_valid && vs_ready && vs_eol && vs_vlast)
 	begin
 		// $display("YP-MAX: %5d, CLIPPED: %5d, VS-SCALE: %5d", yp_max,
@@ -793,7 +809,7 @@ module vid_trace #(
 		yp_eol   <= vs_eol;
 		yp_vlast <= vs_vlast;
 		// }}}
-	end else if (M_VID_READY)
+	end else if (fif_ready)
 		yp_valid <= 1'b0;
 
 	// yp_sof
@@ -880,11 +896,11 @@ module vid_trace #(
 			clip_count <= clip_count + 1;
 	end
 
-	assign	yp_ready = !M_VID_VALID || M_VID_READY;
+	assign	yp_ready = !fif_valid || fif_ready;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// #3: M_VID_*: Convert to a pixel value
+	// #3: fif_*: Convert to a pixel value
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -892,27 +908,27 @@ module vid_trace #(
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		M_VID_VALID <= 0;
-	else if (!M_VID_VALID || M_VID_READY)
-		M_VID_VALID <= yp_valid;
+		fif_valid <= 0;
+	else if (!fif_valid || fif_ready)
+		fif_valid <= yp_valid;
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		M_VID_VLAST <= 0;
-	else if (!M_VID_VALID || M_VID_READY)
-		M_VID_VLAST <= yp_vlast && yp_eol;
+		fif_vlast <= 0;
+	else if (!fif_valid || fif_ready)
+		fif_vlast <= yp_vlast && yp_eol;
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		M_VID_HLAST <= 0;
-	else if (!M_VID_VALID || M_VID_READY)
-		M_VID_HLAST <= yp_eol;
+		fif_hlast <= 0;
+	else if (!fif_valid || fif_ready)
+		fif_hlast <= yp_eol;
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		M_VID_SOF <= 1;
-	else if (M_VID_VALID && M_VID_READY)
-		M_VID_SOF <= M_VID_VLAST;
+		fif_sof <= 1;
+	else if (fif_valid && fif_ready)
+		fif_sof <= fif_vlast;
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -922,54 +938,78 @@ module vid_trace #(
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		M_VID_DATA <= 0;
-	else if (!M_VID_VALID || M_VID_READY)
+		fif_data <= 0;
+	else if (!fif_valid || fif_ready)
 	begin
 		// Unless told otherwise, everything will be in the background
 		// color.
-		M_VID_DATA <= BACKGROUND_COLOR;
+		fif_data <= BACKGROUND_COLOR;
 
 		// Plot a y-axis baseline.  To skip this logic,
 		// simply set AXIS_COLOR to BACKGROUND_COLOR
 		if (OPT_UNSIGNED)
 		begin
 			if (yp_vlast)
-				M_VID_DATA <= AXIS_COLOR;
+				fif_data <= AXIS_COLOR;
 		end else begin // if !OPT_UNSIGNED
 			if (yp_ypos == i_height/2)
-				M_VID_DATA <= AXIS_COLOR;
+				fif_data <= AXIS_COLOR;
 		end
 
 		if (OPT_LINE)
 		begin
 			if (yp_ypos == yp_value)
-				M_VID_DATA <= LINE_COLOR;
-			if (!M_VID_HLAST)
+				fif_data <= LINE_COLOR;
+			if (!fif_hlast)
 			begin
 				if ((yp_ypos >= yp_value && yp_ypos < m_value)
 				  ||(yp_ypos <= yp_value && yp_ypos > m_value))
-					M_VID_DATA <= LINE_COLOR;
+					fif_data <= LINE_COLOR;
 			end
 		end else if (yp_ypos == yp_value) // && !OPT_HLINE
-			M_VID_DATA <= LINE_COLOR;
+			fif_data <= LINE_COLOR;
 	end
 
 	generate if (OPT_TUSER_IS_SOF)
 	begin : SOF_FLAGS
 
-		assign	M_VID_LAST = M_VID_HLAST;
-		assign	M_VID_USER = M_VID_SOF;
+		assign	fif_last = fif_hlast;
+		assign	fif_user = fif_sof;
 
 	end else begin : VLAST_FLAGS
 
-		assign	M_VID_LAST = M_VID_VLAST;
-		assign	M_VID_USER = M_VID_HLAST;
+		assign	fif_last = fif_vlast;
+		assign	fif_user = fif_hlast;
 
 		// Verilator lint_off UNUSED
-		wire	unused_flag = &{ 1'b0, M_VID_SOF, mem_xpos, mem_vlast,
-						mem_ypos, mem_eol };
+		wire	unused_flag = &{ 1'b0, fif_sof };
 		// Verilator lint_on  UNUSED
 	end endgenerate
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// #4: Run through a FIFO to generate our final outputs
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	sfifo #(
+		.BW(2+PW), .LGFLEN(LGFIFO)
+	) sfifo (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
+		.i_wr(fif_valid), .i_data({ fif_user, fif_last, fif_data }),
+			.o_full(fif_full), .o_fill(ign_fif_fill),
+		.i_rd(M_VID_READY),
+			.o_data({ M_VID_USER, M_VID_LAST, M_VID_DATA }),
+			.o_empty(fif_empty)
+		// }}}
+	);
+
+	assign	fif_ready = !fif_full;
+	assign	M_VID_VALID = !fif_empty;
+
 	// }}}
 
 	// }}}
@@ -978,7 +1018,9 @@ module vid_trace #(
 	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, yp_xpos, vs_abs[LGFRAME], m_value };
+	assign	unused = &{ 1'b0, yp_xpos, vs_abs[LGFRAME], m_value,
+				mem_xpos, mem_ypos, mem_eol, mem_vlast,
+				ign_fif_fill };
 	// Verilator lint_on  UNUSED
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
@@ -1223,9 +1265,9 @@ module vid_trace #(
 		// {{{
 		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
 		//
-		.S_VID_TVALID(M_VID_VALID), .S_VID_TREADY(M_VID_READY),
-		.S_VID_TDATA(M_VID_DATA), .S_VID_TLAST(M_VID_LAST),
-		.S_VID_TUSER(M_VID_USER),
+		.S_VID_TVALID(fif_valid), .S_VID_TREADY(fif_ready),
+		.S_VID_TDATA(fif_data), .S_VID_TLAST(fif_last),
+		.S_VID_TUSER(fif_user),
 		//
 		.i_width(i_width), .i_height(i_height),
 		.o_xpos(f_xpos), .o_ypos(f_ypos),
@@ -1237,13 +1279,13 @@ module vid_trace #(
 	always @(posedge S_AXI_ACLK)
 	if (S_AXI_ARESETN)
 	begin
-		if (M_VID_VALID)
+		if (fif_valid)
 		begin
-			if (M_VID_HLAST && M_VID_VLAST)
+			if (fif_hlast && fif_vlast)
 			begin
 				assert(fyp_xpos == 0);
 				assert(fyp_ypos == 0);
-			end else if (M_VID_HLAST)
+			end else if (fif_hlast)
 			begin
 				assert(fyp_xpos == 0);
 				assert(fyp_ypos == f_ypos + 1);
