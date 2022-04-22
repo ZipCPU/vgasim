@@ -43,14 +43,15 @@ module	vid_mux #(
 		parameter	NIN = 5,
 		parameter	LGDIM = 11,
 		parameter	PW = 24,
-		parameter [0:0]	OPT_TUSER_IS_SOF = 1
+		parameter	DEF_SELECT = 0,
+		parameter [0:0]	OPT_TUSER_IS_SOF = 0
 		// }}}
 	) (
 		// {{{
-		input	wire		S_AXI_ACLK, S_AXI_ARESETN,
+		input	wire			S_AXI_ACLK, S_AXI_ARESETN,
 		//
 		input	wire	[NIN-1:0]	S_VID_VALID,
-		output	wire	[NIN-1:0]	S_VID_READY,
+		output	reg	[NIN-1:0]	S_VID_READY,
 		input	wire	[NIN*PW-1:0]	S_VID_DATA,
 		input	wire	[NIN-1:0]	S_VID_LAST,	// HLAST
 		input	wire	[NIN-1:0]	S_VID_USER,	// SOF
@@ -67,21 +68,24 @@ module	vid_mux #(
 
 	// local declarations
 	// {{{
-	reg	[$clog2(NIN)-1:0]	r_framesel;
+	localparam	LGNIN = $clog2(NIN);
+	reg	[LGNIN-1:0]	r_framesel;
 	reg				adjust_select;
 	reg				M_VID_HLAST, M_VID_VLAST;
 	wire	[NIN-1:0]		S_VID_HLAST, S_VID_VLAST, S_VID_SOF;
-	wire	[NIN-1:0]		new_frame;
+	wire	[NIN-1:0]		eof;
+	reg	[NIN-1:0]		new_frame;
 	genvar				gk;
 	integer				ik;
 	// }}}
 
 	// r_framesel
 	// {{{
+	initial	r_framesel = ({ 1'b0, DEF_SELECT } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		r_framesel <= 0;
-	else if (M_VID_VALID && M_VID_HLAST && M_VID_VLAST)
+		r_framesel <= ({ 1'b0, DEF_SELECT } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
+	else if (adjust_select && { 1'b0, i_select } < NIN[LGNIN:0])
 		r_framesel <= i_select;
 	// }}}
 
@@ -90,14 +94,14 @@ module	vid_mux #(
 	always @(posedge  S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		M_VID_VALID <= 0;
-	else if (!M_VID_VALID || (M_VID_HLAST && M_VID_VLAST))
-		M_VID_VALID <= S_VID_VALID[r_framesel]&& !new_frame[r_framesel];
+	else if (!M_VID_VALID || M_VID_READY)
+		M_VID_VALID <= S_VID_VALID[r_framesel]&&S_VID_READY[r_framesel];
 	// }}}
 
 	// M_VID_DATA
 	// {{{
 	always @(posedge  S_AXI_ACLK)
-	if (!M_VID_VALID || (M_VID_HLAST && M_VID_VLAST))
+	if (!M_VID_VALID || M_VID_READY)
 	begin
 		for(ik=0; ik < NIN; ik=ik+1)
 		if (r_framesel == ik[$clog2(NIN)-1:0])
@@ -108,10 +112,10 @@ module	vid_mux #(
 	// M_VID_LAST, M_VID_USER, M_VID_HLAST, M_VID_VLAST
 	// {{{
 	always @(posedge  S_AXI_ACLK)
-	if (!M_VID_VALID || (M_VID_HLAST && M_VID_VLAST))
+	if (!M_VID_VALID || M_VID_READY)
 	begin
-		M_VID_LAST <= S_VID_LAST[r_framesel];
-		M_VID_USER <= S_VID_USER[r_framesel];
+		M_VID_LAST  <= S_VID_LAST[r_framesel];
+		M_VID_USER  <= S_VID_USER[r_framesel];
 		M_VID_HLAST <= S_VID_HLAST[r_framesel];
 		M_VID_VLAST <= S_VID_VLAST[r_framesel];
 	end
@@ -119,15 +123,19 @@ module	vid_mux #(
 
 	// adjust_select
 	// {{{
+	assign	eof = S_VID_VALID & S_VID_READY & S_VID_HLAST & S_VID_VLAST;
+
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		adjust_select <= 1;
-	else if (M_VID_VALID)
+	else if (adjust_select)
 	begin
-		adjust_select <= (M_VID_HLAST && M_VID_VLAST)
-			&& (i_select != r_framesel)
-			&& (i_select < NIN)
-			&& (new_frame[i_select]);
+		if ({ 1'b0, i_select } < NIN[LGNIN:0])
+			adjust_select <= !new_frame[i_select];
+	end else if (|(eof & (1<<r_framesel)))
+	begin
+		adjust_select <= (i_select != r_framesel)
+				&& ({ 1'b0, i_select } < NIN[LGNIN:0]);
 	end
 	// }}}
 
@@ -161,7 +169,7 @@ module	vid_mux #(
 			if (!S_AXI_ARESETN)
 				vlast <= 0;
 			else if  (S_VID_VALID[gk] && S_VID_READY[gk])
-				vlast <= S_VID_HLAST[gk] && (height == vpos + 1);
+				vlast <= S_VID_HLAST[gk]&& (height == vpos + 1);
 			assign	S_VID_VLAST[gk] = vlast;
 			// }}}
 		end else begin
@@ -177,10 +185,11 @@ module	vid_mux #(
 			else if (S_VID_VALID[gk] && S_VID_READY[gk])
 				sof <= S_VID_HLAST[gk] && S_VID_VLAST[gk];
 
-			assign	S_VID_SOF = sof;
+			assign	S_VID_SOF[gk] = sof;
 			// }}}
 		end
 
+		initial	new_frame[gk] = 1'b1;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
 			new_frame[gk] <= 1'b1;
@@ -188,7 +197,7 @@ module	vid_mux #(
 			new_frame[gk] <= S_VID_HLAST[gk] && S_VID_VLAST[gk];
 		else if (S_VID_VALID[gk] && OPT_TUSER_IS_SOF)
 			new_frame[gk] <= S_VID_SOF[gk];
-		
+
 		always @(*)
 		if (adjust_select)
 			S_VID_READY[gk] = 1'b0;
@@ -199,4 +208,208 @@ module	vid_mux #(
 
 	end endgenerate
 	// }}}
+
+	// Keep Verilator happy
+	// {{{
+	// Verilator lint_off UNUSED
+	wire	unused;;
+	assign	unused = &{ 1'b0, M_VID_HLAST, M_VID_VLAST };
+	// Verilator lint_on  UNUSED
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+`ifdef	FORMAL
+	reg	f_past_valid;
+	(* anyconst *)	wire	[LGDIM-1:0]	fm_width, fm_height;
+	wire	[LGDIM-1:0]	fm_xpos, fm_ypos;
+	wire			fm_known, fm_hlast, fm_vlast, fm_sof;
+
+	initial	f_past_valid = 1'b0;
+	always @(posedge S_AXI_ACLK)
+		f_past_valid <= 1'b1;
+
+	always @(*)
+	if (!f_past_valid)
+		assume(!S_AXI_ARESETN);
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Input stream properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	generate for(gk=0; gk<NIN; gk=gk+1)
+	begin : FGEN_INPUTS;
+		//parameter	LGDIM = 11,
+		(* anyconst *)	reg	[LGDIM-1:0]	f_width, f_height;
+		wire	[LGDIM-1:0]	f_xpos, f_ypos;
+		wire			f_known, f_hlast, f_vlast, f_sof;
+
+		always @(*)	assume(f_width  == fm_width);
+		always @(*)	assume(f_height == fm_height);
+
+		faxivideo #(
+			// {{{
+			.PW(PW), .LGDIM(LGDIM), .OPT_SOURCE(1'b0),
+			.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+			// }}}
+		) f_slv (
+			// {{{
+			.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+			//
+			.S_VID_TVALID(S_VID_VALID[gk]),
+				.S_VID_TREADY(S_VID_READY[gk]),
+			.S_VID_TDATA(S_VID_DATA[gk*PW +: PW]),
+			.S_VID_TLAST(S_VID_LAST[gk]),
+			.S_VID_TUSER(S_VID_USER[gk]),
+			.i_width(f_width), .i_height(f_height),
+			.o_xpos(f_xpos), .o_ypos(f_ypos),
+			.f_known_height(f_known),
+			.o_hlast(f_hlast), .o_vlast(f_vlast), .o_sof(f_sof)
+			// }}}
+		);
+
+		// Stream assumptions
+		// {{{
+		always @(posedge S_AXI_ACLK)
+		if (!f_past_valid || $past(!S_AXI_ARESETN))
+		begin
+			assume(!S_VID_VALID[gk]);
+		end else if ($past(S_VID_VALID[gk] && !S_VID_READY[gk]))
+		begin
+			assume(S_VID_VALID[gk]);
+			assume($stable(S_VID_DATA[gk*PW +: PW]));
+			assume($stable(S_VID_LAST[gk]));
+			assume($stable(S_VID_USER[gk]));
+		end
+		// }}}
+
+		// Sync descriptors
+		// {{{
+		if (OPT_TUSER_IS_SOF)
+		begin
+			always @(*)
+			if (S_VID_VALID[gk])
+			begin
+				assume(f_hlast == S_VID_LAST[gk]);
+				assume(f_sof   == S_VID_USER[gk]);
+			end
+		end else begin
+			always @(*)
+			if (S_VID_VALID[gk])
+			begin
+				assume(f_hlast == S_VID_USER[gk]);
+				assume((f_vlast && f_hlast) == S_VID_LAST[gk]);
+			end
+		end
+		// }}}
+
+		always @(*)
+			assert(new_frame[gk]==((f_xpos == 0) && (f_ypos == 0)));
+
+		always @(*)
+		if (S_AXI_ARESETN && (r_framesel != gk || adjust_select))
+			assert(new_frame[gk]);
+
+		always @(*)
+		if (S_AXI_ARESETN && r_framesel == gk)
+		begin
+			if (f_xpos == 0)
+			begin
+				if (M_VID_VALID)
+				begin
+					assert(fm_hlast);
+				end else begin
+					assert(fm_xpos == 0);
+				end
+
+				if (f_ypos == 0)
+				begin
+					assert((M_VID_VALID && fm_hlast && fm_vlast)
+						||(fm_xpos == 0 && fm_ypos==0));
+				end else if (M_VID_VALID)
+				begin
+					assert(f_ypos == fm_ypos + 1);
+				end else begin
+					assert(fm_ypos == f_ypos);
+				end
+			end else begin
+				assert(f_xpos == fm_xpos + (M_VID_VALID ? 1:0));
+				assert(f_ypos == fm_ypos);
+				assert(!M_VID_VALID || !fm_hlast);
+				assert(!M_VID_VALID || !fm_vlast || !fm_hlast);
+			end
+
+		end
+
+		always @(*)
+			assume(f_width >= 3 && f_height >= 1);
+	end endgenerate
+	//  }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Output stream assertions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	faxivideo #(
+		// {{{
+		.PW(PW), .LGDIM(LGDIM), .OPT_SOURCE(1'b0),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) f_master (
+		// {{{
+		.i_clk(S_AXI_ACLK), .i_reset_n(S_AXI_ARESETN),
+		//
+		.S_VID_TVALID(M_VID_VALID),
+			.S_VID_TREADY(M_VID_READY),
+		.S_VID_TDATA(M_VID_DATA),
+		.S_VID_TLAST(M_VID_LAST),
+		.S_VID_TUSER(M_VID_USER),
+		.i_width(fm_width), .i_height(fm_height),
+		.o_xpos(fm_xpos), .o_ypos(fm_ypos),
+		.f_known_height(fm_known),
+		.o_hlast(fm_hlast), .o_vlast(fm_vlast), .o_sof(fm_sof)
+		// }}}
+	);
+
+	always @(*)
+	if (S_AXI_ARESETN && M_VID_VALID)
+	begin
+		assert(M_VID_LAST == (fm_hlast && fm_vlast));
+		assert(M_VID_USER == fm_hlast);
+	end
+
+	always @(*)
+	if (S_AXI_ARESETN && adjust_select)
+	begin
+		if (M_VID_VALID)
+		begin
+			assert(M_VID_HLAST);
+			if (!OPT_TUSER_IS_SOF)
+				assert(M_VID_VLAST);
+		end else begin
+			assert(fm_xpos == 0);
+			assert(fm_ypos == 0);
+		end
+	end
+
+	always @(*)
+	if (S_AXI_ARESETN)
+		assert(r_framesel < NIN);
+
+	// }}}
+`endif
+// }}}
 endmodule
