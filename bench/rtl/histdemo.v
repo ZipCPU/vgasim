@@ -128,11 +128,6 @@ module	histdemo #(
 		//    sure zero inputs to the histogram produce zero
 		//    outputs here.)
 		s_val = tmp_val * 3;
-		//
-		// The signal is two's complement.  Let's convert it
-		// to offset binary, so that zero shows up in the
-		// middle of the histogram.
-		s_val[12] = !s_val[12];
 	end
 
 	// }}}
