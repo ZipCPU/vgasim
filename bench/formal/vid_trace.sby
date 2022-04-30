@@ -13,6 +13,7 @@ smtbmc
 [script]
 read -formal faxivideo.v
 read -formal vid_trace.v
+read -formal sfifo.v
 --pycode-begin--
 cmd = "hierarchy -top vid_trace"
 output(cmd)
@@ -22,3 +23,4 @@ prep -top vid_trace
 [files]
 faxivideo.v
 ../../rtl/gfx/vid_trace.v
+../../rtl/sfifo.v
