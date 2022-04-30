@@ -1,0 +1,26 @@
+[tasks]
+prf
+prfsof	prf opt_sof
+# cvr
+
+[options]
+prf: mode prove
+depth 12
+# cvr: mode cover
+
+[engines]
+smtbmc
+
+[script]
+read -formal vid_mux.v
+read -formal faxivideo.v
+--pycode-begin--
+cmd = "hierarchy -top vid_mux"
+cmd+= " -chparam OPT_TUSER_IS_SOF %d" % (1 if "opt_sof" in tags else 0)
+output(cmd)
+--pycode-end--
+prep -top vid_mux
+
+[files]
+faxivideo.v
+../../rtl/video/vid_mux.v

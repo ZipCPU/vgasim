@@ -202,7 +202,7 @@ module	vid_waterfall_w #(
 	end else if (S_AXI_TVALID && S_AXI_TREADY)
 	begin
 		pw_lastin <= !S_AXI_TLAST && (pw_pos >= i_width-2);
-		if (pix_last)
+		if (pix_last || S_AXI_TLAST)
 			pw_last <= 0;
 		else if (!pw_last)
 			pw_last <= pw_lastin;
@@ -312,10 +312,15 @@ module	vid_waterfall_w #(
 		if (o_wb_stb && !i_wb_stall)
 			o_wb_stb <= !last_request;
 
-		if (i_wb_ack && last_ack && !last_request)
+		if (i_wb_ack && last_ack && last_request)
 			o_wb_cyc <= 1'b0;
 	end else if (fifo_fill[LGBURST])
 		{ o_wb_cyc, o_wb_stb } <= 2'b11;
+`ifdef	FORMAL
+	always @(*)
+	if (wb_outstanding == 0 && !o_wb_stb)
+		assert(!o_wb_cyc);
+`endif
 	// }}}
 
 	assign	o_wb_data = staging_data;
@@ -419,6 +424,11 @@ module	vid_waterfall_w #(
 		end
 		// }}}
 	end
+`ifdef	FORMAL
+	always @(*)
+	if (o_wb_stb)
+		assert(hlast == (line_pos + 1 >= line_step));
+`endif
 
 	always @(posedge i_clk)
 		line_step <= (i_width*PW + DW-1) >> $clog2(DW);
@@ -497,11 +507,11 @@ module	vid_waterfall_w #(
 	always @(posedge i_clk)
 	if (!i_reset && S_AXI_TVALID)
 		assume(S_AXI_TLAST == (f_pktpos + 1 == f_pixwidth));
- 
+
 	always @(posedge i_clk)
 	if (!i_reset)
 		assert(f_pktpos < f_pixwidth);
- 
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//

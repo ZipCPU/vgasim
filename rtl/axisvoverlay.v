@@ -176,7 +176,7 @@ module	axisvoverlay #(
 
 	reg	in_overlay, frame_err, ovw_eof, ovw_eol;
 
-	reg	pix_loaded;
+	wire	pix_loaded;
 	wire	pix_ready;
 
 	wire	mpy_loaded, mpy_ready;
@@ -370,12 +370,12 @@ module	axisvoverlay #(
 		// }}}
 	end else begin : GEN_SOF
 		// {{{
-		reg		p_sof, ov_sof;
-		reg	[LGFRAME-1:0]	ovw_lines, vcount, ovcount;
+		reg			p_sof, ov_sof;
 
 		assign	pskd_vlast = pskd_tlast && pskd_tuser;
 		assign	pskd_hlast = pskd_tuser;
 		assign	pskd_sof   = p_sof;
+		assign	lines_per_frame = 0;	// A dummy value
 
 		// p_sof
 		// {{{
@@ -579,7 +579,7 @@ module	axisvoverlay #(
 			&& ({ 1'b0, i_vpos} + { 1'b0, ovvpos} == { 1'b0, prvpos});
 	4'b00?1: in_overlay <= ({ 1'b0, i_hpos } == { 1'b0, prhpos } + ((pskd_valid && pskd_ready) ? 1:0))
 				&& (i_vpos == prvpos);
-	4'b0010: in_overlay <= ({ 1'b0, i_hpos } == { 1'b0, prhpos } + (pskd_valid && pskd_ready))
+	4'b0010: in_overlay <= ({ 1'b0, i_hpos } == { 1'b0, prhpos } + ((pskd_valid && pskd_ready) ? 1:0))
 			&& ({ 1'b0, i_vpos } + { 1'b0, ovvpos } + 1 == { 1'b0, prvpos });
 	4'b1000: in_overlay <= ({ 1'b0, i_hpos } + { 1'b0, ovhpos }
 				+ ((ovskd_valid && ovskd_ready) ? 1:0) == 0)
@@ -627,7 +627,7 @@ module	axisvoverlay #(
 			if (prvpos >= i_vpos && !ovw_eof)
 				frame_err <= 1;
 		end
-	end else if (ovskd_valid && ovskd_ready && ovskd_vlast && ovskd_tlast)
+	end else if (ovskd_valid && ovskd_ready && ovskd_vlast && ovskd_hlast)
 	begin
 		frame_err <= 0;
 	end
@@ -804,17 +804,17 @@ module	axisvoverlay #(
 			&& (!pix_loaded || !mpy_loaded || !mix_valid
 					|| !M_VID_TVALID || M_VID_TREADY);
 		// {{{
-		reg	pix_hlast, pix_vlast, pix_sof;
+		reg	pix_hlast, pix_vlast, pix_sof, r_pix_loaded;
 		reg	r_mpy_loaded, mpy_hlast, mpy_vlast, mpy_sof;
 		reg	mix_loaded, r_mix_hlast, r_mix_vlast, r_mix_sof;
 
 		always @(posedge ACLK)
 		if (!ARESETN)
-			pix_loaded <= 0;
+			r_pix_loaded <= 0;
 		else if (pskd_valid && pskd_ready)
-			pix_loaded <= 1;
+			r_pix_loaded <= 1;
 		else if (pix_ready)
-			pix_loaded <= 0;
+			r_pix_loaded <= 0;
 
 		always @(posedge ACLK)
 		if (pskd_valid && pskd_ready)
@@ -859,6 +859,7 @@ module	axisvoverlay #(
 		end
 
 
+		assign	pix_loaded= r_pix_loaded;
 		assign	mix_hlast = r_mix_hlast;
 		assign	mix_vlast = r_mix_vlast;
 		assign	mix_sof   = r_mix_sof;
@@ -868,8 +869,9 @@ module	axisvoverlay #(
 	end endgenerate
 	// }}}
 	// }}}
-	assign	ovskd_ready = !ov_line_pause && ((!in_overlay && !ovw_eof)
-					|| (pskd_valid && pskd_ready));
+	assign	ovskd_ready = frame_err
+		|| !ov_line_pause && ((!in_overlay && !ovw_eof)
+					|| (in_overlay && pskd_valid && pskd_ready));
 
 	// M_VID_TVALID
 	// {{{
@@ -897,6 +899,11 @@ module	axisvoverlay #(
 		end
 	end
 	// }}}
+
+	// Verilator lint_off UNUSED
+	wire	unused;
+	assign	unused = &{ 1'b0, lines_per_frame };
+	// Verilator lint_on  UNUSED
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
