@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename:	bench/cpp/Makefile
-##
+## {{{
 ## Project:	vgasim, a Verilator based VGA simulator demonstration
 ##
 ## Purpose:	To direct the Verilator build of the VGA simulation sources.
@@ -27,9 +27,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2017-2022, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2017-2023, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -44,13 +44,14 @@
 ## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	GPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/gpl.html
 ##
 ################################################################################
 ##
-##
+## }}}
 .PHONY: all
 # Make certain the "all" target is the first and therefore the default target
 all:
@@ -70,14 +71,14 @@ VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD)
 VDEFS   := $(shell ./vversion.sh)
-FLAGS	:= -Wall -Og -g $(VDEFS)
+FLAGS	:= -Wall -Og -g $(VDEFS) -faligned-new
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
 CFLAGS  :=  $(GFXFLAGS)
 SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
-VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
+VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o $(OBJDIR)/verilated_threads.o
 all:	main_tb
 
 SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp
@@ -101,19 +102,19 @@ $(OBJDIR)/hdmi_tb.o: axi_tb.cpp
 	$(CXX) -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
 
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
-	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -lpthread -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
 main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 AXIOBJS := $(OBJDIR)/axi_tb.o
 axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 HDMIOBJS := $(OBJDIR)/hdmi_tb.o
 hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 .PHONY: clean
 clean:
