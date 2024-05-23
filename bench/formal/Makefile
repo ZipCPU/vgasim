@@ -41,7 +41,7 @@
 all:
 ## }}}
 GFX := vid_waterfall_r vid_waterfall_w vid_histogram vid_trace vid_empty
-TESTS := llvga axissprite axishdmi pix2stream atxfifo vidstream2pix $(GFX) # imgfifo
+TESTS := llvga axissprite axishdmi axisvoverlay pix2stream atxfifo vidstream2pix $(GFX) # imgfifo
 all: $(TESTS)
 
 ## Definitions
@@ -55,6 +55,7 @@ SPRITE	 := axissprite
 AXISHDMI := axishdmi
 PIX2STREAM := pix2stream
 VID2PIX  := vidstream2pix
+OVLAY    := axisvoverlay
 WFALLW   := vid_waterfall_w
 WFALLR   := vid_waterfall_r
 EMPTY    := vid_empty
@@ -102,6 +103,23 @@ $(SPRITE)_prfsofns/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivid
 	sby -f $(SPRITE).sby prfsofns
 $(SPRITE)_cvr/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
 	sby -f $(SPRITE).sby cvr
+## }}}
+
+.PHONY: $(OVLAY)
+## {{{
+$(OVLAY) : $(OVLAY)_prf/PASS   $(OVLAY)_prf_vlast/PASS
+$(OVLAY) : $(OVLAY)_prflb/PASS $(OVLAY)_prflb_vlast/PASS
+# $(OVLAY) : $(OVLAY)_cvr/PASS
+$(OVLAY)_prf/PASS: $(OVLAY).sby $(RTL)/$(OVLAY).v faxil_slave.v faxivideo.v
+	sbyx.pl $(OVLAY).sby prf
+$(OVLAY)_prf_vlast/PASS: $(OVLAY).sby $(RTL)/$(OVLAY).v faxil_slave.v faxivideo.v
+	sbyx.pl $(OVLAY).sby prf_vlast
+$(OVLAY)_prflb/PASS: $(OVLAY).sby $(RTL)/$(OVLAY).v faxil_slave.v faxivideo.v
+	sbyx.pl $(OVLAY).sby prflb
+$(OVLAY)_prflb_vlast/PASS: $(OVLAY).sby $(RTL)/$(OVLAY).v faxil_slave.v faxivideo.v
+	sbyx.pl $(OVLAY).sby prflb_vlast
+# $(SPRITE)_cvr/PASS: $(SPRITE).sby $(RTL)/axissprite.v faxil_slave.v faxivideo.v
+#	sby -f $(SPRITE).sby cvr
 ## }}}
 
 .PHONY: $(AXISHDMI)

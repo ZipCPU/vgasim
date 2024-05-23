@@ -30,7 +30,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2021-2022, Gisselquist Technology, LLC
+// Copyright (C) 2021-2024, Gisselquist Technology, LLC
 // {{{
 // This file is part of the WB2AXIP project.
 //
@@ -38,10 +38,10 @@
 // Apache License, Version 2.0 (the "License").  You may not use this project,
 // or this file, except in compliance with the License.  You may obtain a copy
 // of the License at
-//
+// }}}
 //	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
+// {{{
+// Unless required by applicable law or agreed to in writing, files
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
 // License for the specific language governing permissions and limitations
@@ -157,7 +157,7 @@ module	axisvoverlay #(
 
 	// Local declarations
 	// {{{
-	localparam [ALPHA_BITS:0]	OPAQUE = (1<<ALPHA_BITS),
+	localparam [ALPHA_BITS:0]	// OPAQUE = (1<<ALPHA_BITS),
 					TRANSPARENT = 0;
 
 	wire			pskd_tuser, pskd_tlast, pskd_ready, pskd_valid,
@@ -174,7 +174,7 @@ module	axisvoverlay #(
 	reg	[LGFRAME-1:0]	ovhpos, ovvpos;
 	wire	[LGFRAME-1:0]	lines_per_frame;
 
-	reg	in_overlay, frame_err, ovw_eof, ovw_eol;
+	reg	in_overlay, in_frame, frame_err, ovw_eof, ovw_eol;
 
 	wire	pix_loaded;
 	wire	pix_ready;
@@ -191,10 +191,11 @@ module	axisvoverlay #(
 	reg	[LGFRAME-1:0]	f_vid_hpos, f_vid_vpos;
 	reg	[LGFRAME-1:0]	f_pskd_hpos, f_pskd_vpos;
 	reg	[LGFRAME-1:0]	f_mix_hpos, f_mix_vpos;
-	reg		f_pri_known, f_ovw_known;
+	wire			f_pri_known, f_ovw_known;
+	wire	[LGFRAME-1:0]	f_ovw_lines_per_frame;
+	wire			f_mix_err;
 `endif
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Pixel skid buffers
@@ -247,7 +248,7 @@ module	axisvoverlay #(
 	generate if (OPT_TUSER_IS_SOF)
 	begin : GEN_VLAST
 		// {{{
-		reg	p_vlast, ov_vlast;
+		reg			p_vlast, ov_vlast;
 		reg	[LGFRAME-1:0]	ovw_lines, vcount, ovcount, r_lines;
 
 		assign	pskd_sof   = pskd_tuser;
@@ -303,39 +304,46 @@ module	axisvoverlay #(
 
 			if (ovskd_hlast)
 			begin
-				ovcount <= ovcount + 1;
-				ov_vlast <= (ovcount == ovw_lines -2);
+				ovcount  <=  ovcount + 1;
+				ov_vlast <= (ovcount + 2 == ovw_lines);
 			end
 		end
 		// }}}
 `ifdef	FORMAL
 		// {{{
-		always @(*)
-		begin
-			f_pri_known = (r_lines == f_vid_height);
-			f_ovw_known = (ovw_lines == f_ovw_height);
-		end
-
+		assign	f_ovw_lines_per_frame = ovw_lines;
 		always @(*)
 		if (ARESETN)
 		begin
 			assert((r_lines == 0) || (r_lines == f_vid_height));
+
+			if (f_pri_sof && (vcount != 0 || r_lines != 0))
+			begin
+				assert(vcount == f_vid_height);
+			end
+
+			// Primary tracking
+			if (r_lines == 0)
+			begin
+				assert(!p_vlast);
+				assert(!f_pri_known
+					|| (f_pri_sof && (vcount == f_vid_height)));
+			end else begin
+				assert(f_pri_known);
+				assert(r_lines == f_vid_height);
+				assert(p_vlast == (f_pri_vpos == f_vid_height-1));
+			end
+
 			if (vcount < f_vid_height)
 			begin
 				assert(f_pri_vpos == vcount);
-				if (r_lines == 0)
-				begin
-					assert(!p_vlast);
-					assert(!f_pri_known);
-				end else begin
-					assert(f_pri_known);
-					assert(p_vlast == (f_pri_vpos == f_vid_height-1));
-					assert(f_pskd_vpos != 0 || f_pskd_hpos != 0);
-				end
+				assert(prvpos == f_pri_vpos
+					|| (f_pri_sof && prvpos == f_vid_height));
 			end else begin
 				assert(vcount == f_vid_height);
 				assert(!p_vlast);
-				assert(f_pri_vpos == 0 && f_pri_hpos == 0);
+				assert(f_pri_sof);
+				assert(f_pri_known);
 			end
 		end
 
@@ -346,24 +354,41 @@ module	axisvoverlay #(
 				assert(ovw_lines == f_ovw_height);
 			assert((ovw_lines == 0) || (ovw_lines == f_ovw_height));
 			if (f_ovw_known)
-				assert(ov_vlast == (f_ovw_vpos == f_ovw_height-1));
-			if (ovcount < f_ovw_height)
 			begin
-				assert(f_ovw_vpos == ovcount);
-				if (ovw_lines == 0)
-				begin
-					assert(!f_ovw_known);
-					assert(!ov_vlast);
-				end else begin
-					assert(f_ovw_known);
-					assert(ov_vlast == (f_ovw_vpos == f_ovw_height-1));
-					assert(f_ovw_vpos != 0 || f_ovw_hpos != 0);
+				assert(ov_vlast == (f_ovw_vpos == f_ovw_height-1));
+				if (!f_ovw_sof)
+					assert(ovw_lines== f_ovw_height);
+				else begin
+					assert(ovcount == f_ovw_height);
+					assert(ovw_lines == 0
+						|| ovw_lines == f_ovw_height);
 				end
-			end else begin
-				assert(ovcount == f_ovw_height);
+			end else
 				assert(!ov_vlast);
-				assert(f_ovw_vpos == 0 && f_ovw_hpos == 0);
+
+			if (f_ovw_known && f_ovw_sof)
+				assert(ovcount == f_ovw_height);
+			if (f_ovw_vpos != ovcount)
+				assert(ovcount == f_ovw_height && f_ovw_sof
+						&& f_ovw_known);
+
+			if (ovw_lines == 0)
+			begin
+				assert(!f_ovw_known
+					||(f_ovw_sof && ovcount == f_ovw_height));
+				assert(!ov_vlast);
+			end else begin
+				assert(f_ovw_known);
+				assert(ovw_lines == f_ovw_height);
+				assert(ov_vlast == (f_ovw_vpos == f_ovw_height-1));
 			end
+
+			if (f_ovw_known && ovw_lines == f_ovw_height)
+			begin
+				assert(ovvpos  == f_ovw_vpos);
+				assert(ovw_eof == f_ovw_sof);
+			end else
+				assert(ovw_lines == 0);
 		end
 		// }}}
 `endif
@@ -399,16 +424,15 @@ module	axisvoverlay #(
 			ov_sof <= ovskd_tlast && ovskd_tuser;
 		// }}}
 `ifdef	FORMAL
+		assign	f_ovw_lines_per_frame = f_ovw_height;
 		always @(*)
+		if (ARESETN)
 		begin
-			f_pri_known = 1;
-			f_ovw_known = 1;
-
-			if (ARESETN)
-			begin
 			assert(pskd_sof == ((f_pri_hpos == 0) && (f_pri_vpos  == 0)));
 			assert(ovskd_sof == ((f_ovw_hpos == 0) && (f_ovw_vpos  == 0)));
-			end
+			assert(prvpos  == f_pskd_vpos);
+			assert((ovw_eof == f_ovw_sof) || !f_ovw_known);
+			assert(ovvpos  == f_ovw_vpos);
 		end
 `endif
 		// }}}
@@ -433,7 +457,7 @@ module	axisvoverlay #(
 		end else
 			prhpos <= prhpos + 1;
 
-		if (pskd_sof)
+		if (pskd_vlast || pskd_sof)
 			prvpos <= 0;
 	end
 `ifdef	FORMAL
@@ -441,14 +465,25 @@ module	axisvoverlay #(
 	if (ARESETN)
 	begin
 		assert(prhpos == f_pskd_hpos);
-		if (f_pri_known)
+		if (!f_pskd_sof)
 			assert(f_pskd_vpos == prvpos);
+		else if (f_pskd_known)
+		begin
+			if (lines_per_frame == 0)
+			begin
+				assert(!OPT_TUSER_IS_SOF
+					|| prvpos == f_vid_height);
+			end else
+				assert(prvpos == 0);
+		end
+
 		if (prvpos < f_vid_height)
 		begin
 			assert(prvpos == f_pskd_vpos);
 		end else if (prvpos != f_pskd_vpos)
 		begin
-			assert(!f_pri_known);
+			assert(!f_pri_known
+				|| (f_pri_sof && prvpos == f_vid_height));
 			assert(prvpos == f_vid_height);
 			assert(f_pskd_vpos == 0);
 			assert(prhpos == 0);
@@ -484,8 +519,7 @@ module	axisvoverlay #(
 	begin
 		assert(ovhpos == f_ovw_hpos);
 		assert(ovvpos == f_ovw_vpos
-			|| (ovvpos == f_ovw_height && f_ovw_hpos == 0
-				&& f_ovw_vpos == 0 && !f_ovw_known));
+			|| (ovvpos == f_ovw_height && f_ovw_sof && f_ovw_known));
 		if (ovskd_valid)
 			assert(ovskd_hlast == (f_ovw_hpos == f_ovw_width-1));
 	end
@@ -526,7 +560,7 @@ module	axisvoverlay #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Overlay flags
+	// Overlay flags: in_overlay, o_err, frame_err, ovw_eof, ovw_eol
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -537,7 +571,7 @@ module	axisvoverlay #(
 	always @(posedge ACLK)
 	if (!ARESETN)
 	begin
-		ovw_eof    <= 1;
+		ovw_eof    <= 0;
 		ovw_eol    <= 1;
 	end else if (ovskd_valid && ovskd_ready)
 	begin
@@ -549,9 +583,81 @@ module	axisvoverlay #(
 	if (ARESETN)
 	begin
 		assert(ovw_eol == (f_ovw_hpos == 0));
-		if (f_ovw_known)
-			assert(ovw_eof == (f_ovw_vpos == 0 && f_ovw_hpos == 0));
+		if (ovw_eof)
+			assert(ovw_eol && f_ovw_known);
+		//
+		// ovw_eof is checked in the big generate block above
+		// if (f_ovw_known)
+		//	assert(ovw_eof == f_ovw_sof);
 	end
+`endif
+	// }}}
+
+	// in_frame -- y-handling
+	// {{{
+	always @(posedge ACLK)
+	if (!ARESETN)
+		in_frame <= 0;
+	else begin
+		if (in_frame && ovskd_valid && ovskd_ready && ovskd_vlast
+			&& ((prvpos > i_vpos)
+				||(prvpos == i_vpos && prhpos > i_hpos)))
+			in_frame <= 0;
+
+		if (pskd_valid && pskd_ready)
+		begin
+			if (pskd_vlast)
+				in_frame <= (i_vpos == 0);
+			else if (pskd_hlast && !in_frame)
+				in_frame <= (i_vpos == prvpos + 1);
+		end
+	end
+`ifdef	FORMAL
+	// {{{
+	always @(posedge ACLK)
+	if (ARESETN && !frame_err)
+	begin
+		if (ovw_eof && f_pri_vpos != i_vpos)
+			assert(!in_frame || (i_hpos >= f_vid_width));
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN && !frame_err // && !w_frame_err
+		&& (f_pri_known && $past(f_pri_known))
+		&& (f_ovw_known && $past(f_ovw_known)
+				&& !f_ovw_sof && !$past(f_ovw_sof)
+				&& (lines_per_frame != 0)
+				&& $stable(lines_per_frame))
+			)
+	begin
+		if (in_overlay)
+			assert(in_frame);
+
+		if (f_pri_vpos < i_vpos)
+		begin
+			assert(!in_frame);
+		end else if (f_pri_vpos
+				>= { 1'b0, i_vpos } + { 1'b0, f_ovw_height })
+		begin
+			// Was ... if (f_sum_ypos != prvpos)
+			assert(!in_frame || f_offscreen
+				// It is possible that we passed the end of the
+				// primary line, but not (yet) the end of the
+				// overlay line.  In this case, we'd be on the
+				// last overline of the overlay frame, and we
+				// wouldn't have come across the EOL yet.
+				|| ((f_pri_vpos == { 1'b0, i_vpos }
+						+ { 1'b0, f_ovw_height })
+					&& !ovw_eol));
+		end else if ({ 1'b0, f_pri_vpos } + 1
+				== { 1'b0, i_vpos }+{ 1'b0, f_ovw_height })
+		begin
+			assert(in_frame != ovw_eof);
+		end else begin
+			assert(in_frame);
+		end
+	end
+	// }}}
 `endif
 	// }}}
 
@@ -560,52 +666,84 @@ module	axisvoverlay #(
 	always @(posedge ACLK)
 	if (!ARESETN)
 		in_overlay <= 0;
-	else if (OPT_LINE_BREAK)
+	else if (pskd_valid && pskd_ready)
 	begin
-		in_overlay <= ({ 1'b0, i_hpos} + { 1'b0, ovhpos}
-				+ ((ovskd_valid && ovskd_ready)? 1:0)
-				== { 1'b0, prhpos}
-					+ ((pskd_valid && pskd_ready)? 1:0))
-			&& ({ 1'b0, i_vpos} + { 1'b0, ovvpos}
-				== { 1'b0, prvpos});
-		if (ovskd_valid && ovskd_ready && ovskd_hlast)
-			in_overlay <= 1'b0;
-	end else casez( {(pskd_valid && pskd_ready && pskd_hlast),		// Primary, end of line
-			(pskd_valid && pskd_ready && pskd_vlast),	// Primary, end of frame
-			(ovskd_valid && ovskd_ready && ovskd_hlast),	// Overlay, end of line
-			(ovskd_valid && ovskd_ready && ovskd_vlast) })	// Overlay, end of frame
-	4'b0000: in_overlay <= ({ 1'b0, i_hpos} + { 1'b0, ovhpos} + ((ovskd_valid && ovskd_ready)? 1:0)
-					== { 1'b0, prhpos} + ((pskd_valid && pskd_ready)? 1:0))
-			&& ({ 1'b0, i_vpos} + { 1'b0, ovvpos} == { 1'b0, prvpos});
-	4'b00?1: in_overlay <= ({ 1'b0, i_hpos } == { 1'b0, prhpos } + ((pskd_valid && pskd_ready) ? 1:0))
-				&& (i_vpos == prvpos);
-	4'b0010: in_overlay <= ({ 1'b0, i_hpos } == { 1'b0, prhpos } + ((pskd_valid && pskd_ready) ? 1:0))
-			&& ({ 1'b0, i_vpos } + { 1'b0, ovvpos } + 1 == { 1'b0, prvpos });
-	4'b1000: in_overlay <= ({ 1'b0, i_hpos } + { 1'b0, ovhpos }
-				+ ((ovskd_valid && ovskd_ready) ? 1:0) == 0)
-			&& ({ 1'b0, i_vpos } + { 1'b0, ovvpos } == { 1'b0, prvpos } + 1);
-	4'b?100: in_overlay <= ({ 1'b0, i_hpos } + { 1'b0, ovhpos } + ((ovskd_valid && ovskd_ready) ? 1:0)
-				== 0) && (i_vpos == 0) && (ovvpos == 0);
-	4'b1010: in_overlay <= (i_hpos == 0)
-			&& ({ 1'b0, i_vpos } + { 1'b0, ovvpos } == { 1'b0, prvpos });
-	4'b?1?1: in_overlay <= (i_hpos == 0)&& (i_vpos == 0);
-	//
-	// 4'b?110: in_overlay <= 0;	// 6, e
-	// 4'b10?1: in_overlay <= 0;	// 9, b
-	default: in_overlay <= 1'b0;
-	endcase
+		if (pskd_vlast)
+			in_overlay <= (i_hpos == 0) && (i_vpos == 0);
+		else if (pskd_hlast)
+		begin
+			in_overlay <= 0;
+			if (in_frame && !ovw_eof)
+				in_overlay <= !(ovskd_valid && ovskd_vlast);
+			if (i_vpos == prvpos + 1)
+				in_overlay <= 1'b1;
+
+			if (i_hpos != 0)
+				in_overlay <= 0;
+		end else if ((ovskd_valid && ovskd_hlast) && in_overlay)
+			in_overlay <= 0;
+		else if (prhpos + 1 == i_hpos)
+			in_overlay <= in_frame && ((i_vpos == prvpos) || !(ovskd_valid && ovskd_vlast));
+	end
+
 `ifdef	FORMAL
 	// {{{
-	always @(posedge ACLK)
-	if (ARESETN && (!OPT_LINE_BREAK || pskd_ready))
+	(* keep *) reg	[LGFRAME:0]	f_sum_xpos, f_sum_ypos;
+	always @(*)
 	begin
-		if ({ 1'b0, i_hpos } + { 1'b0, f_ovw_hpos } != { 1'b0, f_pri_hpos })
-			assert(!in_overlay);	// !!!
-		else if (({ 1'b0, i_vpos } + { 1'b0, ovvpos } != prvpos)
-				&& (f_pri_known && $past(f_pri_known))
-				&& (f_ovw_known && $past(f_ovw_known))
-				) // && prhpos != 1 && ovhpos != 1)
+		f_sum_xpos = { 1'b0, i_hpos } + { 1'b0, f_ovw_hpos };
+		f_sum_ypos = { 1'b0, i_vpos } + { 1'b0, f_ovw_vpos };
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN && !frame_err)
+	begin
+		if (f_pri_hpos != i_hpos && ovw_eol)
 			assert(!in_overlay);
+
+		if (in_overlay && (f_pri_hpos != i_hpos || !w_frame_err))
+			assert(f_pri_hpos == f_sum_xpos);
+
+		if ((f_pri_hpos < i_hpos)
+				|| f_pri_hpos >= { 1'b0, i_hpos }
+						+ { 1'b0, f_ovw_width })
+		begin
+			assert(!in_overlay);
+		end else if (!in_frame && f_pri_vpos > i_vpos)
+		begin
+			assert(!in_overlay);
+		end else if (f_pri_vpos < i_vpos)
+		begin
+			assert(!in_overlay);
+		end
+
+		if (ovw_eof && (f_pri_vpos == i_vpos)
+				&& (f_pri_hpos > { 1'b0, i_hpos }))
+			assert(!in_frame);
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN && !frame_err && !w_frame_err)
+	begin
+		if (f_pri_hpos != i_hpos && ovw_eol)
+			assert(!in_overlay);
+
+		if ((f_pri_hpos < i_hpos)
+				|| f_pri_hpos >= { 1'b0, i_hpos }
+						+ { 1'b0, f_ovw_width })
+		begin
+			// Was ... if (f_sum_xpos != { 1'b0, f_pri_hpos })
+			assert(!in_overlay);
+		end else if (!in_frame && f_pri_vpos > i_vpos)
+		begin
+			assert(!in_overlay);
+		end else if (f_pri_vpos < i_vpos)
+		begin
+			assert(!in_overlay);
+		end else if (in_frame)
+		begin
+			assert(in_overlay);
+		end
 	end
 	// }}}
 `endif
@@ -613,26 +751,259 @@ module	axisvoverlay #(
 
 	// o_err, frame_err
 	// {{{
-	always @(posedge ACLK)
-	if (!ARESETN || !i_enable)
+	reg	w_frame_err;
+
+	always @(*)
 	begin
-		frame_err <= 0;
+		w_frame_err = 1'b0;
+		if (in_overlay)
+			w_frame_err = (!ovskd_valid || !ovskd_ready);
+		else begin
+			// if (prhpos >= i_hpos && !ovw_eol)
+			//	w_frame_err = 1;
+			// if (prvpos >= i_vpos && !ovw_eof)
+			//	w_frame_err = 1;
+		end
+
+		if (prhpos == i_hpos)
+		begin
+			if (!ovw_eol)
+				w_frame_err = 1;
+			if (prvpos == i_vpos && !ovw_eof)
+				w_frame_err = 1;
+		end
+	end
+
+	initial	frame_err = 1;
+	always @(posedge ACLK)
+	if (!ARESETN)
+	begin
+		frame_err <= 1;
 	end else if (!frame_err && pskd_valid && pskd_ready)
 	begin
-		if (in_overlay)
-			frame_err <= (!ovskd_valid || !ovskd_ready);
-		else begin
-			if (prhpos >= i_hpos && !ovw_eol)
-				frame_err <= 1;
-			if (prvpos >= i_vpos && !ovw_eof)
-				frame_err <= 1;
-		end
-	end else if (ovskd_valid && ovskd_ready && ovskd_vlast && ovskd_hlast)
+		frame_err <= w_frame_err;
+	end else if ((ovw_eof || (ovskd_valid && ovskd_ready && ovskd_vlast && ovskd_hlast))
+			&& ((pskd_valid && pskd_ready && pskd_vlast)))
 	begin
 		frame_err <= 0;
 	end
 
-	assign	o_err = frame_err;
+	assign	o_err = frame_err && i_enable;
+`ifdef	FORMAL
+			reg		f_ovw_recovering,
+					f_ovw_final_line,
+					f_offscreen;
+	(* keep *)	reg	[3:0]	f_region;
+
+	always @(*)
+	begin
+		f_ovw_final_line = 0;
+		if (((f_sum_ypos + 1 == f_vid_height)
+					|| (f_ovw_vpos + 1 == f_ovw_height))
+				&& (f_sum_xpos >= f_vid_width))
+			f_ovw_final_line = 1;
+
+		f_ovw_recovering = f_ovw_final_line;
+		if ({1'b0, f_ovw_vpos} + {1'b0, i_vpos} >= {1'b0, f_vid_height})
+			f_ovw_recovering = 1;
+
+		f_offscreen = (i_hpos >= f_vid_width);
+	end
+
+	always @(posedge ACLK)
+	begin
+		if (ARESETN && f_pri_known == 0) begin
+			assert(frame_err);
+		end
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN && $past(ARESETN))
+	begin
+		if (f_pri_hpos < i_hpos)
+		begin
+			// Left column
+			// {{{
+			assert(!in_overlay);
+
+			if (f_pri_vpos < i_vpos)
+			begin // #0: Top left corner
+				// {{{
+				f_region <= 0;
+				assert(!in_frame || frame_err);
+				assert(frame_err || ovw_eof || f_ovw_recovering || f_offscreen);
+				// }}}
+			end else if (f_pri_vpos < { 1'b0, i_vpos } + {1'b0, f_ovw_height})
+			begin // #4: Left of overlay area
+				// {{{
+				f_region <= 4;
+				if ((f_pri_vpos != { 1'b0, i_vpos } + {1'b0, f_ovw_height} - 1) || (f_pri_hpos != { 1'b0, i_hpos } + {1'b0, f_ovw_width} - 1)) begin
+					assert(frame_err || in_frame || f_offscreen);
+				end
+
+				if (in_frame && !frame_err && !f_offscreen)
+				begin
+					if (f_pri_vpos == i_vpos)
+					begin
+						assert(ovw_eof || f_ovw_recovering);
+					end else if (ovw_eol)
+					begin
+						assert(f_pri_vpos == f_sum_ypos);
+					end else if (ovw_eof)
+					begin
+						assert(f_pri_vpos == i_vpos);
+					end else if (f_pri_vpos == i_vpos)
+					begin
+						assert(f_ovw_recovering);
+					end else if (f_pri_vpos > i_vpos)
+					begin
+						assert(f_sum_ypos + 1 == f_pri_vpos);
+					end
+				end
+				// }}}
+			end else begin // #8: Below the overlay area
+				// {{{
+				f_region <= 8;
+				assert(frame_err || !in_frame
+					|| i_hpos >= f_vid_width
+					|| f_ovw_final_line);	// !!!
+				if (!frame_err && !w_frame_err)
+				begin
+					assert(ovw_eof || f_offscreen
+						|| (!ovw_eol && f_ovw_final_line));
+				end
+				// }}}
+			end
+			// }}}
+		end else if (f_pri_hpos < { 1'b0, i_hpos }+{ 1'b0, f_ovw_width})
+		begin
+			// Center column
+			// {{{
+			if (f_pri_vpos < i_vpos)
+			begin
+				assert(!in_frame || frame_err);
+
+				// #1: Top middle section
+				f_region <= 1;
+				assert(frame_err|| ovw_eof || f_ovw_recovering);
+			end else if (f_pri_vpos < { 1'b0, i_vpos } + {1'b0, f_ovw_height})
+			begin // #5: Valid middle section
+				// {{{
+				f_region <= 5;
+				if (!frame_err)
+				begin
+					assert(in_frame);
+					assert(in_overlay);
+					if (ovw_eof)
+					begin
+						assert(f_pri_vpos == i_vpos
+							&&f_pri_hpos == i_hpos);
+					end
+
+					if (ovw_eol)
+					begin
+						assert(f_pri_hpos == i_hpos);
+					end
+
+					if (f_sum_xpos != f_pri_hpos)
+					begin
+						assert(w_frame_err);
+						assert(f_pri_hpos == i_hpos
+							&& !ovw_eol);
+					end
+
+					if (f_sum_ypos != f_pri_vpos)
+					begin
+						assert(w_frame_err);
+						assert(!ovw_eol
+							|| (f_pri_vpos == i_vpos
+								&& f_ovw_recovering));
+					end
+				end
+				// }}}
+			end else begin
+				// #9: Bottom center section
+				f_region <= 9;
+				assert(frame_err || !in_frame
+					|| (!ovw_eol && f_ovw_final_line));
+				assert(frame_err || ovw_eof || f_offscreen
+					|| (!ovw_eol && f_ovw_final_line));
+			end
+			// }}}
+		end else begin
+			// Right column
+			// {{{
+			assert(frame_err || !in_overlay);
+
+			if (f_pri_vpos < i_vpos)
+			begin // #2: Top right corner
+				// {{{
+				f_region <= 2;
+				assert(!in_frame || frame_err);
+				assert(frame_err || ovw_eof || f_ovw_recovering);
+				// }}}
+			end else if (f_pri_vpos < { 1'b0, i_vpos } + {1'b0, f_ovw_height})
+			begin // #6: Right of overlay area
+				// {{{
+				f_region <= 6;
+				if (ovw_eol && !ovw_eof && !frame_err && !f_offscreen) begin
+					assert(f_pri_vpos + 1 == f_sum_ypos);
+				end
+				assert(frame_err || ovw_eol);
+				assert(frame_err || in_frame
+					|| (f_pri_vpos + 1 == { 1'b0, i_vpos } + { 1'b0, f_ovw_height }));
+				// }}}
+			end else begin // #10: Bottom right corner
+				// {{{
+				f_region <= 10;
+				assert(frame_err || ovw_eof || f_offscreen
+					|| (!ovw_eol && f_ovw_vpos + 1 == f_ovw_height
+						&& f_ovw_hpos + i_hpos >= f_vid_width));
+				assert(frame_err || !in_frame);
+				// }}}
+			end
+			// }}}
+		end
+	end else
+		f_region <= 12;
+
+	always @(posedge ACLK)
+	if (ARESETN && $past(ARESETN) && !ovw_eof)
+	begin
+		if (f_pri_vpos >= i_vpos
+				&& f_pri_vpos != f_sum_ypos)
+		begin
+			if (f_pri_hpos >= i_hpos
+				&& f_pri_hpos != f_sum_xpos)
+			begin
+				assert(ovw_eol || frame_err || w_frame_err);
+			end
+		end
+
+		/*
+		if (f_pri_vpos > i_vpos // && !ovw_eof
+			&& ((ovw_eol && f_pri_hpos <= i_hpos
+					&& f_pri_vpos != f_sum_ypos)
+				|| (!ovw_eol && f_pri_hpos <= i_hpos
+					&& f_pri_vpos != f_sum_ypos + 1)
+				|| (!ovw_eol && f_pri_hpos > i_hpos
+					&& f_pri_vpos != f_sum_ypos)
+				))
+			assert(frame_err || w_frame_err);
+		*/
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN)
+	begin
+		if (!f_pri_known || (OPT_TUSER_IS_SOF && lines_per_frame == 0))
+			assert(frame_err);
+		if (!f_ovw_known || f_ovw_lines_per_frame == 0)
+			assert(frame_err);
+		if (ovw_eof)
+			assert(f_ovw_lines_per_frame != 0);
+	end
+`endif
 	// }}}
 
 	// }}}
@@ -655,7 +1026,8 @@ module	axisvoverlay #(
 		if (pskd_valid && pskd_ready)
 		begin
 			r_mix_pixel <= pskd_data;
-			if (in_overlay && ovskd_valid && !frame_err)
+			if (in_overlay && ovskd_valid && !frame_err
+					&& i_enable)
 				r_mix_pixel <= ovskd_data;
 		end
 
@@ -670,7 +1042,7 @@ module	axisvoverlay #(
 		if (pskd_valid && pskd_ready)
 		begin
 			r_mix_pixel <= pskd_data;
-			if (in_overlay && ovskd_valid
+			if (in_overlay && ovskd_valid && i_enable
 					&& !frame_err && ovskd_data[DW])
 				r_mix_pixel <= ovskd_data[DW-1:0];
 		end
@@ -695,11 +1067,13 @@ module	axisvoverlay #(
 		begin
 			pri_pixel <= pskd_data;
 			ovw_pixel <= ovskd_data[DW-1:0];
+			// Verilator lint_off WIDTH
 			alpha     <= ovskd_data[ALPHA_BITS + DW-1 : DW]
 					+ ovskd_data[ALPHA_BITS + DW-1];
 			negalpha  <= (1<<ALPHA_BITS)
 					- ovskd_data[ALPHA_BITS + DW-1 : DW]
 					- ovskd_data[ALPHA_BITS + DW-1];
+			// Verilator lint_on  WIDTH
 			if (!ovskd_valid || frame_err || !in_overlay
 							|| !i_enable)
 			begin
@@ -712,36 +1086,44 @@ module	axisvoverlay #(
 		// mix_pixel
 		// {{{
 		for(clr=0; clr<COLORS; clr=clr+1)
-		begin
-			reg	[BPP + ALPHA_BITS -1:0] pclr, oclr, sclr;
+		begin : MIXCLR
+			// Verilator lint_off UNUSED
+			reg	[BPP + ALPHA_BITS:0] pclr, oclr, sclr;
+			wire	[BPP-1:0] pri_clr, ovw_clr;
+
+			assign	pri_clr = pri_pixel[clr * BPP +: BPP];
+			assign	ovw_clr = ovw_pixel[clr * BPP +: BPP];
+			// Verilator lint_on  UNUSED
 
 			always @(posedge ACLK)
 			if (pix_loaded && pix_ready)
-				pclr <= pri_pixel[clr * BPP +: BPP] * negalpha;
+				pclr <= pri_clr * alpha;
 
 			always @(posedge ACLK)
 			if (pix_loaded && pix_ready)
-				oclr <= ovw_pixel[clr * BPP +: BPP] * alpha;
+				oclr <= ovw_clr * negalpha;
 
 			always @(posedge ACLK)
 			if (mpy_loaded && mpy_ready)
-				sclr <= pclr[clr] + oclr[clr];
+				sclr <= pclr + oclr;
 
-			assign	mix_pixel[clr * BPP +: BPP] = sclr;
+			assign	mix_pixel[clr * BPP +: BPP] = sclr[ALPHA_BITS +: BPP];
 		end
 		// }}}
 		// }}}
 	end endgenerate
 	// }}}
 
-	// mix_hlast, mix_vlast, mix_sof
+	// mix_valid, mix_hlast, mix_vlast, mix_sof
 	// {{{
 	generate if (ALPHA_BITS <= 1)
 	begin : NO_ALPHA_PIPELINE
-		reg	r_mix_sof, r_mix_valid, r_mix_hlast, r_mix_vlast;
-
 		assign	pskd_ready = !pix_line_pause
 				&&(!mix_valid || !M_VID_TVALID || M_VID_TREADY);
+		// {{{
+		reg	r_mix_sof, r_mix_valid, r_mix_hlast, r_mix_vlast;
+
+		// r_mix_valid
 		// {{{
 		initial	r_mix_valid = 0;
 		always @(posedge ACLK)
@@ -751,7 +1133,10 @@ module	axisvoverlay #(
 			r_mix_valid <= 1'b1;
 		else if (mix_ready)
 			r_mix_valid <= 1'b0;
+		// }}}
 
+		// r_mix_[vh]last, r_mix_sof
+		// {{{
 		always @(posedge ACLK)
 		if (pskd_valid && pskd_ready)
 		begin
@@ -759,14 +1144,17 @@ module	axisvoverlay #(
 			r_mix_vlast <= pskd_vlast;
 			r_mix_sof   <= pskd_sof;
 		end
+		// }}}
 
+		// mix_*
+		// {{{
 		assign	mix_valid = r_mix_valid;
 		assign	mix_hlast = r_mix_hlast;
 		assign	mix_vlast = r_mix_vlast;
 		assign	mix_sof   = r_mix_sof;
+		// }}}
 
 		assign	mix_ready = !M_VID_TVALID || M_VID_TREADY;
-		// }}}
 
 		// Keep Verilator happy
 		// {{{
@@ -777,6 +1165,15 @@ module	axisvoverlay #(
 				pix_ready, mix_valid, mpy_ready, mix_ready };
 		// }}}
 `ifdef	FORMAL
+		// {{{
+		reg	r_mix_err;
+
+		always @(posedge ACLK)
+		if (pskd_valid && pskd_ready)
+			r_mix_err <= frame_err;
+
+		assign	f_mix_err = r_mix_err;
+
 		always @(*)
 		if (ARESETN)
 		begin
@@ -798,7 +1195,9 @@ module	axisvoverlay #(
 				assert(f_pskd_vpos == 0);
 			end
 		end
+		// }}}
 `endif
+		// }}}
 	end else begin : MATCH_ALPHA_PIPELINE
 		assign	pskd_ready = !pix_line_pause
 			&& (!pix_loaded || !mpy_loaded || !mix_valid
@@ -807,6 +1206,9 @@ module	axisvoverlay #(
 		reg	pix_hlast, pix_vlast, pix_sof, r_pix_loaded;
 		reg	r_mpy_loaded, mpy_hlast, mpy_vlast, mpy_sof;
 		reg	mix_loaded, r_mix_hlast, r_mix_vlast, r_mix_sof;
+
+		assign	pix_ready = !mpy_loaded || mpy_ready;
+		assign	mpy_ready = !mix_valid || mix_ready;
 
 		always @(posedge ACLK)
 		if (!ARESETN)
@@ -869,12 +1271,15 @@ module	axisvoverlay #(
 	end endgenerate
 	// }}}
 	// }}}
-	assign	ovskd_ready = frame_err
-		|| !ov_line_pause && ((!in_overlay && !ovw_eof)
-					|| (in_overlay && pskd_valid && pskd_ready));
+
+	assign	ovskd_ready = (frame_err && !ovw_eof)
+		|| !ov_line_pause && !frame_err && ((!in_overlay && !ovw_eol)
+				|| (in_overlay && pskd_valid && pskd_ready));
 
 	// M_VID_TVALID
 	// {{{
+	assign	mix_ready = !M_VID_TVALID || M_VID_TREADY;
+
 	initial	M_VID_TVALID = 0;
 	always @(posedge ACLK)
 	if (!ARESETN)
@@ -900,10 +1305,13 @@ module	axisvoverlay #(
 	end
 	// }}}
 
+	// Keep Verilator happy
+	// {{{
 	// Verilator lint_off UNUSED
 	wire	unused;
 	assign	unused = &{ 1'b0, lines_per_frame };
 	// Verilator lint_on  UNUSED
+	// }}}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -916,7 +1324,13 @@ module	axisvoverlay #(
 `ifdef	FORMAL
 	// Declarations
 	// {{{
-	reg	f_past_valid;
+	wire	f_pri_hlast,  f_pri_vlast,  f_pri_sof;
+	wire	f_ovw_hlast,  f_ovw_vlast,  f_ovw_sof;
+	wire	f_pskd_hlast, f_pskd_vlast, f_pskd_sof, f_pskd_known;
+	wire	f_mix_hlast,  f_mix_vlast,  f_mix_sof, f_mix_known;
+	wire	f_vid_hlast,  f_vid_vlast,  f_vid_sof, f_vid_known;
+	(* keep *) reg	f_past_valid, f_mix_frame_valid, f_ovw_frame_valid,
+			f_m_frame_valid;
 
 	initial	f_past_valid = 0;
 	always @(posedge ACLK)
@@ -925,6 +1339,25 @@ module	axisvoverlay #(
 	always @(*)
 	if (!f_past_valid)
 		assume(!ARESETN);
+
+	always @(posedge ACLK)
+	if (!ARESETN)
+		f_ovw_frame_valid <= 0;
+	else if (f_ovw_lines_per_frame == f_ovw_height)
+		f_ovw_frame_valid <= 1;
+
+	always @(posedge ACLK)
+	if (!ARESETN)
+		f_mix_frame_valid <= 0;
+	else if (pskd_valid && pskd_ready && lines_per_frame == f_vid_height)
+		f_mix_frame_valid <= 1;
+
+	always @(posedge ACLK)
+	if (!ARESETN)
+		f_m_frame_valid <= 0;
+	else if ((!M_VID_TVALID || M_VID_TREADY) && f_mix_frame_valid)
+		f_m_frame_valid <= 1;
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -980,13 +1413,13 @@ module	axisvoverlay #(
 	// {{{
 	always @(posedge ACLK)
 	if (!f_past_valid || $past(!ARESETN))
-		assume(!M_VID_TVALID);
+		assert(!M_VID_TVALID);
 	else if ($past(M_VID_TVALID && !M_VID_TREADY))
 	begin
-		assume(M_VID_TVALID);
-		assume($stable(M_VID_TDATA));
-		assume($stable(M_VID_TLAST));
-		assume($stable(M_VID_TUSER));
+		assert(M_VID_TVALID);
+		assert($stable(M_VID_TDATA));
+		assert($stable(M_VID_TLAST));
+		assert($stable(M_VID_TUSER));
 	end
 	// }}}
 	// }}}
@@ -997,68 +1430,89 @@ module	axisvoverlay #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
 	always @(*)
 	begin
 		assume(f_vid_width >= 4);
 		assume(f_vid_height>= 4);
 
-		assume(f_ovw_width >= 2);
-		assume(f_ovw_height>= 2);
+		assume(f_ovw_width >= 4);
+		assume(f_ovw_height>= 4);
 	end
 
 	// f_pri_?pos
 	// {{{
-	initial f_pri_hpos = 0;
-	initial f_pri_vpos = 0;
-	always @(posedge ACLK)
-	if (!ARESETN)
-	begin
-		f_pri_hpos <= 0;
-		f_pri_vpos <= 0;
-	end else if (S_PRI_TVALID && S_PRI_TREADY)
-	begin
-		f_pri_hpos <= f_pri_hpos + 1;
-		if (f_pri_hpos + 1 >= f_vid_width)
-		begin
-			f_pri_hpos <= 0;
-			f_pri_vpos <= f_pri_vpos + 1;
-			if (f_pri_vpos + 1 >= f_vid_height)
-				f_pri_vpos <= 0;
-		end
-	end
+	faxivideo #(
+		// {{{
+		.PW(DW), .LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fpri (
+		// {{{
+		.i_clk(ACLK), .i_reset_n(ARESETN),
+		.S_VID_TVALID(S_PRI_TVALID),
+		.S_VID_TREADY(S_PRI_TREADY),
+		.S_VID_TDATA( S_PRI_TDATA),
+		.S_VID_TLAST( S_PRI_TLAST),
+		.S_VID_TUSER( S_PRI_TUSER),
+		//
+		.i_width(f_vid_width), .i_height(f_vid_height),
+		.o_xpos(f_pri_hpos), .o_ypos(f_pri_vpos),
+			.f_known_height(f_pri_known),
+		.o_hlast(f_pri_hlast), .o_vlast(f_pri_vlast),
+			.o_sof(f_pri_sof),
+		// }}}
+	);
 
 	always @(*)
+	if (ARESETN && S_PRI_TVALID)
 	begin
-		assert(f_pri_hpos < f_vid_width);
-		assert(f_pri_vpos < f_vid_height);
+		if (OPT_TUSER_IS_SOF)
+		begin
+			assume(S_PRI_TLAST == f_pri_hlast);
+			assume(S_PRI_TUSER == f_pri_sof);
+		end else begin
+			assume(S_PRI_TLAST == (f_pri_vlast && f_pri_hlast));
+			assume(S_PRI_TUSER == f_pri_hlast);
+		end
 	end
 	// }}}
 
 	// f_ovw_?pos
 	// {{{
-	initial f_ovw_hpos = 0;
-	initial f_ovw_vpos = 0;
-	always @(posedge ACLK)
-	if (!ARESETN)
-	begin
-		f_ovw_hpos <= 0;
-		f_ovw_vpos <= 0;
-	end else if (S_OVW_TVALID && S_OVW_TREADY)
-	begin
-		f_ovw_hpos <= f_ovw_hpos + 1;
-		if (f_ovw_hpos + 1 >= f_ovw_width)
-		begin
-			f_ovw_hpos <= 0;
-			f_ovw_vpos <= f_ovw_vpos + 1;
-			if (f_ovw_vpos + 1 >= f_ovw_height)
-				f_ovw_vpos <= 0;
-		end
-	end
+	faxivideo #(
+		// {{{
+		.PW(DW), .LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fovw (
+		// {{{
+		.i_clk(ACLK), .i_reset_n(ARESETN),
+		.S_VID_TVALID(S_OVW_TVALID),
+		.S_VID_TREADY(S_OVW_TREADY),
+		.S_VID_TDATA( S_OVW_TDATA),
+		.S_VID_TLAST( S_OVW_TLAST),
+		.S_VID_TUSER( S_OVW_TUSER),
+		//
+		.i_width(f_ovw_width), .i_height(f_ovw_height),
+		.o_xpos(f_ovw_hpos), .o_ypos(f_ovw_vpos),
+			.f_known_height(f_ovw_known),
+		.o_hlast(f_ovw_hlast), .o_vlast(f_ovw_vlast),
+			.o_sof(f_ovw_sof),
+		// }}}
+	);
 
 	always @(*)
+	if (ARESETN && S_OVW_TVALID)
 	begin
-		assert(f_ovw_hpos < f_ovw_width);
-		assert(f_ovw_vpos < f_ovw_height);
+		if (OPT_TUSER_IS_SOF)
+		begin
+			assume(S_OVW_TLAST == f_ovw_hlast);
+			assume(S_OVW_TUSER == f_ovw_sof);
+		end else begin
+			assume(S_OVW_TLAST == (f_ovw_vlast && f_ovw_hlast));
+			assume(S_OVW_TUSER == f_ovw_hlast);
+		end
 	end
 	// }}}
 
@@ -1110,80 +1564,52 @@ module	axisvoverlay #(
 
 	// f_vid_?pos
 	// {{{
-	initial f_vid_hpos = 0;
-	initial f_vid_vpos = 0;
-	always @(posedge ACLK)
-	if (!ARESETN)
-	begin
-		f_vid_hpos <= 0;
-		f_vid_vpos <= 0;
-	end else if (M_VID_TVALID && M_VID_TREADY)
-	begin
-		f_vid_hpos <= f_vid_hpos + 1;
-		if (f_vid_hpos + 1 >= f_vid_width)
-		begin
-			f_vid_hpos <= 0;
-			f_vid_vpos <= f_vid_vpos + 1;
-			if (f_vid_vpos + 1 >= f_vid_height)
-				f_vid_vpos <= 0;
-		end
-	end
-
-	always @(*)
-	begin
-		assert(f_vid_hpos < f_vid_width);
-		assert(f_vid_vpos < f_vid_height);
-	end
-	// }}}
-
-	// M_VID_TLAST, M_VID_TUSER
-	// {{{
-	generate if (OPT_TUSER_IS_SOF)
-	begin : CHECK_OUTGOING_SOF
-		always @(*)
-		if (M_VID_TVALID)
-		begin
-			assert(M_VID_TLAST == (f_vid_hpos == f_vid_width-1));
-			assert(M_VID_TUSER == (f_vid_hpos == 0 && f_vid_vpos == 0));
-		end
-	end else begin : CHECK_OUTGOING_VLAST
-		always @(*)
-		if (M_VID_TVALID)
-		begin
-			assert(M_VID_TUSER == (f_vid_hpos == f_vid_width-1));
-			if (!M_VID_TUSER || f_vid_vpos < f_vid_height-1)
-				assert(!M_VID_TLAST);
-			else
-				assert(M_VID_TLAST == (f_vid_vpos == f_vid_height-1));
-		end
-	end endgenerate
+	faxivideo #(
+		// {{{
+		.PW(DW), .LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fvid (
+		// {{{
+		.i_clk(ACLK), .i_reset_n(ARESETN),
+		.S_VID_TVALID(M_VID_TVALID),
+		.S_VID_TREADY(M_VID_TREADY),
+		.S_VID_TDATA( M_VID_TDATA),
+		.S_VID_TLAST( M_VID_TLAST),
+		.S_VID_TUSER( M_VID_TUSER),
+		//
+		.i_width(f_vid_width), .i_height(f_vid_height),
+		.o_xpos(f_vid_hpos), .o_ypos(f_vid_vpos),
+			.f_known_height(f_vid_known),
+		.o_hlast(f_vid_hlast), .o_vlast(f_vid_vlast),
+			.o_sof(f_vid_sof),
+		// }}}
+	);
 	// }}}
 
 	// f_mix_?pos
 	// {{{
-	always @(posedge ACLK)
-	if (!ARESETN)
-	begin
-		f_mix_hpos <= 0;
-		f_mix_vpos <= 0;
-	end else if (mix_valid && mix_ready)
-	begin
-		f_mix_hpos <= f_mix_hpos + 1;
-		if (f_mix_hpos == f_vid_width - 1)
-		begin
-			f_mix_hpos <= 0;
-			f_mix_vpos <= f_mix_vpos + 1;
-			if (f_mix_vpos == f_vid_height-1)
-				f_mix_vpos <= 0;
-		end
-	end
-
-	always @(*)
-	if (ARESETN)
-	begin
-		assert(f_mix_hpos < f_vid_width);
-		assert(f_mix_vpos < f_vid_height);
-	end
+	faxivideo #(
+		// {{{
+		.PW(DW), .LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fmix (
+		// {{{
+		.i_clk(ACLK), .i_reset_n(ARESETN),
+		.S_VID_TVALID(mix_valid),
+		.S_VID_TREADY(mix_ready),
+		.S_VID_TDATA( mix_pixel),
+		.S_VID_TLAST( (OPT_TUSER_IS_SOF) ? mix_hlast : mix_vlast),
+		.S_VID_TUSER( (OPT_TUSER_IS_SOF) ? mix_sof   : mix_hlast),
+		//
+		.i_width(f_vid_width), .i_height(f_vid_height),
+		.o_xpos(f_mix_hpos), .o_ypos(f_mix_vpos),
+			.f_known_height(f_mix_known),
+		.o_hlast(f_mix_hlast), .o_vlast(f_mix_vlast),
+			.o_sof(f_mix_sof),
+		// }}}
+	);
 	// }}}
 
 	// f_mix_hlast, f_mix_sof, f_mix_vlast
@@ -1193,8 +1619,8 @@ module	axisvoverlay #(
 	begin
 		assert(mix_hlast == (f_mix_hpos == f_vid_width-1));
 		assert(mix_sof   == (f_mix_vpos == 0 && f_mix_hpos == 0));
-		if (mix_vlast || f_pri_known)
-			assert(mix_vlast == (mix_hlast && f_mix_vpos == f_vid_height-1));
+		if (mix_vlast || f_mix_known || f_pri_known)
+			assert(f_pri_sof || (mix_vlast == (mix_hlast && f_mix_vpos == f_vid_height-1)));
 	end
 	// }}}
 
@@ -1240,32 +1666,39 @@ module	axisvoverlay #(
 
 	// f_pskd_?pos
 	// {{{
-	initial f_pskd_hpos = 0;
-	initial f_pskd_vpos = 0;
-	always @(posedge ACLK)
-	if (!ARESETN)
-	begin
-		f_pskd_hpos <= 0;
-		f_pskd_vpos <= 0;
-	end else if (pskd_valid && pskd_ready)
-	begin
-		f_pskd_hpos <= f_pskd_hpos + 1;
-		if (f_pskd_hpos + 1 >= f_vid_width)
-		begin
-			f_pskd_hpos <= 0;
-			f_pskd_vpos <= f_pskd_vpos + 1;
-			if (f_pskd_vpos + 1 >= f_vid_height)
-				f_pskd_vpos <= 0;
-		end
-	end
+	faxivideo #(
+		// {{{
+		.PW(DW), .LGDIM(LGFRAME),
+		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF)
+		// }}}
+	) fpskd (
+		// {{{
+		.i_clk(ACLK), .i_reset_n(ARESETN),
+		.S_VID_TVALID(pskd_valid),
+		.S_VID_TREADY(pskd_ready),
+		.S_VID_TDATA( pskd_data),
+		.S_VID_TLAST( (OPT_TUSER_IS_SOF) ? pskd_hlast : pskd_vlast),
+		.S_VID_TUSER( (OPT_TUSER_IS_SOF) ? pskd_sof   : pskd_hlast),
+		//
+		.i_width(f_vid_width), .i_height(f_vid_height),
+		.o_xpos(f_pskd_hpos), .o_ypos(f_pskd_vpos),
+			.f_known_height(f_pskd_known),
+		.o_hlast(f_pskd_hlast), .o_vlast(f_pskd_vlast),
+			.o_sof(f_pskd_sof),
+		// }}}
+	);
 
 	always @(*)
-	if (ARESETN)
 	begin
-		assert(f_pskd_hpos < f_vid_width);
-		assert(f_pskd_vpos < f_vid_height);
+		assert(f_pskd_sof   == f_pri_sof);
+		assert(f_pskd_hpos  == f_pri_hpos);
+		assert(f_pskd_vpos  == f_pri_vpos);
+		assert(f_pskd_known == f_pri_known);
 	end
+	// }}}
 
+	// Relate f_pskd to f_pri (they are the same)
+	// {{{
 	always @(*)
 	if (ARESETN)
 	begin
@@ -1293,20 +1726,220 @@ module	axisvoverlay #(
 	generate if (OPT_TUSER_IS_SOF)
 	begin : CHECK_LINES_PER_FRAME
 		always @(posedge ACLK)
-		if (f_past_valid && $past(ARESETN)
-				&& $past(lines_per_frame == f_vid_height))
-			assert(lines_per_frame == f_vid_height);
+		if (f_past_valid && $past(ARESETN))
+		begin
+			if ($past(lines_per_frame == f_vid_height))
+				assert(lines_per_frame == f_vid_height);
+			if (lines_per_frame != 0)
+				assert(f_pri_known);
+		end
 	end endgenerate
+
+	always @(*)
+	if (ARESETN)
+	begin
+		if (!f_pri_known)
+		begin
+			assert(lines_per_frame == 0);
+		end else begin
+			assert(lines_per_frame == f_vid_height
+				|| lines_per_frame == 0);
+		end
+	end
 
 	always @(*)
 	if (pskd_valid)
 	begin
-		assert(pskd_hlast == (f_pskd_hpos == f_vid_width-1));
-		assert(pskd_sof   == (f_pskd_hpos == 0 && f_pskd_vpos == 0));
+		assert(pskd_hlast == f_pskd_hlast);
+		assert(pskd_sof   == f_pskd_sof);
 		if (lines_per_frame == f_vid_height)
-			assert(pskd_vlast == (pskd_hlast && f_pskd_vpos == f_vid_height-1));
+		begin
+			assert(f_pskd_known);
+			assert(pskd_vlast == (pskd_hlast && f_pskd_vlast));
+		end
 	end
 	// }}}
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Contract properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	(* anyconst *)	reg	fc_check;
+	(* anyconst *)	reg	[LGFRAME-1:0]	fc_pri_hpos, fc_pri_vpos;
+	(* anyconst *)	reg	[LGFRAME-1:0]	fc_ovw_hpos, fc_ovw_vpos;
+	(* anyconst *)	reg	[LGFRAME-1:0]	fc_off_hpos, fc_off_vpos;
+	(* anyconst *)	reg	[DW-1:0]	fc_pri_pixel;
+	(* anyconst *)	reg	[DW+ALPHA_BITS-1:0]	fc_ovw_pixel;
+	reg	f_vid_err;
+
+	always @(*)
+	begin
+		assume(fc_pri_hpos < f_vid_width);
+		assume(fc_pri_vpos < f_vid_height);
+
+		assume(fc_off_hpos < f_vid_width);
+		assume(fc_off_vpos < f_vid_height);
+
+		assume(fc_ovw_hpos < f_ovw_width);
+		assume(fc_ovw_vpos < f_ovw_height);
+
+	end
+
+	always @(posedge ACLK)
+	if (!ARESETN)
+		f_vid_err <= 0;
+	else if (!M_VID_TVALID || M_VID_TREADY)
+		f_vid_err <= f_mix_err;
+
+	always @(*)
+	if (fc_check && ARESETN)
+	begin
+		if (S_PRI_TVALID && f_pri_hpos == fc_pri_hpos
+				&&  f_pri_vpos == fc_pri_vpos)
+			assume(S_PRI_TDATA == fc_pri_pixel);
+		if (S_OVW_TVALID && f_ovw_hpos == fc_ovw_hpos
+				&&  f_ovw_vpos == fc_ovw_vpos)
+			assume(S_OVW_TDATA == fc_ovw_pixel);
+
+		assume(fc_off_hpos == i_hpos);
+		assume(fc_off_vpos == i_vpos);
+
+		assume({ 1'b0, fc_pri_hpos } == { 1'b0, i_hpos } + { 1'b0, fc_ovw_hpos });
+		assume({ 1'b0, fc_pri_vpos } == { 1'b0, i_vpos } + { 1'b0, fc_ovw_vpos });
+	end
+
+	always @(posedge ACLK)
+	if (ARESETN && fc_check)
+		assume(!$rose(frame_err));
+
+	always @(posedge ACLK)
+	if (ARESETN && fc_check && !frame_err)
+	begin
+		if (f_pri_known && $stable(f_pri_known)
+			&& f_ovw_known && $stable(f_ovw_known)
+				&& f_ovw_lines_per_frame == f_ovw_height
+			&& (lines_per_frame > 0)
+			&& $stable(lines_per_frame))
+		begin
+			if (f_pri_hpos >= i_hpos && f_pri_vpos >= i_vpos
+				&& f_pri_hpos < { 1'b0, i_hpos } + { 1'b0, f_ovw_width }
+				&& f_pri_vpos < { 1'b0, i_vpos } + { 1'b0, f_ovw_height })
+			begin
+				assert(in_overlay);
+				// {{{
+				// assert({ 1'b0, f_pri_hpos } == { 1'b0, f_ovw_hpos } + { 1'b0, i_hpos });
+				// assert({ 1'b0, f_pri_vpos } == { 1'b0, f_ovw_vpos } + { 1'b0, i_vpos });
+				// }}}
+			end else begin
+				assert(!in_overlay || (f_ovw_vlast && f_pri_hpos == i_hpos && f_ovw_recovering));
+				// {{{
+				if (ovw_eof)
+				begin
+					// {{{
+					assert(
+						// Before/waiting 4 the frame
+						(f_pri_vpos < i_vpos
+							|| (f_pri_vpos == i_vpos && f_pri_hpos < i_hpos))
+						// or afterwards on the same line
+						||(f_pri_hpos >= { 1'b0, i_hpos } + { 1'b0, f_ovw_width }
+							&& { 1'b0, f_pri_vpos } == { 1'b0, i_vpos } + { 1'b0, f_ovw_height } - 1)
+						// or on following lines
+						||({ 1'b0, f_pri_vpos } >= { 1'b0, i_vpos } + { 1'b0, f_ovw_height }));
+					// }}}
+				end else if (ovw_eol
+					&& f_pri_vpos >= i_vpos
+					&& f_pri_vpos < { 1'b0, i_vpos } + { 1'b0, f_ovw_height })
+				begin
+					if (f_pri_hpos < i_hpos)
+					begin
+						assert(f_ovw_recovering || ({ 1'b0, f_pri_vpos } == { 1'b0, f_ovw_vpos } + { 1'b0, i_vpos }));
+					end else 
+						assert({ 1'b0, f_pri_vpos } == { 1'b0, f_ovw_vpos } + { 1'b0, i_vpos } - 1);
+				end else if (f_pri_vpos >= i_vpos
+					&& f_pri_vpos < { 1'b0, i_vpos } + { 1'b0, f_ovw_height })
+				begin
+					if (f_pri_hpos <= i_hpos)
+					begin
+						assert(f_ovw_recovering || ({ 1'b0, f_pri_vpos }
+							== { 1'b0, f_ovw_vpos }
+						 	+ { 1'b0, i_vpos } + 1));
+					end else
+						assert({ 1'b0, f_pri_vpos }
+							== { 1'b0, f_ovw_vpos }
+						 	+ { 1'b0, i_vpos });
+				end // else assert(ovw_eof);
+				// }}}
+			end
+		end
+	end
+
+	generate if (ALPHA_BITS == 0)
+	begin : GEN_CONTRACT_A0
+		// {{{
+		always @(posedge ACLK)
+		if (ARESETN && fc_check && mix_valid
+			&& (f_mix_hpos == fc_pri_hpos
+				&& f_mix_vpos == fc_pri_vpos))
+		begin
+			if (i_enable && !f_mix_err)
+			begin
+				assert(mix_pixel == fc_ovw_pixel);
+			end else begin
+				assert(mix_pixel == fc_pri_pixel);
+			end
+		end
+
+		always @(posedge ACLK)
+		if (ARESETN && fc_check && M_VID_TVALID)
+		begin
+			if (f_vid_hpos == fc_pri_hpos
+					&& f_vid_vpos == fc_pri_vpos)
+			begin
+				if (i_enable && !f_vid_err)
+				begin
+					assert(M_VID_TDATA == fc_ovw_pixel);
+				end else begin
+					assert(M_VID_TDATA == fc_pri_pixel);
+				end
+			end
+		end
+		// }}}
+	end else if (ALPHA_BITS == 1)
+	begin : GEN_CONTRACT_A1
+		// {{{
+		always @(posedge ACLK)
+		if (ARESETN && fc_check && mix_valid
+			&& (f_mix_hpos == fc_pri_hpos
+				&& f_mix_vpos == fc_pri_vpos))
+		begin
+			if (fc_ovw_pixel[DW] && i_enable && !f_mix_err)
+			begin
+				assert(mix_pixel == fc_ovw_pixel[DW-1:0]);
+			end else begin
+				assert(mix_pixel == fc_pri_pixel[DW-1:0]);
+			end
+		end
+
+		always @(posedge ACLK)
+		if (ARESETN && fc_check && M_VID_TVALID)
+		begin
+			if (f_vid_hpos == fc_pri_hpos
+				&& f_vid_vpos == fc_pri_vpos)
+			begin
+				if (fc_ovw_pixel[DW] && i_enable && !f_vid_err)
+				begin
+					assert(M_VID_TDATA == fc_ovw_pixel[DW-1:0]);
+				end else begin
+					assert(M_VID_TDATA == fc_pri_pixel[DW-1:0]);
+				end
+			end
+		end
+		// }}}
+	end endgenerate
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -1318,7 +1951,7 @@ module	axisvoverlay #(
 	//
 
 	always @(posedge ACLK)
-	if (ARESETN && (!OPT_LINE_BREAK || pskd_ready))
+	if (ARESETN && (!OPT_LINE_BREAK || !pix_line_pause))
 	begin
 		if (f_pskd_hpos < i_hpos)
 		begin
@@ -1326,19 +1959,121 @@ module	axisvoverlay #(
 		end else if (f_pskd_vpos < i_vpos
 				&& f_pskd_vpos == prvpos
 				&& f_ovw_vpos == ovvpos
-				&& f_pskd_hpos != 1)
-			assert(!in_overlay);
+				&& f_pskd_hpos != 1 && f_pri_known)
+			assert(frame_err || !in_overlay);
+
+		if (!frame_err && !ovw_eof && in_frame && lines_per_frame > 0)
+		begin
+			if (ovw_eol && f_pri_hpos > i_hpos)
+			begin
+				assert(f_sum_ypos == f_pskd_vpos + 1);
+			/*
+			end else if (ovw_eol && f_pri_hpos <= i_hpos)
+			begin
+				assert(f_sum_ypos == f_pskd_vpos
+					|| (f_ovw_vpos == 0
+						&& f_ovw_hpos == 0
+						&& f_ovw_lines_per_frame == 0
+						&& (f_sum_ypos == { 1'b0, i_vpos } + { 1'b0, f_ovw_height })
+						&& OPT_TUSER_IS_SOF));
+			end
+			else if (f_pri_hpos <= i_hpos)
+			begin
+				assert(f_sum_ypos + 1 == f_pskd_vpos);
+			end else begin // if (!ovw_eol && f_pri_hpos > i_hpos)
+				assert(f_sum_ypos == f_pskd_vpos
+					|| f_sum_ypos >= f_vid_height);
+			*/
+			end
+		end
 
 		if (!frame_err && !ovw_eof && in_overlay
 			&& lines_per_frame > 0)
 		begin
-			assert(i_hpos + f_ovw_hpos == f_pskd_hpos);
-			if (f_ovw_vpos == ovvpos && f_pskd_vpos == prvpos
-				&& f_pskd_hpos > 1
-				&& ovhpos > 1)
-				assert(i_vpos + f_ovw_vpos == f_pskd_vpos);
+			assert(w_frame_err || (i_hpos + f_ovw_hpos == f_pskd_hpos));
 		end
 	end
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Cover properties
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	reg	[2:0]	cvr_pframes, cvr_oframes;
+
+	initial	cvr_pframes = 0;
+	always @(posedge ACLK)
+	if (!ARESETN)
+		cvr_pframes <= 0;
+	else if (pskd_valid && pskd_ready && pskd_vlast && !cvr_pframes[2])
+		cvr_pframes <= cvr_pframes + 1;
+
+	initial	cvr_oframes = 0;
+	always @(posedge ACLK)
+	if (!ARESETN)
+		cvr_oframes <= 0;
+	else if (ovskd_valid && ovskd_ready && ovskd_vlast && !cvr_oframes[2])
+		cvr_oframes <= cvr_oframes + 1;
+
+	always @(posedge ACLK)
+	if (ARESETN)
+	begin
+		cover(cvr_pframes == 1);
+		cover(cvr_oframes == 1);
+
+		cover(cvr_pframes == 2);
+		cover(cvr_oframes == 2);
+	end
+
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// "Careless" assumptions
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+
+	always @(posedge ACLK)
+	if ((1||fc_check) && ARESETN && $past(ARESETN && !S_PRI_TVALID)
+			&& $past(ARESETN && !S_PRI_TVALID, 2)
+			&& $past(ARESETN && !S_PRI_TVALID, 3))
+	begin
+		assume(S_PRI_TVALID);
+	end
+
+	always @(*)
+	if (fc_check)
+		assume(M_VID_TREADY);
+
+	always @(posedge ACLK)
+	if ((1||fc_check) && ARESETN && $past(ARESETN && !M_VID_TREADY)
+			&& $past(ARESETN && !M_VID_TREADY, 2)
+			&& $past(ARESETN && !M_VID_TREADY, 3))
+	begin
+		assume(M_VID_TREADY);
+	end
+
+	// always @(*)
+		// assume(i_vpos == 0);
+
+	// always @(*)
+	// if (!S_PRI_TVALID)
+	// begin
+	// 	assume(!S_PRI_TUSER);
+	// 	assume(!S_PRI_TLAST);
+	// end
+
+	// always @(*)
+	// if (!S_OVW_TVALID)
+	// begin
+	// 	assume(!S_OVW_TUSER);
+	// 	assume(!S_OVW_TLAST);
+	// end
+
 	// }}}
 `endif
 // }}}

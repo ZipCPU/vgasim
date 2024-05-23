@@ -15,6 +15,7 @@ pix2stream_*/
 vidstream2pix_*/
 vid_empty_*/
 vid_histogram_*/
+vid_tile_*/
 vid_trace_*/
 vid_waterfall_r_*/
 vid_waterfall_w_*/

@@ -7,7 +7,8 @@ prflb_vlast prf opt_vlast opt_linebreak
 
 [options]
 prf: mode prove
-prf: depth 3
+prf: depth 6
+prf: depth 20
 # cvr: mode cover
 # cvr: depth 80
 
@@ -17,14 +18,17 @@ smtbmc
 [script]
 read_verilog -formal skidbuffer.v
 read_verilog -formal axisvoverlay.v
+read_verilog -formal faxivideo.v
 --pycode-begin--
 cmd = "hierarchy -top axisvoverlay"
 cmd += " -chparam OPT_TUSER_IS_SOF %d" % (0 if "opt_vlast" in tags else 1)
 cmd += " -chparam OPT_LINE_BREAK %d" % (1 if "opt_linebreak" in tags else 0)
 output(cmd)
 --pycode-end--
+proc -norom
 prep -top axisvoverlay
 
 [files]
+faxivideo.v
 ../../rtl/skidbuffer.v
 ../../rtl/axisvoverlay.v
