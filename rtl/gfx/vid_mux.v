@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_mux.v
+// Filename:	rtl/gfx/vid_mux.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -81,10 +81,10 @@ module	vid_mux #(
 
 	// r_framesel
 	// {{{
-	initial	r_framesel = ({ 1'b0, DEF_SELECT } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
+	initial	r_framesel = ({ 1'b0, DEF_SELECT[LGNIN-1:0] } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		r_framesel <= ({ 1'b0, DEF_SELECT } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
+		r_framesel <= ({ 1'b0, DEF_SELECT[LGNIN-1:0] } < NIN[LGNIN:0]) ? DEF_SELECT : 0;
 	else if (adjust_select && { 1'b0, i_select } < NIN[LGNIN:0])
 		r_framesel <= i_select;
 	// }}}
@@ -142,9 +142,9 @@ module	vid_mux #(
 	// S_VID_HLAST, S_VID_SOF, S_VID_READY
 	// {{{
 	generate for(gk=0; gk<NIN; gk=gk+1)
-	begin
+	begin : GEN_PER_INPUT
 		if (OPT_TUSER_IS_SOF)
-		begin
+		begin : GEN_SOF
 			// {{{
 			reg	[LGDIM-1:0]	height, vpos;
 			reg			vlast;
@@ -172,7 +172,7 @@ module	vid_mux #(
 				vlast <= S_VID_HLAST[gk]&& (height == vpos + 1);
 			assign	S_VID_VLAST[gk] = vlast;
 			// }}}
-		end else begin
+		end else begin : GEN_VLAST
 			// {{{
 			reg	sof;
 
@@ -212,7 +212,7 @@ module	vid_mux #(
 	// Keep Verilator happy
 	// {{{
 	// Verilator lint_off UNUSED
-	wire	unused;;
+	wire	unused;
 	assign	unused = &{ 1'b0, M_VID_HLAST, M_VID_VLAST };
 	// Verilator lint_on  UNUSED
 	// }}}

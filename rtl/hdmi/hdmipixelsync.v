@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	hdmipixelsync.v
+// Filename:	rtl/hdmi/hdmipixelsync.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -29,13 +29,12 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
-//
 //
 `default_nettype	none
 // }}}
@@ -70,25 +69,32 @@ module	hdmipixelsync (
 	// Test all possible synchronizations for a match
 	// {{{
 	generate for(gk=0; gk<10; gk=gk+1)
-	begin
+	begin : CHECK_SYNC_OPTIONS
 		reg		control_word;
-		reg	[5:0]	control_matches;
+		reg	[4:0]	control_matches;
+		wire	[9:0]	check_word;
+
+		assign	check_word = pre_match_win[gk +: 10];
 
 		always @(posedge i_clk)
 		begin
+			// Look for a control word
+			//	(Bit reversed)	(User guide)
+			//	0010101011	1101010100
+			//	1101010100	0101010100
+			//	1101010101	1010101011
+			//
 			control_word <= 1'b0;
-			if((pre_match_win[gk+9:gk]== 10'h0ab) // 354
-				    ||(pre_match_win[gk+9:gk]==10'h354) //0ab
-				    ||(pre_match_win[gk+9:gk]==10'h0aa) //154
-				    ||(pre_match_win[gk+9:gk]==10'h355))//2ab
+			if((check_word== 10'h0ab) // 354
+				    ||(check_word ==10'h354) //0ab
+				    ||(check_word ==10'h0aa) //154
+				    ||(check_word ==10'h355))//2ab
 				control_word <= 1'b1;
 
-			if (control_word)
-			begin
-				if (!control_matches[5])
-					control_matches <= control_matches + 1;
-			end else
+			if (!control_word)
 				control_matches <= 0;
+			else if (!control_matches[4])
+				control_matches <= control_matches + 1;
 
 			sync[gk] <= (control_matches >= 12);
 		end
@@ -106,7 +112,7 @@ module	hdmipixelsync (
 	end
 	// }}}
 
-	// valid_match, match_log
+	// valid_match, match_loc
 	// {{{
 	always @(posedge i_clk)
 	begin

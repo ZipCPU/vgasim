@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vidstream2pix.v
+// Filename:	rtl/vidstream2pix.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -25,10 +25,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -41,10 +41,10 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -144,12 +144,12 @@ module	vidstream2pix #(
 	// integer			k;
 
 	generate if (OPT_TUSER_IS_SOF)
-	begin
+	begin : GEN_STUSER_SOF
 		always @(*)
 			S_AXIS_HLAST = S_AXIS_TLAST;
 		always @(*)
 			S_AXIS_FRAME = S_AXIS_TUSER;
-	end else begin
+	end else begin : GEN_STUSER_HLAST
 		always @(*)
 			S_AXIS_HLAST = S_AXIS_TUSER;
 		always @(*)
@@ -502,7 +502,7 @@ module	vidstream2pix #(
 	begin
 		pix_hlast <= 1;
 		pix_count <= 0;
-	end else if (!M_AXIS_TVALID || M_AXIS_TREADY)
+	end else if ((!M_AXIS_TVALID || M_AXIS_TREADY) && c_valid)
 	begin
 		if (!c_hlast)
 		begin
@@ -529,13 +529,13 @@ module	vidstream2pix #(
 	assign	M_AXIS_TDATA  = pix_data;
 
 	generate if (OPT_TUSER_IS_SOF)
-	begin
+	begin : GEN_MTUSER_SOF
 		always @(*)
 		begin
 			M_AXIS_TLAST  = pix_hlast;	// HLAST
 			M_AXIS_TUSER  = pix_frame;	// SOF
 		end
-	end else begin
+	end else begin : GEN_MTUSER_HLAST
 		always @(*)
 		begin
 			M_AXIS_TLAST  = pix_frame;	// VLAST

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_histogram.v
+// Filename:	rtl/gfx/vid_histogram.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -20,7 +20,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -398,7 +398,7 @@ module	vid_histogram #(
 	wire	m_vid_sof;
 `endif
 	generate if (OPT_TUSER_IS_SOF)
-	begin : GEN_SOF
+	begin : GEN_M_SOF
 		reg	M_VID_SOF;
 
 		always @(posedge S_AXI_ACLK)
@@ -412,7 +412,7 @@ module	vid_histogram #(
 `ifdef	FORMAL
 		assign	m_vid_sof = M_VID_SOF;
 `endif
-	end else begin
+	end else begin : GEN_M_VLAST
 		assign	M_VID_USER = M_VID_HLAST;
 		assign	M_VID_LAST = M_VID_VLAST;
 `ifdef	FORMAL

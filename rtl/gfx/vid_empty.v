@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_empty.v
+// Filename:	rtl/gfx/vid_empty.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2021-2022, Gisselquist Technology, LLC
+// Copyright (C) 2021-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -105,7 +105,7 @@ module	vid_empty #(
 	// }}}
 
 	generate if (OPT_TUSER_IS_SOF)
-	begin
+	begin : GEN_SOF
 		reg	sof;
 
 		always @(posedge i_clk)
@@ -121,7 +121,7 @@ module	vid_empty #(
 		if (!i_reset)
 			assert(sof == (xpos == 0 && ypos == 0));
 `endif
-	end else begin
+	end else begin : GEN_VLAST
 		assign	M_VID_LAST = vlast & hlast;
 		assign	M_VID_USER = hlast;
 	end endgenerate
