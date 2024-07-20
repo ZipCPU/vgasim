@@ -1,8 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axisvoverlay.v
+// Filename:	rtl/axisvoverlay.v
 // {{{
-// Project:	WB2AXIPSP: bus bridges and other odds and ends
+// Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Overlay a second video stream on top of a first one, producing
 //		an outgoing video stream.
@@ -32,20 +32,24 @@
 // }}}
 // Copyright (C) 2021-2024, Gisselquist Technology, LLC
 // {{{
-// This file is part of the WB2AXIP project.
+// This program is free software (firmware): you can redistribute it and/or
+// modify it under the terms of the GNU General Public License as published
+// by the Free Software Foundation, either version 3 of the License, or (at
+// your option) any later version.
 //
-// The WB2AXIP project contains free software and gateware, licensed under the
-// Apache License, Version 2.0 (the "License").  You may not use this project,
-// or this file, except in compliance with the License.  You may obtain a copy
-// of the License at
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTIBILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+// for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+// target there if the PDF file isn't present.)  If not, see
+// <http://www.gnu.org/licenses/> for a copy.
 // }}}
-//	http://www.apache.org/licenses/LICENSE-2.0
+// License:	GPL, v3, as defined and found on www.gnu.org,
 // {{{
-// Unless required by applicable law or agreed to in writing, files
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-// License for the specific language governing permissions and limitations
-// under the License.
+//		http://www.gnu.org/licenses/gpl.html
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -1088,26 +1092,44 @@ module	axisvoverlay #(
 		for(clr=0; clr<COLORS; clr=clr+1)
 		begin : MIXCLR
 			// Verilator lint_off UNUSED
-			reg	[BPP + ALPHA_BITS:0] pclr, oclr, sclr;
+			reg	[BPP + ALPHA_BITS:0] pclr, oclr;
+			wire	[BPP + ALPHA_BITS:0] sum_clr;
 			wire	[BPP-1:0] pri_clr, ovw_clr;
+			reg	[BPP-1:0] bypass_clr, sclr;
 
 			assign	pri_clr = pri_pixel[clr * BPP +: BPP];
 			assign	ovw_clr = ovw_pixel[clr * BPP +: BPP];
 			// Verilator lint_on  UNUSED
 
 			always @(posedge ACLK)
-			if (pix_loaded && pix_ready)
+			if (pix_loaded && pix_ready && !i_enable)
+				bypass_clr <= pri_clr;
+
+			always @(posedge ACLK)
+			if (pix_loaded && pix_ready && i_enable)
 				pclr <= pri_clr * alpha;
 
 			always @(posedge ACLK)
-			if (pix_loaded && pix_ready)
+			if (pix_loaded && pix_ready && i_enable)
 				oclr <= ovw_clr * negalpha;
+
+			assign	sum_clr = pclr + oclr;
 
 			always @(posedge ACLK)
 			if (mpy_loaded && mpy_ready)
-				sclr <= pclr + oclr;
+			begin
+				if (!i_enable)
+					// Skip
+					sclr <= bypass_clr;
+				else if (sum_clr[ALPHA_BITS + BPP])
+					// Overflow
+					sclr <= -1;
+				else
+					// Color is valid
+					sclr <= sum_clr[ALPHA_BITS +: BPP];
+			end
 
-			assign	mix_pixel[clr * BPP +: BPP] = sclr[ALPHA_BITS +: BPP];
+			assign	mix_pixel[clr * BPP +: BPP] = sclr;
 		end
 		// }}}
 		// }}}
@@ -1866,11 +1888,11 @@ module	axisvoverlay #(
 					begin
 						assert(f_ovw_recovering || ({ 1'b0, f_pri_vpos }
 							== { 1'b0, f_ovw_vpos }
-						 	+ { 1'b0, i_vpos } + 1));
+							+ { 1'b0, i_vpos } + 1));
 					end else
 						assert({ 1'b0, f_pri_vpos }
 							== { 1'b0, f_ovw_vpos }
-						 	+ { 1'b0, i_vpos });
+							+ { 1'b0, i_vpos });
 				end // else assert(ovw_eof);
 				// }}}
 			end
