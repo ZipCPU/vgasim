@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	tbclock.h
+// Filename:	bench/cpp/tbclock.h
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2022, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -105,7 +105,7 @@ public:
 		// Divide the clocks interval by two, so we can have a
 		// period for raising the clock, and another for lowering
 		// the clock.
-		m_increment_ps = (interval_ps>>1);
+		m_increment_ps = (interval_ps>>1)&-2l;
 		assert(m_increment_ps > 0);
 	}
 
@@ -113,7 +113,7 @@ public:
 		double	tmp = 1e12 / (double)frequency_hz;
 		unsigned long tmp_interval = (unsigned long)tmp;
 
-		m_increment_ps = (tmp_interval>>1);
+		m_increment_ps = (tmp_interval>>1)&-2l;
 		// printf("SET FREQ = %f MHz = %ld ps\n", frequency_hz/1e6, tmp_interval);
 		assert(m_increment_ps > 0);
 	}

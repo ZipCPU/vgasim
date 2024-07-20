@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	hdmibitsync.v
+// Filename:	rtl/hdmi/hdmibitsync.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -27,10 +27,10 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -59,9 +59,28 @@ module	hdmibitsync (
 	// It is possible that we'll lock up to one color on one word and
 	// another word on another cut.  Hence, we may still need to lock
 	// the words together afterwards.
-	hdmipixelsync	rasync(i_pix_clk, i_reset, i_r, auto_bitslip_r, auto_r);
-	hdmipixelsync	gasync(i_pix_clk, i_reset, i_g, auto_bitslip_g, auto_g);
-	hdmipixelsync	basync(i_pix_clk, i_reset, i_b, auto_bitslip_b, auto_b);
+	hdmipixelsync
+	rasync(
+		.i_clk(i_pix_clk), .i_reset(i_reset),
+		.i_px(i_r),
+		.o_sync(auto_bitslip_r), .o_pix(auto_r)
+	);
+
+	hdmipixelsync
+	gasync(
+		.i_clk(i_pix_clk), .i_reset(i_reset),
+		.i_px(i_g),
+		.o_sync(auto_bitslip_g), .o_pix(auto_g)
+	);
+
+	hdmipixelsync
+	basync(
+		.i_clk(i_pix_clk), .i_reset(i_reset),
+		.i_px(i_b),
+		.o_sync(auto_bitslip_b), .o_pix(auto_b)
+	);
+
+	assign	o_debug = dbg_grn;
 	// }}}
 
 	// all_locked
@@ -69,8 +88,8 @@ module	hdmibitsync (
 	// True if all channels are locked.
 	initial	all_locked = 0;
 	always @(posedge i_pix_clk)
-		all_locked <= ((auto_bitslip_r[4])
-				&&(auto_bitslip_g[4])&&(auto_bitslip_b[4]));
+		all_locked <= auto_bitslip_r[4]
+				&& auto_bitslip_g[4] && auto_bitslip_b[4];
 	// }}}
 
 	// o_r, o_g, o_b --- our bit-synchronized output channels

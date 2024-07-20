@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	synccount.v
+// Filename:	rtl/hdmi/synccount.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -27,8 +27,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +72,11 @@ module	synccount #(
 		always @(posedge i_clk)
 		if (i_v)
 			o_val <= i_val;
+
+		// Verilator lint_off UNUSED
+		wire	unused;
+		assign	unused = &{ 1'b0, i_reset };
+		// Verilator lint_on  UNUSED
 	end else begin : REQUIRE_QUALITY
 		reg			inc, dec;
 		reg [QUALITY_BITS-1:0]	ngood;

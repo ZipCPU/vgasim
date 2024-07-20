@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	transferstb.v
+// Filename:	rtl/transferstb.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,10 +11,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -37,10 +37,11 @@
 `default_nettype none
 // }}}
 module	transferstb #(
+		// {{{
 		parameter	NFF=2
+		// }}}
 	) (
 		// {{{
-		// (i_src_clk, i_dest_clk, i_stb, o_stb);
 		input	wire	i_src_clk, i_dest_clk, i_stb,
 		output	reg	o_stb
 		// }}}

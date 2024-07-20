@@ -1,8 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axivcamera
+// Filename:	rtl/axivcamera.v
 // {{{
-// Project:	WB2AXIPSP: bus bridges and other odds and ends
+// Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	Reads a video frame from a source and writes the result to
 // {{{
@@ -93,9 +93,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
-//
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at

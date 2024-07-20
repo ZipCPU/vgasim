@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	imgfifo.v
+// Filename:	rtl/imgfifo.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,10 +11,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -51,10 +51,14 @@ module	imgfifo #(
 		// verilator lint_off SYNCASYNCNET
 		input	wire			i_newframe,
 		// verilator lint_on SYNCASYNCNET
+		// Frame buffer control info
+		// {{{
 		input	wire [(AW-1):0]		i_baseaddr,
 		input	wire [LGFLEN:0]		i_linewords,
 		input	wire [(LW-1):0]		i_nlines,
-		// Wishbone bus commanding
+		// }}}
+		// Wishbone bus signaling
+		// {{{
 		output	reg			o_wb_cyc, o_wb_stb,
 		output	reg [(AW-1):0]		o_wb_addr,
 		// Return values on the Wishbone
@@ -62,11 +66,14 @@ module	imgfifo #(
 		input	wire			i_wb_ack,
 		input	wire	[(BUSW-1):0]	i_wb_data,
 		input	wire			i_wb_err,
-		// Now for the interface to the reader on the other end
+		// }}}
+		// Now for the pixel interface to the reader on the other end
+		// {{{
 		input	wire			i_rd,
 		output	wire			o_valid,
-		output	reg	[(BUSW-1):0]	o_word,
+		output	wire	[(BUSW-1):0]	o_word,
 		output	wire			o_err
+		// }}}
 		// }}}
 	);
 
@@ -82,6 +89,7 @@ module	imgfifo #(
 	reg	[2:0]	pix_reset_pipe;
 	reg	[(FAW-1):0]	stb_count;
 	reg	[(FAW-1):0]	ack_count;
+
 	wire	fifo_empty, fifo_full;
 	wire	wb_reset_n  = !wb_reset;
 	wire	pix_reset_n = !pix_reset;
@@ -150,7 +158,7 @@ module	imgfifo #(
 	end
 	// }}}
 
-	// last_stb, stb_count
+	// stb_count
 	// {{{
 	initial	stb_count= 0;
 	always @(posedge i_clk)
@@ -158,7 +166,10 @@ module	imgfifo #(
 		stb_count <= 0;
 	else if ((o_wb_stb)&&(!i_wb_stall))
 		stb_count <= stb_count + 1'b1;
+	// }}}
 
+	// last_stb
+	// {{{
 	initial	last_stb = 1'b0;
 	always @(posedge i_clk)
 	if ((wb_reset)||(!o_wb_cyc))
@@ -169,7 +180,7 @@ module	imgfifo #(
 		last_stb <= ({ 2'b0, stb_count } >= { 1'b0, i_linewords}- 1'b1);
 	// }}}
 
-	// last_ack, ack_count
+	// ack_count
 	// {{{
 	initial	ack_count= 0;
 	always @(posedge i_clk)
@@ -177,7 +188,10 @@ module	imgfifo #(
 		ack_count <= 0;
 	else if (i_wb_ack)
 		ack_count <= ack_count + 1'b1;
+	// }}}
 
+	// last_ack
+	// {{{
 	initial	last_ack = 1'b0;
 	always @(posedge i_clk)
 	if ((wb_reset)||(!o_wb_cyc))
@@ -220,10 +234,10 @@ module	imgfifo #(
 			<= (fifo_availability > i_linewords + 1);
 	// }}}
 
+	// Asynchronous FIFO
+	// {{{
 	atxfifo	#(
-		// {{{
 		.DSIZE(BUSW),.ASIZE(FAW)
-		// }}}
 	) fifo(
 		// {{{
 		i_clk, wb_reset_n,
@@ -234,6 +248,7 @@ module	imgfifo #(
 		i_pixclk, pix_reset_n, (i_rd)&&(!pix_reset), o_word, fifo_empty
 		// }}}
 	);
+	// }}}
 
 	assign	o_err = (o_wb_cyc)&&(i_wb_ack)&&(fifo_full);
 	assign	o_valid = (!fifo_empty);
@@ -256,19 +271,24 @@ module	imgfifo #(
 `endif
 	initial	assume(i_reset);
 
-assume property(i_linewords == 1280);
-assume property(i_nlines    == 1080);
+	always @(*)
+	begin
+		assume(i_linewords == 1280);
+		assume(i_nlines    == 1080);
+	end
+
 	//
 	// Set up the f_past_valid registers.  We'll need one for each of
 	// the three clock domains: write, read, and the global simulation
 	// clock.
 	//
 	reg	f_past_valid_pix, f_past_valid_clk, f_past_valid_gbl;
+	(* gclk *)	reg	gbl_clk;
 
 	initial	f_past_valid_pix  = 0;
 	initial	f_past_valid_clk  = 0;
 	initial	f_past_valid_gbl = 0;
-	always @($global_clock)
+	always @(posedge gbl_clk)
 		f_past_valid_gbl <= 1'b1;
 	always @(posedge i_clk)
 		f_past_valid_clk  <= 1'b1;
@@ -297,9 +317,9 @@ assume property(i_nlines    == 1080);
 
 	reg	[F_CLKBITS-1:0]	f_clk_count, f_pclk_count;
 
-	always @($global_clock)
+	always @(posedge gbl_clk)
 		f_clk_count <= f_clk_count + f_clk_step;
-	always @($global_clock)
+	always @(posedge gbl_clk)
 		f_pclk_count <= f_pclk_count + f_pclk_step;
 
 	always @(*)
@@ -310,7 +330,7 @@ assume property(i_nlines    == 1080);
 
 	// Insist that items synchronous to the wishbone clock only
 	// change on a clock edge
-	always @($global_clock)
+	always @(posedge gbl_clk)
 	if ((f_past_valid_gbl)&&(!$rose(i_clk)))
 	begin
 		assume($stable(i_reset));
@@ -328,7 +348,7 @@ assume property(i_nlines    == 1080);
 	if (!f_past_valid_clk)
 		assume(i_reset);
 
-	always @($global_clock)
+	always @(posedge gbl_clk)
 	if ((!f_past_valid_gbl)||(!$rose(i_pixclk)))
 	begin
 		assume($stable(i_rd));
@@ -360,8 +380,7 @@ assume property(i_nlines    == 1080);
 			.F_LGDEPTH(FAW),
 			.F_OPT_RMW_BUS_OPTION(1'b0),
 			.F_OPT_SOURCE(1'b1),
-			.F_OPT_DISCONTINUOUS(1'b0),
-			.F_OPT_CLK2FFLOGIC(1'b1)
+			.F_OPT_DISCONTINUOUS(1'b0)
 		) f_bus(i_clk, i_reset,
 			o_wb_cyc, o_wb_stb, 1'b0, o_wb_addr, 32'h0, 4'h0,
 			i_wb_ack, i_wb_stall, i_wb_data, i_wb_err,

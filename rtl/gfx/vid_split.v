@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_split.v
+// Filename:	rtl/gfx/vid_split.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -57,6 +57,8 @@ module	vid_split #(
 		//
 		input	wire	[LGFRAME-1:0]	i_width, i_height,
 		input	wire	[AW-1:0]	i_baseaddr, i_lastaddr,
+		input	wire			i_en,
+		output	wire	[2:0]		o_split_err,
 		//
 		input	wire			S_AXIS_TVALID,
 		output	wire			S_AXIS_TREADY,
@@ -76,7 +78,9 @@ module	vid_split #(
 		input	wire			M_VID_READY,
 		output	wire	[PW-1:0]	M_VID_DATA,
 		output	wire			M_VID_LAST,
-		output	wire			M_VID_USER
+		output	wire			M_VID_USER,
+		//
+		output	wire	[31:0]		o_debug
 		// }}}
 	);
 
@@ -216,9 +220,10 @@ module	vid_split #(
 		.LGFRAME(LGFRAME), .LGLEN(LGNFFT), .IW(IW), .PW(2),
 		.OPT_TUSER_IS_SOF(OPT_TUSER_IS_SOF), .OPT_TRIGGER(0),
 		.OPT_FRAMED(1'b1), .OPT_UNSIGNED(1'b1),
+		.OPT_TRUNCATE_WIDTH(1'b1),
 		.BACKGROUND_COLOR(2'b00), .AXIS_COLOR(2'b10),
 		.LINE_COLOR(2'b11),
-		.DEF_VSCALE({ 6'h1, {(LGFRAME-6){1'b0}} })
+		.DEF_VSCALE({ 8'h1, {(LGFRAME-8){1'b0}} })
 		// }}}
 	) u_spectrogram (
 		// {{{
@@ -287,6 +292,7 @@ module	vid_split #(
 		//
 		.i_baseaddr(i_baseaddr), .i_lastaddr(i_lastaddr),
 		.i_width(i_width), .i_height(half_height),
+		.i_en(i_en),
 		//
 		.S_AXIS_TVALID(wfall_data_valid),
 			.S_AXIS_TREADY(wfall_data_ready),
@@ -305,7 +311,9 @@ module	vid_split #(
 		.M_VID_TREADY(wfall_ready),
 		.M_VID_TDATA(wfall_data),
 		.M_VID_TLAST(wfall_last),
-		.M_VID_TUSER(wfall_user)
+		.M_VID_TUSER(wfall_user),
+		//
+		.o_debug(o_debug)
 		// }}}
 	);
 
@@ -330,8 +338,8 @@ module	vid_split #(
 		// {{{
 		.ACLK(i_pixclk), .ARESETN(!i_pix_reset),
 		//
-		.i_enable(1'b1), .i_hpos(0), .i_vpos(pix_height/2+1),
-			.o_err(bottom_err),
+		.i_enable(1'b1), .i_hpos({(LGFRAME){1'b0}}),
+			.i_vpos(pix_height/2+1), .o_err(bottom_err),
 		//
 		.S_PRI_TVALID(top_valid), .S_PRI_TREADY(top_ready),
 			.S_PRI_TDATA(top_color), .S_PRI_TLAST(top_last),
@@ -348,6 +356,8 @@ module	vid_split #(
 	);
 
 	// }}}
+
+	assign	o_split_err = { (o_wb_cyc && i_wb_err), top_err, bottom_err };
 
 	// Keep Verilator happy
 	// {{{

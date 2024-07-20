@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	vgasim.cpp
+// Filename:	bench/cpp/vgasim.cpp
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -18,10 +18,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -267,17 +267,17 @@ void	VGAWIN::init(void) {
 	Gtk::Window::set_title(Glib::ustring("VGA Simulator"));
 };
 
-VGAWIN::VGAWIN(void) {
+VGAWIN::VGAWIN(void) : SIMWIN(640,480) {
 	m_vgasim = new VGASIM(640, 480);
 	init();
 }
 
-VGAWIN::VGAWIN(const int w, const int h) {
+VGAWIN::VGAWIN(const int w, const int h) : SIMWIN(w, h) {
 	m_vgasim = new VGASIM(w, h);
 	init();
 }
 
-VGAWIN::VGAWIN(const char *h, const char *v) {
+VGAWIN::VGAWIN(const char *h, const char *v) : SIMWIN(h, v) {
 	m_vgasim = new VGASIM(h, v);
 	init();
 }

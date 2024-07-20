@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	llvga.v
+// Filename:	rtl/llvga.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -11,10 +11,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -59,7 +59,9 @@ module	llvga #(
 		// Outgoing signal generation
 		// {{{
 		output	reg			o_rd, o_newline, o_newframe,
+		// }}}
 		// VGA connections
+		// {{{
 		output	reg			o_vsync, o_hsync,
 		output	reg	[BPC-1:0]	o_red, o_grn, o_blu
 		// }}}
