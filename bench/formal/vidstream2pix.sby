@@ -24,6 +24,7 @@ cmd += " -chparam BUS_DATA_WIDTH %d" % (64 if "bus64" in tags else 32)
 cmd += " -chparam OPT_TUSER_IS_SOF %d" % (1 if "opt_sof" in tags else 0)
 output(cmd)
 --pycode-end--
+proc -norom
 prep -top vidstream2pix
 cvr: chformal -assert -remove
 
