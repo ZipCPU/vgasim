@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axissprite.v
+// Filename:	rtl/axissprite.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -30,7 +30,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -46,10 +46,10 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -166,6 +166,7 @@ module	axissprite #(
 						axil_read_reg;
 
 	reg	[3*SBPC+ALPHA_BITS-1:0]	spritemem	[0:MEMSZ-1];
+	reg	[15:0]			new_top, new_left;
 	reg	[LGFRAME-1:0]		bus_top, bus_left,
 					staged_top, staged_left,
 					this_top, this_left,
@@ -413,10 +414,16 @@ module	axissprite #(
 		last_bus_pos[0  +: LGFRAME] = bus_left;
 	end
 
+	always @(*)
+		{ new_top, new_left } = apply_wstrb(last_bus_pos, wskd_data,
+					wskd_strb);
+
 	always @(posedge S_AXI_ACLK)
 	if (axil_write_ready && !awskd_addr[LGMEMSZ-ADDRLSB])
-		{ bus_top, bus_left } <= apply_wstrb(last_bus_pos, wskd_data,
-					wskd_strb);
+	begin
+		bus_top  <= new_top[ 16 +: LGFRAME];
+		bus_left <= new_left[16 +: LGFRAME];
+	end
 	// }}}
 
 	// axil_read_mem: Read from memory
