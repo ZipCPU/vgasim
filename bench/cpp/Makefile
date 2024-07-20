@@ -35,10 +35,10 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2017-2022, Gisselquist Technology, LLC
+## Copyright (C) 2017-2024, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
-## modify it under the terms of  the GNU General Public License as published
+## modify it under the terms of the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
 ## your option) any later version.
 ##
@@ -78,14 +78,15 @@ VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD)
 VDEFS   := $(shell ./vversion.sh)
-FLAGS	:= -Wall -Og -g $(VDEFS)
+FLAGS	:= -Wall -Og -g $(VDEFS) -faligned-new
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
 CFLAGS  :=  $(GFXFLAGS)
 SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
-VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o
+VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o $(OBJDIR)/verilated_threads.o
+
 
 SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
 HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp
@@ -112,38 +113,38 @@ $(OBJDIR)/sprite_tb.o: axi_tb.cpp
 	$(CXX) -DSPRITETB -DHDMI $(CFLAGS) $(INCS) -c $^ -o $@
 
 simcheck: $(OBJDIR)/simcheck.o $(OBJDIR)/vgasim.o $(OBJDIR)/vgasource.o
-	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -lpthread -o $@
 
 hdmicheck: $(OBJDIR)/hdmicheck.o $(OBJDIR)/hdmisim.o $(OBJDIR)/hdmisource.o
-	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(GFXLIBS) -lpthread -o $@
 
 MAINOBJS := $(OBJDIR)/main_tb.o
 main_tb: $(MAINOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vdemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vdemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 AXIOBJS := $(OBJDIR)/axi_tb.o
 axi_tb: $(AXIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxidemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxidemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 SPRITEOBJS := $(OBJDIR)/sprite_tb.o
 sprite_tb: $(SPRITEOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vspritedemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vspritedemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vspritedemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 HDMIOBJS := $(OBJDIR)/hdmi_tb.o
 hdmi_tb: $(HDMIOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxihdmi__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxihdmi__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxihdmi__ALL.a $(GFXLIBS) -lpthread -o $@
 
 REPEATEROBJS := $(OBJDIR)/axirepeater_tb.o $(OBJDIR)/hdmisource.o
 axirepeater_tb: $(REPEATEROBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vaxirepeater__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxirepeater__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vaxirepeater__ALL.a $(GFXLIBS) -lpthread -o $@
 
 HISTOBJS := $(OBJDIR)/hist_tb.o
 hist_tb: $(HISTOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vhistdemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vhistdemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vhistdemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 TRACEOBJS := $(OBJDIR)/trace_tb.o
 trace_tb: $(TRACEOBJS) $(SIMOBJECTS) $(VOBJS) $(VOBJDR)/Vtracedemo__ALL.a
-	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vtracedemo__ALL.a $(GFXLIBS) -o $@
+	$(CXX) $(GFXFLAGS) $^ $(VOBJDR)/Vtracedemo__ALL.a $(GFXLIBS) -lpthread -o $@
 
 
 .PHONY: clean
