@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_trace.v
+// Filename:	rtl/gfx/vid_trace.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -35,7 +35,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -71,6 +71,10 @@ module vid_trace #(
 		parameter	PW = 2,		// Bits per pixel
 		parameter [LGFRAME-1:0]	DEF_VSCALE = { 3'b001, {(LGFRAME-3){1'b0}} },
 		parameter [0:0] OPT_TUSER_IS_SOF = 1'b0,
+		// OPT_TRUNCATE_WIDTH: True if we want to truncate our data
+		// when the pixel width is wider than the data width (i.e.
+		// when running FFTs with the raster)
+		parameter [0:0]	OPT_TRUNCATE_WIDTH = 1'b0,
 		// OPT_TRIGGER: True if we want to pause the trace on an
 		// external trigger event of some type.
 		parameter [0:0] OPT_TRIGGER      = 1'b0,
@@ -133,6 +137,7 @@ module vid_trace #(
 	reg	[LGMEM-2:0]	axis_wraddr, axis_rdaddr;
 	reg	[LGMEM-1:0]	wr_page_fill;
 	wire			frame_syncd;
+	wire	[LGFRAME-1:0]	frame_width;
 
 	reg			rd_vid_flag, rd_valid, rd_eol, rd_vlast, rd_mem,
 				mem_eol, mem_vlast;
@@ -155,7 +160,7 @@ module vid_trace #(
 
 	reg			vs_valid, vs_eol, vs_vlast;
 	reg	[LGFRAME-1:0]	vs_xpos, vs_ypos;
-	wire			vs_ready;
+	wire			vs_ready, vs_overflow;
 
 	wire	[LGFRAME-1:0]	vs_value;
 	reg	[LGFRAME-1:0]	vs_scale, vs_min_goal;
@@ -186,7 +191,7 @@ module vid_trace #(
 	//
 	//
 	generate if (OPT_TRIGGER)
-	begin
+	begin : GEN_TRIGGER
 		reg	r_triggered, mem_triggered, r_captured;
 
 		always @(posedge S_AXI_ACLK)
@@ -219,7 +224,7 @@ module vid_trace #(
 				&& (!rd_valid || rd_ready)
 				&& rd_eol && rd_vlast && wr_page_fill[LGMEM-1];
 
-	end else begin
+	end else begin : NO_TRIGGER
 
 		assign	wr_swap_pages = (!rd_valid || rd_ready)
 				&& rd_eol && rd_vlast && wr_page_fill[LGMEM-1];
@@ -429,6 +434,37 @@ module vid_trace #(
 	end endgenerate
 	// }}}
 
+	// frame_width
+	// {{{
+	generate if (OPT_FRAMED)
+	begin : GEN_FRAME_WIDTH
+		reg	[LGFRAME-1:0]	r_frame_width, frame_count;
+
+		initial	frame_count = 0;
+		initial	r_frame_width = (1<<LGLEN);
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+		begin
+			frame_count <= 0;
+			r_frame_width <= (1<<LGLEN);
+		end else if (S_AXIS_TVALID && S_AXIS_TREADY)
+		begin
+			frame_count <= frame_count + 1;
+			if (S_AXIS_TLAST)
+			begin
+				frame_count <= 0;
+				r_frame_width <= frame_count + 1;
+			end
+		end
+
+		assign	frame_width = r_frame_width;
+	end else begin : NO_FRAMING
+
+		assign	frame_width = (1<<LGLEN);
+
+	end endgenerate
+	// }}}
+
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////
@@ -567,6 +603,10 @@ module vid_trace #(
 			hdelta <= hdelta + (4<<HEXTRA);
 		end else
 			hdelta <= hdelta + 1;
+
+		// (Optionally) Truncate any oversized frame
+		if (OPT_TRUNCATE_WIDTH && (frame_width >= i_width))
+			hdelta <= (1<<HEXTRA);
 		// Verilator lint_on  WIDTH
 	end
 	// }}}
@@ -690,7 +730,7 @@ module vid_trace #(
 	// vs_value = read value times our vertical scale
 	// {{{
 	generate if (OPT_UNSIGNED)
-	begin
+	begin : GEN_UNSIGNED_SCALE
 		wire	[LGFRAME:0]	us_scale;
 		wire	[IW-1:0]	us_value;
 		reg	[LGFRAME+IW:0]	us_product;
@@ -702,13 +742,14 @@ module vid_trace #(
 		if (S_AXI_ARESETN && (!vs_valid || vs_ready))
 			us_product <= us_value * us_scale;
 
+		assign	vs_overflow = us_product[IW+LGFRAME];
 		assign	vs_value = us_product[IW + LGFRAME -1 : IW];
 
 		// Verilator lint_off UNUSED
 		wire	unused_product;
-		assign	unused_product = &{ 1'b0, us_product[IW+LGFRAME], us_product[IW-1:0] };
+		assign	unused_product = &{ 1'b0, us_product[IW-1:0] };
 		// Verilator lint_on  UNUSED
-	end else begin
+	end else begin : GEN_SIGNED_SCALE
 		wire	signed	[LGFRAME:0]	sgn_scale;
 		wire	signed	[IW-1:0]	sgn_value;
 		reg	signed	[LGFRAME+IW:0]	sgn_product;
@@ -721,6 +762,7 @@ module vid_trace #(
 			sgn_product <= sgn_value * sgn_scale;
 
 		assign	vs_value = sgn_product[IW + LGFRAME -1 : IW];
+		assign	vs_overflow = sgn_product[IW+LGFRAME] != sgn_product[IW+LGFRAME-1];
 
 		// Verilator lint_off UNUSED
 		wire	unused_product;
@@ -733,9 +775,9 @@ module vid_trace #(
 	// {{{
 	always @(posedge S_AXI_ACLK)
 	if (OPT_UNSIGNED)
-		vs_min_goal <= (i_height>>1) + (i_height >> 2);
+		vs_min_goal <= (i_height>>1) + (i_height >> 2);	// 75% Height
 	else
-		vs_min_goal <= (i_height>>2) + (i_height >> 3);
+		vs_min_goal <= (i_height>>2) + (i_height >> 3);	// 75% Hlfheight
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -783,7 +825,7 @@ module vid_trace #(
 	//		yp_value <= i_height - 1
 	//		clipped  <= 1;
 	//	else begin
-	//		yp_value <= i_height/2 - vs_value;
+	//		yp_value <= i_height/2 - vs_value
 	//		clipped  <= 0;
 	//	end
 
@@ -824,12 +866,12 @@ module vid_trace #(
 	// vs_posn, vs_abs
 	// {{{
 	generate if (OPT_UNSIGNED)
-	begin
+	begin : GEN_UNSIGNED_POSN
 
 		assign	vs_posn = i_height-1 - vs_value;
 		assign	vs_abs =  { 1'b0, vs_value };
 
-	end else begin
+	end else begin : GEN_SIGNED_POSN
 		wire	[LGFRAME:0]	vs_neg;
 
 		assign	vs_neg = -{ vs_value[LGFRAME-1], vs_value };
@@ -868,10 +910,19 @@ module vid_trace #(
 			yp_clipped <= 1;
 
 			// OPT_UNSIGNED will (should) *never* be negative
-		end else if (vs_posn > i_height - 1)
+		end else if (!OPT_UNSIGNED && vs_posn > i_height - 1)
 		begin
 			// Position was too high
-			yp_value   <= i_height - 1;
+			yp_value   <= i_height-1;
+			yp_clipped <= 1;
+		end else if (OPT_UNSIGNED && vs_value > i_height - 1)
+		begin
+			// Position was too high
+			//
+			// If our value is *UNSIGNED*, then we don't have to
+			// check for it being too small as well.
+			//
+			yp_value   <= 0;
 			yp_clipped <= 1;
 		end else begin
 			// Just right --- keep it
@@ -879,6 +930,9 @@ module vid_trace #(
 			yp_clipped  <= 0;
 		end
 		// }}}
+
+		if (vs_overflow)
+			yp_clipped <= 1;
 	end
 
 	always @(posedge S_AXI_ACLK)
