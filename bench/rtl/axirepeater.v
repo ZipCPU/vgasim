@@ -442,6 +442,7 @@ module	axirepeater #(
 	//
 	wire		cam_pix_valid, cam_vsync, cam_hsync;
 	wire [23:0]	cam_pixel;
+	wire	[31:0]	ign_sync_word, ign_sync_debug;
 
 	// Convert HDMI to a digitized (VGA) pixel stream
 	// {{{
@@ -455,7 +456,9 @@ module	axirepeater #(
 			.o_vsync(cam_vsync), .o_hsync(cam_hsync),
 		.o_vga_red(cam_pixel[23:16]),
 			.o_vga_green(cam_pixel[15:8]),
-			.o_vga_blue(cam_pixel[7:0])
+			.o_vga_blue(cam_pixel[7:0]),
+		.o_sync_word(ign_sync_word),
+		.o_debug(ign_sync_debug)
 	);
 	// }}}
 
@@ -674,6 +677,7 @@ module	axirepeater #(
 		axil_hdmi_awaddr[11],  axil_hdmi_araddr[11],
 		//
 		ex_clk, ex_aresetn,
+		ign_sync_word, ign_sync_debug,
 		//
 		1'b0
 		// }}}

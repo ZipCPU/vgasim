@@ -41,6 +41,7 @@
 #include <gtkmm.h>
 #include "image.h"
 #include "videomode.h"
+#include "simwin.h"
 
 class	VGASIM : public Gtk::DrawingArea {
 public:

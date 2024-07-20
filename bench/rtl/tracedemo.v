@@ -285,11 +285,13 @@ module	tracedemo #(
 		.i_hm_porch(DEF_HPORCH),
 		.i_hm_synch(DEF_HSYNC),
 		.i_hm_raw(DEF_HRAW),
+		.i_hm_syncpol(1'b0),
 		//
 		.i_vm_height(DEF_HEIGHT),
 		.i_vm_porch(DEF_VPORCH),
 		.i_vm_synch(DEF_VSYNC),
 		.i_vm_raw(DEF_VRAW),
+		.i_vm_syncpol(1'b0),
 		//
 		.o_red(o_hdmi_red),
 		.o_grn(o_hdmi_grn),

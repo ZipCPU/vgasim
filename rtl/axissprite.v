@@ -136,8 +136,8 @@ module	axissprite #(
 		output	reg		M_AXIS_TVALID,
 		input	wire		M_AXIS_TREADY,
 		output	reg	[BPP-1:0]	M_AXIS_TDATA,
-		output	reg		M_AXIS_TLAST,	// HLAST && VLAST
-		output	reg		M_AXIS_TUSER	// HLAST
+		output	wire		M_AXIS_TLAST,	// HLAST && VLAST
+		output	wire		M_AXIS_TUSER	// HLAST
 		// }}}
 		// }}}
 	);
@@ -421,8 +421,8 @@ module	axissprite #(
 	always @(posedge S_AXI_ACLK)
 	if (axil_write_ready && !awskd_addr[LGMEMSZ-ADDRLSB])
 	begin
-		bus_top  <= new_top[ 16 +: LGFRAME];
-		bus_left <= new_left[16 +: LGFRAME];
+		bus_top  <= new_top[ 0 +: LGFRAME];
+		bus_left <= new_left[0 +: LGFRAME];
 	end
 	// }}}
 
@@ -457,7 +457,7 @@ module	axissprite #(
 
 		assign	alpha_byte = r_alpha_byte;
 		// }}}
-	end else begin
+	end else begin : NO_ALPHA
 		assign	alpha_byte = 0;
 	end endgenerate
 	// }}}
@@ -494,7 +494,7 @@ module	axissprite #(
 
 	// apply_wstrb
 	// {{{
-	function [C_AXI_DATA_WIDTH-1:0]	apply_wstrb;
+	function automatic [C_AXI_DATA_WIDTH-1:0]	apply_wstrb;
 		input	[C_AXI_DATA_WIDTH-1:0]		prior_data;
 		input	[C_AXI_DATA_WIDTH-1:0]		new_data;
 		input	[C_AXI_DATA_WIDTH/8-1:0]	wstrb;
@@ -818,6 +818,7 @@ module	axissprite #(
 		reg		a1_valid, a1_tlast, a1_tuser, a1_insprite;
 		reg		a2_valid, a2_tlast, a2_tuser;
 		wire	[ALPHA_BITS-1:0]	alpha, alphan;
+		reg		a3_tlast, a3_tuser;
 
 		// alpha_data
 		wire	[SBPC-1:0]	sr, sg, sb;
@@ -924,6 +925,7 @@ module	axissprite #(
 
 		// M_AXIS_TVALID, M_AXIS_TLAST, M_AXIS_TUSER
 		// {{{
+
 		initial	M_AXIS_TVALID = 1'b0;
 		always @(posedge S_VID_ACLK)
 		if (!S_VID_ARESETN)
@@ -933,7 +935,9 @@ module	axissprite #(
 
 		always @(posedge S_VID_ACLK)
 		if (a3_step)
-			{ M_AXIS_TLAST, M_AXIS_TUSER } <= { a2_tlast, a2_tuser };
+			{ a3_tlast, a3_tuser } <= { a2_tlast, a2_tuser };
+		assign	M_AXIS_TLAST = a3_tlast;
+		assign	M_AXIS_TUSER = a3_tuser;
 		// }}}
 
 		assign	vskd_ready = p_step  || !p_valid;
@@ -1169,21 +1173,17 @@ module	axissprite #(
 		// }}}
 
 		if (OPT_TUSER_IS_SOF)
-		begin
-			always @(*)
-				M_AXIS_TUSER = M_AXIS_SOF;
-			always @(*)
-				M_AXIS_TLAST = M_AXIS_HLAST;
+		begin : OPT_SOF
+			assign	M_AXIS_TUSER = M_AXIS_SOF;
+			assign	M_AXIS_TLAST = M_AXIS_HLAST;
 
 			// Verilator lint_off UNUSED
 			wire	unused_tuser;
 			assign	unused_tuser = &{ 1'b0, M_AXIS_VLAST };
 			// Verilator lint_on  UNUSED
-		end else begin
-			always @(*)
-				M_AXIS_TUSER = M_AXIS_HLAST;
-			always @(*)
-				M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
+		end else begin : OPT_VLAST
+			assign	M_AXIS_TUSER = M_AXIS_HLAST;
+			assign	M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
 
 			// Verilator lint_off UNUSED
 			wire	unused_tuser;
@@ -1194,7 +1194,7 @@ module	axissprite #(
 		// M_AXIS_TDATA
 		// {{{
 		if (ALPHA_BITS == 0)
-		begin
+		begin : GEN_NO_ALPHABITS
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
@@ -1204,7 +1204,7 @@ module	axissprite #(
 					M_AXIS_TDATA <= p_data;
 			end
 		end else // if (ALPHA_BITS == 1)
-		begin
+		begin : GEN_ONOFF_ALPHA
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
@@ -1793,7 +1793,7 @@ module	axissprite #(
 		end
 		// }}}
 		// }}}
-	end else begin
+	end else begin : NO_SKIDBUFFER
 		assign	f_vskd_xpos = S_AXIS_XPOS;
 		assign	f_vskd_ypos = S_AXIS_YPOS;
 		assign	fvskd_known = fs_known;

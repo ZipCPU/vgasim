@@ -472,13 +472,13 @@ module	axivdisplay #(
 			wskd_data, wskd_strb);
 
 	generate if (C_AXI_ADDR_WIDTH > 32)
-	begin
+	begin : GEN_WIDE_ADDRESS
 
 		assign	new_cmdaddrhi = apply_wstrb(
 			wide_address[2*C_AXIL_DATA_WIDTH-1:C_AXIL_DATA_WIDTH],
 			wskd_data, wskd_strb);
 
-	end else begin
+	end else begin : ONEWORD_ADDR
 
 		assign	new_cmdaddrhi = 0;
 

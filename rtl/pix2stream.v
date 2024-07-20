@@ -282,7 +282,7 @@ module	pix2stream #(
 	end
 
 	generate if (BUS_DATA_WIDTH == 32)
-	begin
+	begin : AXIL_BUS_WIDTH
 		initial	clr_word = 0;
 		always @(posedge i_clk)
 		if (skd_valid && skd_ready)
@@ -293,7 +293,7 @@ module	pix2stream #(
 		if (z_step)
 			clr_zmask <= clr_word;
 
-	end  else begin
+	end else begin : WIDE_BUS_WIDTH
 		initial	clr_word = 0;
 		always @(posedge i_clk)
 		if (skd_valid && skd_ready)

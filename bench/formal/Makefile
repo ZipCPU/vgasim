@@ -42,7 +42,7 @@ all:
 ## }}}
 GFX := vid_waterfall_r vid_waterfall_w vid_histogram vid_trace vid_empty
 TESTS := llvga axissprite axishdmi axisvoverlay pix2stream atxfifo vidstream2pix $(GFX) # imgfifo
-all: $(TESTS)
+all: $(TESTS) report
 
 ## Definitions
 ## {{{
@@ -162,16 +162,20 @@ $(VID2PIX)_cvr/PASS: $(VID2PIX).sby $(RTL)/$(VID2PIX).v $(RTL)/skidbuffer.v
 .PHONY: $(WFALLW) waterfall
 ## {{{
 waterfall: $(WFALLW) $(WFALLR)
-$(WFALLW): $(WFALLW)_prf/PASS
+$(WFALLW): $(WFALLW)_prf/PASS $(WFALLW)_cvr/PASS
 $(WFALLW)_prf/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
 	sby -f $(WFALLW).sby prf
+$(WFALLW)_cvr/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
+	sby -f $(WFALLW).sby cvr
 ## }}}
 
 .PHONY: $(WFALLR)
 ## {{{
-$(WFALLR): $(WFALLR)_prf/PASS
+$(WFALLR): $(WFALLR)_prf/PASS $(WFALLR)_cvr/PASS
 $(WFALLR)_prf/PASS: $(WFALLR).sby $(RTL)/gfx/$(WFALLR).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
 	sby -f $(WFALLR).sby prf
+$(WFALLR)_cvr/PASS: $(WFALLR).sby $(RTL)/gfx/$(WFALLR).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
+	sby -f $(WFALLR).sby cvr
 ## }}}
 
 .PHONY: $(HSGRAM) histogram
@@ -198,6 +202,9 @@ $(EMPTY)_prf/PASS: $(EMPTY).sby $(RTL)/gfx/$(EMPTY).v faxivideo.v
 	sby -f $(EMPTY).sby prf
 ## }}}
 
+.PHONY: report
+report:
+	+perl genreport.pl > report.html
 .PHONY: clean
 ## {{{
 clean:

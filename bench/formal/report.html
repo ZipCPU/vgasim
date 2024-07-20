@@ -1,0 +1,49 @@
+<HTML><HEAD><TITLE>Formal Verification Report</TITLE></HEAD>
+<BODY>
+<H1 align=center>ZipCPU Verification Report</H1>
+<H2 align=center>20240720</H2>
+<TABLE border>
+<TR><TH>Status</TH><TH>Component</TD><TH>Proof</TH><TH>Component description</TH></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>atxfifo</TD><TD>_prf</TD><TD rowspan=1>Cummings' Asynchronous FIFO</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axishdmi</TD><TD>_prf</TD><TD rowspan=2>Stream to HDMI generator</TD></TR>
+<TR><TD bgcolor=#ffffca>15 steps of BMC</TD><TD>axishdmi</TD><TD>_prfrs</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>13 Cover points</TD><TD>axissprite</TD><TD>_cvr</TD><TD rowspan=5>Sprite overlay</TD></TR>
+<TR><TD bgcolor=#ffa4a4>FAIL</TD><TD>axissprite</TD><TD>_prf</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axissprite</TD><TD>_prfns</TD></TR>
+<TR><TD bgcolor=#ffffca>12 steps of BMC</TD><TD>axissprite</TD><TD>_prfsof</TD></TR>
+<TR><TD bgcolor=#ffffca>12 steps of BMC</TD><TD>axissprite</TD><TD>_prfsofns</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axisvoverlay</TD><TD>_prf_vlast</TD><TD rowspan=4>Overlay video</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axisvoverlay</TD><TD>_prflb</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axisvoverlay</TD><TD>_prf</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>axisvoverlay</TD><TD>_prflb_vlast</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>llvga</TD><TD>_prf</TD><TD rowspan=1>Lower level VGA controller</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>pix2stream</TD><TD>_prf</TD><TD rowspan=3>Pixels to AXI stream</TD></TR>
+<TR><TD bgcolor=#caeec8>44 Cover points</TD><TD>pix2stream</TD><TD>_cvr</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>pix2stream</TD><TD>_prf64</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>2 Cover points</TD><TD>vid_empty</TD><TD>_cvr</TD><TD rowspan=2>Generate an empty video stream</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vid_empty</TD><TD>_prf</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vid_histogram</TD><TD>_prf</TD><TD rowspan=1>Histogram display</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vid_trace</TD><TD>_prf</TD><TD rowspan=1>Trace display</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vid_waterfall_r</TD><TD>_cvr</TD><TD rowspan=2>Waterfall reader</TD></TR>
+<TR><TD bgcolor=#ffa4a4>FAIL</TD><TD>vid_waterfall_r</TD><TD>_prf</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#e5e5e5>Unknown</TD><TD>vid_waterfall_w</TD><TD>_cvr</TD><TD rowspan=2>Waterfall writer</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vid_waterfall_w</TD><TD>_prf</TD></TR>
+<TR></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vidstream2pix</TD><TD>_prfsof</TD><TD rowspan=5>Video stream back to pixels</TD></TR>
+<TR><TD bgcolor=#caeec8>7 Cover points</TD><TD>vidstream2pix</TD><TD>_cvr</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vidstream2pix</TD><TD>_prf64sof</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vidstream2pix</TD><TD>_prf</TD></TR>
+<TR><TD bgcolor=#caeec8>Pass</TD><TD>vidstream2pix</TD><TD>_prf64</TD></TR>
+</TABLE>
+</BODY></HTML>

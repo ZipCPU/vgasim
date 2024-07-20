@@ -15,7 +15,7 @@ controller is demonstrated via a [slightly different
 simulator](bench/cpp/axi_tb.cpp), including simulations for both
 [VGA](bench/cpp/vgasim.cpp) and [HDMI](bench/cpp/hdmisim.cpp).
 The [second AXI-based video controller will record incoming video signals to
-memory](rtl/axicamera.v).  The is incoming capability is [demonstrated via
+memory](rtl/axicamera.v).  The incoming capability is [demonstrated via
 a simulation](bench/rtl/axirepeater.v) to capture a piece of your screen via
 an [HDMI source simulator](bench/cpp/hdmisource.cpp), [write it to an AXI-based
 block RAM frame buffer memory](rtl/axivcamera.v), and then to [read it back out

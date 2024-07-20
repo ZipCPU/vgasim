@@ -48,6 +48,7 @@
 
 #include "testb.h"
 // #include "twoc.h"
+#include "simwin.h"
 #include "vgasim.h"
 #include "vgasource.h"
 

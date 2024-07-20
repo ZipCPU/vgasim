@@ -66,6 +66,8 @@ module	vid_waterfall_r #(
 		input	wire	[AW-1:0]	i_baseaddr,
 						i_lastaddr,
 						i_first_line,
+		input	wire			i_en,
+		output	wire			o_err,
 		// }}}
 		// Wishbone bus master
 		// {{{
@@ -86,8 +88,9 @@ module	vid_waterfall_r #(
 		input	wire		M_VID_TREADY,
 		output	wire [PW-1:0]	M_VID_TDATA,
 		output	wire		M_VID_TLAST,
-		output	wire		M_VID_TUSER
+		output	wire		M_VID_TUSER,
 		// }}}
+		output	wire	[3:0]	o_dbg
 		// }}}
 	);
 
@@ -96,7 +99,7 @@ module	vid_waterfall_r #(
 	wire			wb_reset;
 	assign	wb_reset = i_reset || (o_wb_cyc && i_wb_err);
 
-	reg			last_ack, last_request;
+	reg			last_ack, last_request, zero_outstanding;
 	reg	[LGBURST:0]	wb_outstanding;
 
 	wire				ign_fifo_full, fifo_empty, afifo_empty;
@@ -113,6 +116,7 @@ module	vid_waterfall_r #(
 
 	reg			wb_hlast, wb_vlast;
 	reg	[LGFRAME-1:0]	wb_hpos, wb_vpos, line_step;
+	reg	[LGFRAME+$clog2(PW):0]	wide_line_step;
 	reg	[AW-1:0]	line_addr;
 
 	reg			rx_vlast, rx_hlast;
@@ -120,6 +124,9 @@ module	vid_waterfall_r #(
 	wire			fifo_vlast, fifo_hlast;
 	wire			afifo_vlast, afifo_hlast;
 	reg			px_vlast, px_hlast, px_lost_sync;
+
+	wire			pix_clk, pix_reset;
+	wire	[LGFRAME-1:0]	px_width, px_height;
 
 `ifdef	FORMAL
 	wire	i_pixclk = i_clk;
@@ -139,15 +146,16 @@ module	vid_waterfall_r #(
 	// {{{
 	initial { o_wb_cyc, o_wb_stb } = 2'b00;
 	always @(posedge i_clk)
-	if (wb_reset)
+	if (wb_reset || !i_en)
 		{ o_wb_cyc, o_wb_stb } <= 2'b00;
 	else if (o_wb_cyc)
 	begin
 		if (!o_wb_stb || !i_wb_stall)
 			o_wb_stb <= !last_request;
 
-		if (i_wb_ack && (!o_wb_stb || !i_wb_stall)
-					&& last_request && last_ack)
+		if (i_wb_ack && !o_wb_stb && last_ack)
+			o_wb_cyc <= 1'b0;
+		if (!o_wb_stb && zero_outstanding)
 			o_wb_cyc <= 1'b0;
 	end else if (fifo_fill[LGFIFO:LGBURST] == 0)
 		{ o_wb_cyc, o_wb_stb } <= 2'b11;
@@ -159,19 +167,22 @@ module	vid_waterfall_r #(
 
 	// wb_outstanding
 	// {{{
+	initial	wb_outstanding = 0;
+	initial	zero_outstanding = 1;
 	always @(posedge i_clk)
 	if (i_reset || !o_wb_cyc || i_wb_err)
 		wb_outstanding <= 0;
 	else case({ o_wb_stb && !i_wb_stall, i_wb_ack })
-	2'b10: wb_outstanding <= wb_outstanding + 1;
-	2'b01: wb_outstanding <= wb_outstanding - 1;
+	2'b10: begin
+		wb_outstanding <= wb_outstanding + 1;
+		zero_outstanding <= 1'b0;
+		end
+	2'b01: begin
+		wb_outstanding <= wb_outstanding - 1;
+		zero_outstanding <= (wb_outstanding <= 1);
+		end
 	default: begin end
 	endcase
-`ifdef	FORMAL
-	always @(*)
-	if (!i_reset && wb_outstanding == 0 && !o_wb_stb)
-		assert(!o_wb_cyc);
-`endif
 	// }}}
 
 	// last_ack
@@ -181,7 +192,7 @@ module	vid_waterfall_r #(
 		last_ack <= 0;
 	else
 		last_ack <= (wb_outstanding + (o_wb_stb ? 1:0)
-				<= 2 +(i_wb_ack ? 1:0));
+				<= 1 +(i_wb_ack ? 1:0));
 	// }}}
 
 	// last_request
@@ -191,17 +202,24 @@ module	vid_waterfall_r #(
 		last_request <= 0;
 	else if (wb_outstanding+(o_wb_stb ? 1:0) >= { 1'b0, {(LGBURST){1'b1}} })
 		last_request <= 1;
-	else if (wb_outstanding + fifo_fill + 1 + (o_wb_stb ? 1:0) >= (1<<LGFIFO))
+	else if (wb_outstanding + fifo_fill + 1 + ((o_wb_stb && !i_wb_stall) ? 1:0) >= (1<<LGFIFO))
 		last_request <= 1;
 	// }}}
 
+	always @(*)
+	begin
+		wide_line_step = (i_width * PW);
+		wide_line_step = wide_line_step + DW-1;
+		wide_line_step = wide_line_step >> $clog2(DW);
+	end
+
 	always @(posedge i_clk)
-		line_step <= (i_width*PW + DW-1) >> $clog2(DW);
+		line_step <= wide_line_step[LGFRAME-1:0];
 
 	// o_wb_addr, wb_[hv]pos, wb_[hv]last
 	// {{{
 	always @(posedge i_clk)
-	if (wb_reset)
+	if (wb_reset || !i_en)
 	begin
 		// {{{
 		wb_hpos <= 0;
@@ -266,7 +284,7 @@ module	vid_waterfall_r #(
 
 	// rx_[hv]pos, rx_[hv]last
 	always @(posedge i_clk)
-	if (wb_reset)
+	if (wb_reset || !i_en)
 	begin
 		// {{{
 		rx_hpos  <= 0;
@@ -291,14 +309,14 @@ module	vid_waterfall_r #(
 		begin
 			// {{{
 			rx_hpos  <= 0;
-			rx_hlast <= 0;
+			rx_hlast <= (line_step <= 1);
 
 			rx_vpos  <=  rx_vpos + 1;
 			rx_vlast <= (rx_vpos + 2 >= i_height);
 			if (rx_vlast)
 			begin
 				rx_vpos  <= 0;
-				rx_vlast <= 0;
+				rx_vlast <= (i_height <= 1);
 			end
 			// }}}
 		end
@@ -327,14 +345,13 @@ module	vid_waterfall_r #(
 	//
 	//
 
-	wire	pix_clk, pix_reset;
-
 	generate if (OPT_ASYNC_CLOCKS)
 	begin : GEN_ASYNC_FIFO
 		// {{{
 		reg		r_pix_reset;
 		reg	[2:0]	r_pix_reset_pipe;
 		wire		afifo_full;
+		wire		ign_a_ready, ign_b_valid;
 
 		initial	{ r_pix_reset, r_pix_reset_pipe } = -1;
 		always @(posedge i_pixclk or posedge i_reset)
@@ -344,7 +361,7 @@ module	vid_waterfall_r #(
 			{ r_pix_reset, r_pix_reset_pipe } <= { r_pix_reset_pipe, 1'b0 };
 
 		afifo #(
-			.WIDTH(DW+2), .LGFIFO(3)
+			.WIDTH(DW+2), .LGFIFO(3), .OPT_REGISTER_READS(1'b1)
 		) pxfifo (
 			// {{{
 			.i_wclk(i_clk), .i_wr_reset_n(!i_reset),
@@ -359,11 +376,37 @@ module	vid_waterfall_r #(
 			// }}}
 		);
 
+		tfrvalue #(
+			.W(LGFRAME*2)
+		) u_size (
+			// {{{
+			.i_a_clk(i_clk),
+			.i_a_reset_n(!i_reset),
+			.i_a_valid(1'b1),
+			.o_a_ready(ign_a_ready),
+			.i_a_data({ i_width, i_height }),
+			//
+			.i_b_clk(i_clk),
+			.i_b_reset_n(!pix_reset),
+			.o_b_valid(ign_b_valid),
+			.i_b_ready(1'b1),
+			.o_b_data({ px_width, px_height })
+			// }}}
+		);
+
 		assign	fifo_read = !fifo_empty && !afifo_full;
 		assign	pix_clk   = i_pixclk;
 		assign	pix_reset = r_pix_reset;
+
+		// Keep Verilator happy
+		// {{{
+		// Verilator lint_off UNUSED
+		wire		unused_async;
+		assign	unused_async = &{ 1'b0, ign_a_ready, ign_b_valid };
+		// Verilator lint_off UNUSED
 		// }}}
-	end else begin
+		// }}}
+	end else begin : NO_FIFO
 		// {{{
 		assign	pix_clk     = i_clk;
 		assign	pix_reset   = i_reset;
@@ -371,6 +414,8 @@ module	vid_waterfall_r #(
 		assign	afifo_empty = fifo_empty;
 		assign	{ afifo_vlast, afifo_hlast, afifo_data }
 				= { fifo_vlast, fifo_hlast, fifo_data };
+		assign	px_width = i_width;
+		assign	px_height = i_height;
 		// }}}
 	end endgenerate
 
@@ -395,6 +440,9 @@ module	vid_waterfall_r #(
 
 		if (px_lost_sync && (!px_hlast || !px_vlast))
 			afifo_read = 1'b1;
+		if (px_lost_sync && px_hlast && px_vlast && (!M_VID_HLAST
+				|| !M_VID_VLAST))
+			afifo_read = 1'b0;
 	end
 	// }}}
 

@@ -85,7 +85,7 @@ module	hdmi2vga // #()	// No parameters (yet)
 	reg		r_pix_valid;
 	reg	[7:0]	r_vga_red, r_vga_green, r_vga_blue;
 
-	wire	[31:0]	dbg_bitsync, dbg_vga;
+	wire	[31:0]	dbg_vga;
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -97,15 +97,13 @@ module	hdmi2vga // #()	// No parameters (yet)
 		.i_pix_clk(i_clk), .i_reset(i_reset),
 		.i_r(i_hdmi_red), .i_g(i_hdmi_grn), .i_b(i_hdmi_blu),
 		.o_r(red_word), .o_g(grn_word), .o_b(blu_word),
-		.o_sync_word(o_sync_word),
-		.o_debug(dbg_bitsync)
+		.o_sync_word(o_sync_word)
 	);
 `else
 	assign	red_word = i_hdmi_red;
 	assign	grn_word = i_hdmi_grn;
 	assign	blu_word = i_hdmi_blu;
 	assign	o_sync_word = 32'h0;
-	assign	dbg_bitsync = 32'h0;
 `endif
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -498,7 +496,7 @@ module	hdmi2vga // #()	// No parameters (yet)
 	assign	unused = &{ 1'b0, sblu_aux[3:0], sgrn_aux[3:0], sred_aux[3:0],
 			sgrn_ctl, sred_ctl, control_sync,
 			sred_aux[6:5], sgrn_aux[6:5], sblu_aux[6:5],
-			dbg_bitsync, dbg_vga
+			dbg_vga
 			};
 	// Verilator lint_on  UNUSED
 	// }}}

@@ -67,6 +67,7 @@ module	vid_waterfall_w #(
 		input	wire	[LGFRAME-1:0]	i_height, i_width,
 		input	wire	[AW-1:0]	i_baseaddr,
 		input	wire	[AW-1:0]	i_lastaddr,
+		input	wire			i_en,
 
 		output	reg	[AW-1:0]	o_first_line,
 		// }}}
@@ -247,11 +248,12 @@ module	vid_waterfall_w #(
 	always @(posedge i_clk)
 	if (i_reset)
 		clear_fifo <= 0;
-	else if ((o_wb_cyc && i_wb_err)
+	else if (!i_en || (o_wb_cyc && i_wb_err)
 			|| (pix_valid && !clear_fifo && fifo_full))
 	begin
 		clear_fifo <= 1;
 `ifdef	VERILATOR
+		if (!clear_fifo)
 		$display("WATERFALL-W: Lost sync!");
 `endif
 	end else if (S_AXI_TVALID && S_AXI_TREADY && S_AXI_TLAST)
@@ -314,7 +316,7 @@ module	vid_waterfall_w #(
 	// {{{
 	initial	{ o_wb_cyc, o_wb_stb } = 2'b00;
 	always @(posedge i_clk)
-	if (i_reset || i_wb_err || clear_fifo)
+	if (i_reset || i_wb_err || clear_fifo || !i_en)
 	begin
 		o_wb_cyc <= 1'b0;
 		o_wb_stb <= 1'b0;

@@ -466,13 +466,13 @@ module	axivcamera #(
 			wskd_data, wskd_strb);
 
 	generate if (C_AXI_ADDR_WIDTH > 32)
-	begin
+	begin : WIDE_ADDRESS
 
 		assign	new_cmdaddrhi = apply_wstrb(
 			wide_address[2*C_AXIL_DATA_WIDTH-1:C_AXIL_DATA_WIDTH],
 			wskd_data, wskd_strb);
 
-	end else begin
+	end else begin : AXIL_ADDRESS
 
 		assign	new_cmdaddrhi = 0;
 

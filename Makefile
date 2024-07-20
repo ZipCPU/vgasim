@@ -12,6 +12,7 @@
 ##
 ################################################################################
 ##
+## }}}
 ## Copyright (C) 2018-2024, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
@@ -35,7 +36,7 @@
 ##
 ################################################################################
 ##
-##
+## }}}
 all:	bench
 .PHONY: rtl demo bench formal
 SUBMAKE := $(MAKE) --no-print-directory -C

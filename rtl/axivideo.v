@@ -240,7 +240,9 @@ module	axivideo #(
 	// Local declarations
 	// {{{
 	wire	i_clk   =  S_AXI_ACLK;
+	// Verilator lint_off SYNCASYNCNET
 	wire	i_reset = !S_AXI_ARESETN;
+	// Verilator lint_on  SYNCASYNCNET
 
 	wire	arskd_valid;
 	wire	awskd_valid, wskd_valid;
@@ -310,7 +312,6 @@ module	axivideo #(
 
 	wire		vin_valid, vin_ready, vin_hsync, vin_vsync;
 	wire	[23:0]	vin_data;
-
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -917,9 +918,11 @@ module	axivideo #(
 		// {{{
 		.i_hm_width(hm_width), .i_hm_porch(hm_porch),
 			.i_hm_synch(hm_synch), .i_hm_raw(hm_raw),
+			.i_hm_syncpol(1'b0),
 		//
 		.i_vm_height(vm_height), .i_vm_porch(vm_porch),
 			.i_vm_synch(vm_synch), .i_vm_raw(vm_raw),
+			.i_vm_syncpol(1'b0),
 		// }}}
 		// HDMI outputs
 		.o_red(o_hdmi_red), .o_grn(o_hdmi_grn), .o_blu(o_hdmi_blu)

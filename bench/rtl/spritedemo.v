@@ -116,7 +116,6 @@ module	spritedemo #(
 	wire				axil_vid_wvalid, axil_vid_wready;
 	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_vid_wdata;
 	wire [C_AXIL_DATA_WIDTH/8-1:0]	axil_vid_wstrb;
-	wire	[2:0]			axil_vid_awprot;
 	wire				axil_vid_bvalid, axil_vid_bready;
 	wire	[1:0]			axil_vid_bresp;
 	wire				axil_vid_arvalid, axil_vid_arready;
@@ -135,7 +134,6 @@ module	spritedemo #(
 	wire				axil_sprite_wvalid, axil_sprite_wready;
 	wire	[C_AXIL_DATA_WIDTH-1:0]	axil_sprite_wdata;
 	wire [C_AXIL_DATA_WIDTH/8-1:0]	axil_sprite_wstrb;
-	wire	[2:0]			axil_sprite_awprot;
 	wire				axil_sprite_bvalid, axil_sprite_bready;
 	wire	[1:0]			axil_sprite_bresp;
 	wire				axil_sprite_arvalid,axil_sprite_arready;

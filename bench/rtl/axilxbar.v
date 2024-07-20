@@ -80,7 +80,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype none
 // }}}
 module	axilxbar #(
@@ -115,9 +114,9 @@ module	axilxbar #(
 		// maps to the given slave or not
 		// Verilator lint_off WIDTH
 		parameter	[NS*AW-1:0]	SLAVE_MASK =
-			(NS <= 1) ? { 4'b1111, {(AW-4){1'b0}}}
+			(NS <= 1) ? { 4'b1111, {(AW-4){1'b0}} }
 			: { {(NS-2){ 3'b111, {(AW-3){1'b0}} }},
-				{(2){ 4'b1111, {(AW-4){1'b0}}}} },
+				{(2){ 4'b1111, {(AW-4){1'b0}} }} },
 		// Verilator lint_on WIDTH
 		//
 		// If set, OPT_LOWPOWER will set all unused registers, both
@@ -142,29 +141,33 @@ module	axilxbar #(
 		input	wire	S_AXI_ARESETN,
 		// Incoming AXI4-lite slave port(s)
 		// {{{
-		input	wire	[NM*C_AXI_ADDR_WIDTH-1:0]	S_AXI_AWADDR,
-		input	wire	[NM*3-1:0]			S_AXI_AWPROT,
 		input	wire	[NM-1:0]			S_AXI_AWVALID,
 		output	wire	[NM-1:0]			S_AXI_AWREADY,
+		input	wire	[NM*C_AXI_ADDR_WIDTH-1:0]	S_AXI_AWADDR,
+		// Verilator coverage_off
+		input	wire	[NM*3-1:0]			S_AXI_AWPROT,
+		// Verilator coverage_on
 		//
-		input	wire	[NM*C_AXI_DATA_WIDTH-1:0]	S_AXI_WDATA,
-		input	wire	[NM*C_AXI_DATA_WIDTH/8-1:0]	S_AXI_WSTRB,
 		input	wire	[NM-1:0]			S_AXI_WVALID,
 		output	wire	[NM-1:0]			S_AXI_WREADY,
+		input	wire	[NM*C_AXI_DATA_WIDTH-1:0]	S_AXI_WDATA,
+		input	wire	[NM*C_AXI_DATA_WIDTH/8-1:0]	S_AXI_WSTRB,
 		//
-		output	wire	[NM*2-1:0]			S_AXI_BRESP,
 		output	wire	[NM-1:0]			S_AXI_BVALID,
 		input	wire	[NM-1:0]			S_AXI_BREADY,
+		output	wire	[NM*2-1:0]			S_AXI_BRESP,
 		//
-		input	wire	[NM*C_AXI_ADDR_WIDTH-1:0]	S_AXI_ARADDR,
-		input	wire	[NM*3-1:0]			S_AXI_ARPROT,
 		input	wire	[NM-1:0]			S_AXI_ARVALID,
 		output	wire	[NM-1:0]			S_AXI_ARREADY,
+		input	wire	[NM*C_AXI_ADDR_WIDTH-1:0]	S_AXI_ARADDR,
+		// Verilator coverage_off
+		input	wire	[NM*3-1:0]			S_AXI_ARPROT,
+		// Verilator coverage_on
 		//
-		output	wire	[NM*C_AXI_DATA_WIDTH-1:0]	S_AXI_RDATA,
-		output	wire	[NM*2-1:0]			S_AXI_RRESP,
 		output	wire	[NM-1:0]			S_AXI_RVALID,
 		input	wire	[NM-1:0]			S_AXI_RREADY,
+		output	wire	[NM*C_AXI_DATA_WIDTH-1:0]	S_AXI_RDATA,
+		output	wire	[NM*2-1:0]			S_AXI_RRESP,
 		// }}}
 		// Outgoing AXI4-lite master port(s)
 		// {{{
@@ -231,7 +234,9 @@ module	axilxbar #(
 
 	// verilator lint_off UNUSED
 	wire	[LGMAXBURST-1:0]	w_sawpending	[0:NM-1];
+`ifdef	FORMAL
 	wire	[LGMAXBURST-1:0]	w_swpending	[0:NM-1];
+`endif
 	wire	[LGMAXBURST-1:0]	w_srpending	[0:NM-1];
 	// verilator lint_on  UNUSED
 	reg	[NM-1:0]		swfull;
@@ -266,8 +271,8 @@ module	axilxbar #(
 	wire	[AW-1:0]	skd_araddr			[0:NM-1];
 	wire	[3-1:0]		skd_arprot			[0:NM-1];
 
-	reg		r_bvalid	[0:NM-1];
-	reg	[1:0]	r_bresp		[0:NM-1];
+	reg	[NM-1:0]	r_bvalid;
+	reg	[1:0]		r_bresp		[0:NM-1];
 
 	reg	[NSFULL-1:0]	m_axi_awvalid;
 	reg	[NSFULL-1:0]	m_axi_awready;
@@ -288,7 +293,7 @@ module	axilxbar #(
 	reg	[NSFULL-1:0]	m_axi_rready;
 	// Verilator lint_on  UNUSED
 
-	reg			r_rvalid	[0:NM-1];
+	reg	[NM-1:0]	r_rvalid;
 	reg	[1:0]		r_rresp		[0:NM-1];
 	reg	[DW-1:0]	r_rdata		[0:NM-1];
 
@@ -342,19 +347,21 @@ module	axilxbar #(
 	begin : DECODE_WRITE_REQUEST
 		// {{{
 		wire	[NS:0]		wdecode;
+		reg	r_mawvalid, r_mwvalid;
 
 		// awskid
 		// {{{
 		skidbuffer #(
 			// {{{
 			.DW(AW+3), .OPT_OUTREG(OPT_SKID_INPUT)
+			// }}}
 		) awskid(
 			// {{{
-			S_AXI_ACLK, !S_AXI_ARESETN,
-			S_AXI_AWVALID[N], S_AXI_AWREADY[N],
-			{ S_AXI_AWADDR[N*AW +: AW], S_AXI_AWPROT[N*3 +: 3] },
-			skd_awvalid[N], !skd_awstall[N],
-				{ skd_awaddr[N], skd_awprot[N] }
+			.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
+			.i_valid(S_AXI_AWVALID[N]), .o_ready(S_AXI_AWREADY[N]),
+			.i_data({ S_AXI_AWADDR[N*AW +: AW], S_AXI_AWPROT[N*3 +: 3] }),
+			.o_valid(skd_awvalid[N]), .i_ready(!skd_awstall[N]),
+				.o_data({ skd_awaddr[N], skd_awprot[N] })
 			// }}}
 		);
 		// }}}
@@ -386,13 +393,16 @@ module	axilxbar #(
 		skidbuffer #(
 			// {{{
 			.DW(DW+DW/8), .OPT_OUTREG(OPT_SKID_INPUT)
-		) wskid
+			// }}}
+		) wskid (
 			// {{{
-			(S_AXI_ACLK, !S_AXI_ARESETN,
-			S_AXI_WVALID[N], S_AXI_WREADY[N],
-			{ S_AXI_WDATA[N*DW +: DW], S_AXI_WSTRB[N*DW/8 +: DW/8]},
-			skd_wvalid[N], (m_wvalid[N] && slave_waccepts[N]),
-					{ m_wdata[N], m_wstrb[N] }
+			.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
+			.i_valid(S_AXI_WVALID[N]), .o_ready(S_AXI_WREADY[N]),
+				.i_data({ S_AXI_WDATA[N*DW +: DW],
+						S_AXI_WSTRB[N*DW/8 +: DW/8]}),
+			.o_valid(skd_wvalid[N]),
+				.i_ready(m_wvalid[N] && slave_waccepts[N]),
+				.o_data({ m_wdata[N], m_wstrb[N] })
 			// }}}
 		);
 		// }}}
@@ -432,9 +442,8 @@ module	axilxbar #(
 		end
 		// }}}
 
+		// r_mawvalid, r_mwvalid
 		// {{{
-		reg	r_mawvalid, r_mwvalid;
-
 		always @(*)
 		begin
 			r_mawvalid= dcd_awvalid[N] && !swfull[N];
@@ -464,19 +473,21 @@ module	axilxbar #(
 	begin : DECODE_READ_REQUEST
 		// {{{
 		wire	[NS:0]		rdecode;
+		reg	r_marvalid;
 
 		// arskid
 		// {{{
 		skidbuffer #(
 			// {{{
 			.DW(AW+3), .OPT_OUTREG(OPT_SKID_INPUT)
+			// }}}
 		) arskid(
 			// {{{
-			S_AXI_ACLK, !S_AXI_ARESETN,
-			S_AXI_ARVALID[N], S_AXI_ARREADY[N],
-			{ S_AXI_ARADDR[N*AW +: AW], S_AXI_ARPROT[N*3 +: 3] },
-			skd_arvalid[N], !skd_arstall[N],
-				{ skd_araddr[N], skd_arprot[N] }
+			.i_clk(S_AXI_ACLK), .i_reset(!S_AXI_ARESETN),
+			.i_valid(S_AXI_ARVALID[N]), .o_ready(S_AXI_ARREADY[N]),
+			.i_data({ S_AXI_ARADDR[N*AW +: AW], S_AXI_ARPROT[N*3 +: 3] }),
+			.o_valid(skd_arvalid[N]), .i_ready(!skd_arstall[N]),
+				.o_data({ skd_araddr[N], skd_arprot[N] })
 			// }}}
 		);
 		// }}}
@@ -502,10 +513,8 @@ module	axilxbar #(
 		);
 		// }}}
 
-		// m_arvalid[N]
+		// r_marvalid -> m_arvalid[N]
 		// {{{
-		reg	r_marvalid;
-
 		always @(*)
 		begin
 			r_marvalid = dcd_arvalid[N] && !srfull[N];
@@ -623,8 +632,9 @@ module	axilxbar #(
 	// mwgrant, mrgrant
 	// {{{
 	generate for(M=0; M<NS; M=M+1)
-	begin
+	begin : GEN_GRANT
 		// {{{
+		initial	mwgrant[M] = 0;
 		always @(*)
 		begin
 			mwgrant[M] = 0;
@@ -653,6 +663,7 @@ module	axilxbar #(
 		reg			requested_channel_is_available;
 		reg			leave_channel;
 		reg	[LGNS-1:0]	requested_index;
+		wire			linger;
 		// }}}
 
 		// stay_on_channel
@@ -670,7 +681,7 @@ module	axilxbar #(
 		// {{{
 		always @(*)
 		begin
-			requested_channel_is_available = 
+			requested_channel_is_available =
 				|(wrequest[N][NS-1:0] & ~mwgrant
 						& ~wrequested[N][NS-1:0]);
 			if (wrequest[N][NS])
@@ -681,9 +692,8 @@ module	axilxbar #(
 		end
 		// }}}
 
-		wire	linger;
 		if (OPT_LINGER == 0)
-		begin
+		begin : NO_LINGER
 			// {{{
 			assign	linger = 0;
 			// }}}
@@ -787,7 +797,7 @@ module	axilxbar #(
 		// }}}
 		// }}}
 	end for (N=NM; N<NMFULL; N=N+1)
-	begin
+	begin : EMPTY_WRITE_REQUEST
 		// {{{
 		assign	swindex[N] = 0;
 		// }}}
@@ -802,6 +812,7 @@ module	axilxbar #(
 		reg			requested_channel_is_available;
 		reg			leave_channel;
 		reg	[LGNS-1:0]	requested_index;
+		wire			linger;
 		// }}}
 
 		// stay_on_channel
@@ -819,7 +830,7 @@ module	axilxbar #(
 		// {{{
 		always @(*)
 		begin
-			requested_channel_is_available = 
+			requested_channel_is_available =
 				|(rrequest[N][NS-1:0] & ~mrgrant
 						& ~rrequested[N][NS-1:0]);
 			if (rrequest[N][NS])
@@ -830,15 +841,13 @@ module	axilxbar #(
 		end
 		// }}}
 
-		wire	linger;
 		if (OPT_LINGER == 0)
-		begin
+		begin : NO_LINGER
 			// {{{
 			assign	linger = 0;
 			// }}}
 		end else begin : READ_LINGER
 			// {{{
-
 			reg [LGLINGER-1:0]	linger_counter;
 			reg			r_linger;
 
@@ -936,38 +945,24 @@ module	axilxbar #(
 		// }}}
 		// }}}
 	end for (N=NM; N<NMFULL; N=N+1)
-	begin
+	begin : EMPTY_READ_REQUEST
 		// {{{
 		assign	srindex[N] = 0;
 		// }}}
 	end endgenerate
-
-`ifdef	FORMAL
-	generate for (N=0; N<NM; N=N+1)
-	begin
-		always @(*)
-		if (dcd_awvalid[N])
-			assert(m_awprot[N] == 0);
-
-		always @(*)
-		if (dcd_arvalid[N])
-			assert(m_arprot[N] == 0);
-
-	end endgenerate
-`endif
 
 	// Calculate mwindex
 	generate for (M=0; M<NS; M=M+1)
 	begin : SLAVE_WRITE_INDEX
 		// {{{
 		if (NM <= 1)
-		begin
+		begin : ONE_MASTER
 			// {{{
 			assign mwindex[M] = 0;
 			// }}}
 		end else begin : MULTIPLE_MASTERS
 			// {{{
-			reg [LGNM-1:0]	reswindex;
+			reg [LGNM-1:0]		reswindex;
 			reg	[LGNM-1:0]	r_mwindex;
 
 			always @(*)
@@ -988,7 +983,7 @@ module	axilxbar #(
 		end
 		// }}}
 	end for (M=NS; M<NSFULL; M=M+1)
-	begin
+	begin : NO_WRITE_INDEX
 		// {{{
 		assign	mwindex[M] = 0;
 		// }}}
@@ -999,7 +994,7 @@ module	axilxbar #(
 	begin : SLAVE_READ_INDEX
 		// {{{
 		if (NM <= 1)
-		begin
+		begin : ONE_MASTER
 			// {{{
 			assign mrindex[M] = 0;
 			// }}}
@@ -1026,7 +1021,7 @@ module	axilxbar #(
 		end
 		// }}}
 	end for (M=NS; M<NSFULL; M=M+1)
-	begin
+	begin : NO_READ_INDEX
 		// {{{
 		assign	mrindex[M] = 0;
 		// }}}
@@ -1049,14 +1044,11 @@ module	axilxbar #(
 		//
 		reg			axi_bready;
 
-		reg	sawstall, swstall, mbstall;
+		wire	sawstall, swstall, mbstall;
 		// }}}
-		always @(*)
-			sawstall= (M_AXI_AWVALID[M]&& !M_AXI_AWREADY[M]);
-		always @(*)
-			swstall = (M_AXI_WVALID[M] && !M_AXI_WREADY[M]);
-		always @(*)
-			mbstall = (S_AXI_BVALID[mwindex[M]] && !S_AXI_BREADY[mwindex[M]]);
+		assign	sawstall= (M_AXI_AWVALID[M]&& !M_AXI_AWREADY[M]);
+		assign	swstall = (M_AXI_WVALID[M] && !M_AXI_WREADY[M]);
+		assign	mbstall = (S_AXI_BVALID[mwindex[M]] && !S_AXI_BREADY[mwindex[M]]);
 
 		// axi_awvalid
 		// {{{
@@ -1196,12 +1188,10 @@ module	axilxbar #(
 		//
 		reg				axi_rready;
 
-		reg	arstall, srstall;
+		wire	arstall, srstall;
 		// }}}
-		always @(*)
-			arstall= (M_AXI_ARVALID[M]&& !M_AXI_ARREADY[M]);
-		always @(*)
-			srstall = (S_AXI_RVALID[mrindex[M]]
+		assign	arstall= (M_AXI_ARVALID[M]&& !M_AXI_ARREADY[M]);
+		assign	srstall = (S_AXI_RVALID[mrindex[M]]
 						&& !S_AXI_RREADY[mrindex[M]]);
 
 		// axi_arvalid
@@ -1290,20 +1280,19 @@ module	axilxbar #(
 		reg		axi_bvalid;
 		reg	[1:0]	axi_bresp;
 		reg		i_axi_bvalid;
-		reg	[1:0]	i_axi_bresp;
-		reg		mbstall;
+		wire	[1:0]	i_axi_bresp;
+		wire		mbstall;
 
+		initial	i_axi_bvalid = 1'b0;
 		always @(*)
 		if (wgrant[N][NS])
 			i_axi_bvalid = m_wvalid[N] && slave_waccepts[N];
 		else
 			i_axi_bvalid = m_axi_bvalid[swindex[N]];
 
-		always @(*)
-			i_axi_bresp = m_axi_bresp[swindex[N]];
+		assign	i_axi_bresp = m_axi_bresp[swindex[N]];
 
-		always @(*)
-			mbstall = S_AXI_BVALID[N] && !S_AXI_BREADY[N];
+		assign	mbstall = S_AXI_BVALID[N] && !S_AXI_BREADY[N];
 
 		// r_bvalid
 		// {{{
@@ -1371,6 +1360,7 @@ module	axilxbar #(
 		assign	S_AXI_BVALID[N]       = axi_bvalid;
 		assign	S_AXI_BRESP[N*2 +: 2] = axi_bresp;
 `ifdef	FORMAL
+		// {{{
 		always @(*)
 		if (r_bvalid[N])
 			assert(r_bresp[N] != 2'b01);
@@ -1414,17 +1404,17 @@ module	axilxbar #(
 		reg			axi_rvalid;
 		reg	[1:0]		axi_rresp;
 		reg	[DW-1:0]	axi_rdata;
-		reg			srstall;
+		wire			srstall;
 		reg			i_axi_rvalid;
 
+		initial	i_axi_rvalid = 1'b0;
 		always @(*)
 		if (rgrant[N][NS])
 			i_axi_rvalid = m_arvalid[N] && slave_raccepts[N];
 		else
 			i_axi_rvalid = m_axi_rvalid[srindex[N]];
 
-		always @(*)
-			srstall = S_AXI_RVALID[N] && !S_AXI_RREADY[N];
+		assign	srstall = S_AXI_RVALID[N] && !S_AXI_RREADY[N];
 
 		initial	r_rvalid[N] = 0;
 		always @(posedge S_AXI_ACLK)
@@ -1542,7 +1532,7 @@ module	axilxbar #(
 	generate for (N=0; N<NM; N=N+1)
 	begin : COUNT_PENDING
 		// {{{
-		reg	[LGMAXBURST-1:0]	wpending, awpending, rpending,
+		reg	[LGMAXBURST-1:0]	awpending, rpending,
 						missing_wdata;
 		//reg				rempty, awempty; // wempty;
 		reg	r_wdata_expected;
@@ -1568,17 +1558,6 @@ module	axilxbar #(
 			swempty[N] <= 0;
 			swfull[N]     <= &awpending[LGMAXBURST-1:1];
 			end
-		default: begin end
-		endcase
-
-		initial	wpending = 0;
-		always @(posedge S_AXI_ACLK)
-		if (!S_AXI_ARESETN)
-			wpending <= 0;
-		else case ({(m_wvalid[N] && slave_waccepts[N]),
-				(S_AXI_BVALID[N] && S_AXI_BREADY[N])})
-		2'b01: wpending <= wpending - 1;
-		2'b10: wpending <= wpending + 1;
 		default: begin end
 		endcase
 
@@ -1629,19 +1608,32 @@ module	axilxbar #(
 		endcase
 
 		assign	w_sawpending[N] = awpending;
-		assign	w_swpending[N]  = wpending;
 		assign	w_srpending[N]  = rpending;
 
 		assign	wdata_expected[N] = r_wdata_expected;
 
 `ifdef	FORMAL
 		// {{{
-	reg	[LGMAXBURST-1:0]	f_missing_wdata;
+		reg	[LGMAXBURST-1:0]	wpending;
+		reg	[LGMAXBURST-1:0]	f_missing_wdata;
 
-	always @(*)
-		assert(missing_wdata == awpending - wpending);
-	always @(*)
-		assert(r_wdata_expected == (missing_wdata > 0));
+		initial	wpending = 0;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			wpending <= 0;
+		else case ({(m_wvalid[N] && slave_waccepts[N]),
+				(S_AXI_BVALID[N] && S_AXI_BREADY[N])})
+		2'b01: wpending <= wpending - 1;
+		2'b10: wpending <= wpending + 1;
+		default: begin end
+		endcase
+
+		assign	w_swpending[N]  = wpending;
+
+		always @(*)
+			assert(missing_wdata == awpending - wpending);
+		always @(*)
+			assert(r_wdata_expected == (missing_wdata > 0));
 		always @(*)
 			assert(awpending >= wpending);
 		// }}}
@@ -2011,11 +2003,11 @@ module	axilxbar #(
 			assert(fs_rd_outstanding[M] == 0);
 
 		always @(*)
-			assert(fs_awr_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}}});
+			assert(fs_awr_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}} });
 		always @(*)
-			assert(fs_wr_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}}});
+			assert(fs_wr_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}} });
 		always @(*)
-			assert(fs_rd_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}}});
+			assert(fs_rd_outstanding[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}} });
 
 		always @(*)
 		if (M_AXI_AWVALID[M])
@@ -2095,53 +2087,54 @@ module	axilxbar #(
 	// Can things transition without dropping the request line(s)?
 	generate for(N=0; N<NM; N=N+1)
 	begin : COVER_CONNECTIVITY_FROM_MASTER
-		reg [3:0]	w_returns, r_returns;
+		reg [3:0]	cvr_w_returns, cvr_r_returns;
 		reg		err_wr_return, err_rd_return;
-		reg [NS-1:0]	w_every, r_every;
-		reg		was_wevery, was_revery, whsreturn, rhsreturn;
+		reg [NS-1:0]	cvr_w_every, cvr_r_every;
+		reg		cvr_was_wevery, cvr_was_revery,
+				cvr_whsreturn, cvr_rhsreturn;
 
-		// w_returns is a speed check: Can we return one write
+		// cvr_w_returns is a speed check: Can we return one write
 		// acknowledgement per clock cycle?
-		initial	w_returns = 0;
+		initial	cvr_w_returns = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			w_returns = 0;
+			cvr_w_returns = 0;
 		else begin
-			w_returns <= { w_returns[2:0], 1'b0 };
+			cvr_w_returns <= { cvr_w_returns[2:0], 1'b0 };
 			if (S_AXI_BVALID[N] && S_AXI_BREADY[N] && !wgrant[N][NS])
-				w_returns[0] <= 1'b1;
+				cvr_w_returns[0] <= 1'b1;
 		end
 
-		initial	whsreturn = 0;
+		initial	cvr_whsreturn = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			whsreturn <= 0;
+			cvr_whsreturn <= 0;
 		else
-			whsreturn <= whsreturn || (&w_returns);
+			cvr_whsreturn <= cvr_whsreturn || (&cvr_w_returns);
 
 		// w_every is a connectivity test: Can we get a return from
 		// every slave?
-		initial	w_every = 0;
+		initial	cvr_w_every = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			w_every <= 0;
+			cvr_w_every <= 0;
 		else if (!S_AXI_AWVALID[N])
-			w_every <= 0;
+			cvr_w_every <= 0;
 		else begin
 			if (S_AXI_BVALID[N] && S_AXI_BREADY[N] && !wgrant[N][NS])
-				w_every[swindex[N]] <= 1'b1;
+				cvr_w_every[swindex[N]] <= 1'b1;
 		end
 
 		always @(posedge S_AXI_ACLK)
 		if (S_AXI_BVALID[N])
 			assert($stable(swindex[N]));
 
-		initial	was_wevery = 0;
+		initial	cvr_was_wevery = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			was_wevery <= 0;
+			cvr_was_wevery <= 0;
 		else
-			was_wevery <= was_wevery || (&w_every);
+			cvr_was_wevery <= cvr_was_wevery || (&cvr_w_every);
 
 		// err_wr_return is a test to make certain we can return a
 		// bus error on the write channel.
@@ -2155,9 +2148,9 @@ module	axilxbar #(
 
 `ifndef	VERILATOR
 		always @(*)
-			cover(!swgrant[N] && whsreturn);
+			cover(!swgrant[N] && cvr_whsreturn);
 		always @(*)
-			cover(!swgrant[N] && was_wevery);
+			cover(!swgrant[N] && cvr_was_wevery);
 
 		always @(*)
 			cover(S_AXI_ARESETN && wrequest[N][NS]);
@@ -2173,49 +2166,49 @@ module	axilxbar #(
 		if (S_AXI_BVALID[N])
 			assert(swgrant[N]);
 
-		// r_returns is a speed check: Can we return one read
+		// cvr_r_returns is a speed check: Can we return one read
 		// acknowledgment per clock cycle?
-		initial	r_returns = 0;
+		initial	cvr_r_returns = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			r_returns = 0;
+			cvr_r_returns = 0;
 		else begin
-			r_returns <= { r_returns[2:0], 1'b0 };
+			cvr_r_returns <= { cvr_r_returns[2:0], 1'b0 };
 			if (S_AXI_RVALID[N] && S_AXI_RREADY[N])
-				r_returns[0] <= 1'b1;
+				cvr_r_returns[0] <= 1'b1;
 		end
 
-		initial	rhsreturn = 0;
+		initial	cvr_rhsreturn = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			rhsreturn <= 0;
+			cvr_rhsreturn <= 0;
 		else
-			rhsreturn <= rhsreturn || (&r_returns);
+			cvr_rhsreturn <= cvr_rhsreturn || (&cvr_r_returns);
 
 
 		// r_every is a connectivity test: Can we get a read return from
 		// every slave?
-		initial	r_every = 0;
+		initial	cvr_r_every = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			r_every = 0;
+			cvr_r_every = 0;
 		else if (!S_AXI_ARVALID[N])
-			r_every = 0;
+			cvr_r_every = 0;
 		else begin
 			if (S_AXI_RVALID[N] && S_AXI_RREADY[N])
-				r_every[srindex[N]] <= 1'b1;
+				cvr_r_every[srindex[N]] <= 1'b1;
 		end
 
-		// was_revery is a return to idle check following the
+		// cvr_was_revery is a return to idle check following the
 		// connectivity test.  Since the connectivity test is cleared
 		// if there's ever a drop in the valid line, we need a separate
 		// wire to check that this master can return to idle again.
-		initial	was_revery = 0;
+		initial	cvr_was_revery = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
-			was_revery <= 0;
+			cvr_was_revery <= 0;
 		else
-			was_revery <= was_revery || (&r_every);
+			cvr_was_revery <= cvr_was_revery || (&cvr_r_every);
 
 		always @(posedge S_AXI_ACLK)
 		if (S_AXI_RVALID[N])
@@ -2231,9 +2224,9 @@ module	axilxbar #(
 
 `ifndef	VERILATOR
 		always @(*)
-			cover(!srgrant[N] && rhsreturn);	// @26
+			cover(!srgrant[N] && cvr_rhsreturn);	// @26
 		always @(*)
-			cover(!srgrant[N] && was_revery);	// @26
+			cover(!srgrant[N] && cvr_was_revery);	// @26
 
 		always @(*)
 			cover(S_AXI_ARVALID[N] && rrequest[N][NS]);
@@ -2253,33 +2246,33 @@ module	axilxbar #(
 			assert(S_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR);
 	end endgenerate
 
-	reg	multi_write_hit, multi_read_hit;
+	reg	cvr_multi_write_hit, cvr_multi_read_hit;
 
-	initial	multi_write_hit = 0;
+	initial	cvr_multi_write_hit = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		multi_write_hit <= 0;
+		cvr_multi_write_hit <= 0;
 	else if (fm_awr_outstanding[0] > 2 && !wgrant[0][NS])
-		multi_write_hit <= 1;
+		cvr_multi_write_hit <= 1;
 
-	initial	multi_read_hit = 0;
+	initial	cvr_multi_read_hit = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		multi_read_hit <= 0;
+		cvr_multi_read_hit <= 0;
 	else if (fm_rd_outstanding[0] > 2 && !rgrant[0][NS])
-		multi_read_hit <= 1;
+		cvr_multi_read_hit <= 1;
 
 	always @(*)
-		cover(multi_write_hit);
+		cover(cvr_multi_write_hit);
 
 	always @(*)
-		cover(multi_read_hit);
+		cover(cvr_multi_read_hit);
 
 	always @(*)
-		cover(S_AXI_ARESETN && multi_write_hit & mwgrant == 0 && M_AXI_BVALID == 0);
+		cover(S_AXI_ARESETN && cvr_multi_write_hit & mwgrant == 0 && M_AXI_BVALID == 0);
 
 	always @(*)
-		cover(S_AXI_ARESETN && multi_read_hit & mrgrant == 0 && M_AXI_RVALID == 0);
+		cover(S_AXI_ARESETN && cvr_multi_read_hit & mrgrant == 0 && M_AXI_RVALID == 0);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//

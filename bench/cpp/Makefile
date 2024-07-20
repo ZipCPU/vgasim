@@ -77,7 +77,7 @@ VROOT	:= $(VERILATOR_ROOT)
 VINCD   := $(VROOT)/include
 VINC	:= -I$(VINCD) -I$(VINCD)/vltstd -I$(VOBJDR)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VINCD)
-VDEFS   := $(shell ./vversion.sh)
+VDEFS   := $(shell bash ./vversion.sh)
 FLAGS	:= -Wall -Og -g $(VDEFS) -faligned-new
 GFXFLAGS:= $(FLAGS) `pkg-config gtkmm-3.0 --cflags`
 GFXLIBS := `pkg-config gtkmm-3.0 --libs`
@@ -86,7 +86,6 @@ SIMSOURCES:= vgasim.cpp hdmisim.cpp
 SIMOBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SIMSOURCES)))
 SIMHEADERS:= $(foreach header,$(subst .cpp,.h,$(SIMSOURCES)),$(wildcard $(header)))
 VOBJS   := $(OBJDIR)/verilated.o $(OBJDIR)/verilated_vcd_c.o $(OBJDIR)/verilated_threads.o
-
 
 SOURCES := main_tb.cpp vgasim.cpp vgasource.cpp hdmisim.cpp hdmisource.h
 HEADERS := image.h testb.h vgasim.h vgasource.h hdmisim.h hdmisource.h videomode.h image.cpp

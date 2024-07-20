@@ -226,10 +226,12 @@ module	axicamera #(
 	wire		pix_locked;
 	reg	[15:0]	pix_imwidth, pix_imhfront, pix_imhsync, pix_imwidth_raw;
 	reg	[15:0]	pix_imheight,pix_imvfront, pix_imvsync,pix_imheight_raw;
+	wire		pix_imhpol, pix_imvpol;
 
 	wire		bus_locked;
 	wire	[15:0]	bus_imwidth, bus_imhfront, bus_imhsync, bus_imwidth_raw;
 	wire	[15:0]	bus_imheight,bus_imvfront, bus_imvsync,bus_imheight_raw;
+	wire		bus_imhpol, bus_imvpol;
 
 	reg				axil_write_ready, axil_read_ready,
 					axil_read_valid, axil_bvalid;
@@ -375,6 +377,7 @@ module	axicamera #(
 			4'b1010: staging_data <= { bus_imvsync, bus_imhsync };
 			4'b1011: staging_data <= { bus_imheight_raw,
 							bus_imwidth_raw };
+			4'b1100: staging_data <= { 15'h0, bus_imvpol, 15'h0, bus_imhpol };
 			default: begin end
 			endcase
 		end else begin
@@ -478,9 +481,11 @@ module	axicamera #(
 		//
 		.o_width(pix_imwidth), .o_hfront(pix_imhfront),
 		.o_hsync(pix_imhsync), .o_raw_width(pix_imwidth_raw),
+		.o_hsync_pol(pix_imhpol),
 		//
 		.o_height(pix_imheight), .o_vfront(pix_imvfront),
 		.o_vsync(pix_imvsync), .o_raw_height(pix_imheight_raw),
+		.o_vsync_pol(pix_imvpol),
 		//
 		.o_locked(pix_locked)
 	);
@@ -495,9 +500,14 @@ module	axicamera #(
 
 	// _locked, _imwidth, _imheight
 	// {{{
-	tfrvalue #( .NB(1+32)
-	) tfrsz (.i_aclk(i_pix_clk), .i_value({ pix_locked, pix_imwidth, pix_imheight }),
-		.i_bclk(S_AXI_ACLK), .o_value({ bus_locked, bus_imwidth, bus_imheight })
+	tfrvalue #(
+		.NB(2+1+32)
+	) tfrsz (.i_aclk(i_pix_clk), .i_value({ pix_locked,
+				pix_imhpol, pix_imvpol,
+				pix_imwidth, pix_imheight }),
+		.i_bclk(S_AXI_ACLK), .o_value({ bus_locked,
+				bus_imhpol, bus_imvpol,
+				bus_imwidth, bus_imheight })
 	);
 	// }}}
 
@@ -513,9 +523,13 @@ module	axicamera #(
 
 	// _imhfront, _imvfront
 	// {{{
-	tfrvalue #( .NB(32)
-	) tfrporch (.i_aclk(i_pix_clk), .i_value({ pix_imhfront, pix_imvfront }),
-		.i_bclk(S_AXI_ACLK), .o_value({ bus_imhfront, bus_imvfront })
+	tfrvalue #(
+		.NB(32)
+	) tfrporch (
+		.i_aclk(i_pix_clk),
+			.i_value({ pix_imhfront, pix_imvfront }),
+		.i_bclk(S_AXI_ACLK),
+			.o_value({ bus_imhfront, bus_imvfront })
 	);
 	// }}}
 

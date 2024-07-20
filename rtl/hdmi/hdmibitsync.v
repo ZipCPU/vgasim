@@ -80,7 +80,6 @@ module	hdmibitsync (
 		.o_sync(auto_bitslip_b), .o_pix(auto_b)
 	);
 
-	assign	o_debug = dbg_grn;
 	// }}}
 
 	// all_locked
