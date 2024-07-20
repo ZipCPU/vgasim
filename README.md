@@ -9,10 +9,17 @@ displayed on the screen.  This is the basis of a frame buffer approach to
 video.  This capability is fully demonstrated via the [Verilator
 based](http://zipcpu.com/blog/2017/06/21/looking-at-verilator.html) simulator.
 
-There is now also an [AXI-based Video Controller](rtl/axivideo.v) that can
-produce either VGA or HDMI signals.  This controller is demonstrated via
-a [slightly different simulator](bench/cpp/axi_tb.cpp), including simulations
-for both [VGA](bench/cpp/vgasim.cpp) and [HDMI](bench/cpp/hdmisim.cpp).
+There are now also two AXI-based cores.  The first is an [AXI-based Video
+Controller](rtl/axivideo.v) that can produce either VGA or HDMI signals.  This
+controller is demonstrated via a [slightly different
+simulator](bench/cpp/axi_tb.cpp), including simulations for both
+[VGA](bench/cpp/vgasim.cpp) and [HDMI](bench/cpp/hdmisim.cpp).
+The [second AXI-based video controller will record incoming video signals to
+memory](rtl/axicamera.v).  The incoming capability is [demonstrated via
+a simulation](bench/rtl/axirepeater.v) to capture a piece of your screen via
+an [HDMI source simulator](bench/cpp/hdmisource.cpp), [write it to an AXI-based
+block RAM frame buffer memory](rtl/axivcamera.v), and then to [read it back out
+again](rtl/axivdisplay.v) to feed a GTK++ window.
 
 ## Simulation
 
@@ -21,8 +28,9 @@ components.  The first, either [VGASIM](bench/cpp/vgasim.cpp)
 or [HDMISIM](bench/cpp/hdmisim.cpp) takes video outputs from a
 Verilated [design module](bench/rtl/demo.v) and displays them on your screen
 as though it were the monitor the design was displaying to, and the
-[second](bench/cpp/vgasource.cpp) takes a piece of your screen and creates a
-VGA source signal with it.  (There's no simulated HDMI source presently.)
+[second](bench/cpp/vgasource.cpp) takes a piece of your screen and creates
+either [a VGA source signal](bench/cpp/vgasource.cpp) or [an HDMI source
+signal](bench/cpp/hdmisource.cpp) with it.
 
 All [video modes](bench/cpp/videomode.h)
 are supported by simply creating the [simulator object](bench/cpp/vgasim.cpp)
@@ -47,7 +55,10 @@ Be careful that you match the proper polarity of the sync pulses.
 There is a [master Makefile](Makefile) in this directory.  Hence, to build
 this project you should be able to just clone it,
 `git clone https://github.com/ZipCPU/vgasim`, run `make` in the main
-directory, and then run `main_tb` from within the `bench/cpp` directory.
+directory, and then run one of the test programs, such as `main_tb`, from
+within the `bench/cpp` directory.  For those that display images from the
+frame buffer, such as `main_tb` or `axi_tb`, be sure to wait long enough
+to see the outgoing image from the frame buffer--it takes a few seconds.
 
 The project depends upon having both Verilator and gtkmm-3.0 installed.
 
