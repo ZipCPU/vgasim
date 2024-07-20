@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_waterfall_r.v
+// Filename:	rtl/gfx/vid_waterfall_r.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -103,7 +103,8 @@ module	vid_waterfall_r #(
 	wire	[LGFIFO:0]		fifo_fill;
 	wire	[DW-1:0]		fifo_data, afifo_data;
 
-	wire				afifo_read, fifo_read;
+	wire				fifo_read;
+	reg				afifo_read;
 	reg				px_valid;
 	reg	[$clog2(DW+1)-1:0]	px_count;
 	reg	[DW-1:0]		px_data;
@@ -113,6 +114,12 @@ module	vid_waterfall_r #(
 	reg			wb_hlast, wb_vlast;
 	reg	[LGFRAME-1:0]	wb_hpos, wb_vpos, line_step;
 	reg	[AW-1:0]	line_addr;
+
+	reg			rx_vlast, rx_hlast;
+	reg	[LGFRAME-1:0]	rx_hpos, rx_vpos;
+	wire			fifo_vlast, fifo_hlast;
+	wire			afifo_vlast, afifo_hlast;
+	reg			px_vlast, px_hlast, px_lost_sync;
 
 `ifdef	FORMAL
 	wire	i_pixclk = i_clk;
@@ -191,7 +198,7 @@ module	vid_waterfall_r #(
 	always @(posedge i_clk)
 		line_step <= (i_width*PW + DW-1) >> $clog2(DW);
 
-	// o_wb_addr
+	// o_wb_addr, wb_[hv]pos, wb_[hv]last
 	// {{{
 	always @(posedge i_clk)
 	if (wb_reset)
@@ -257,14 +264,57 @@ module	vid_waterfall_r #(
 	//
 	//
 
+	// rx_[hv]pos, rx_[hv]last
+	always @(posedge i_clk)
+	if (wb_reset)
+	begin
+		// {{{
+		rx_hpos  <= 0;
+		rx_vpos  <= 0;
+		rx_hlast <= 0;
+		rx_vlast <= 0;
+		// }}}
+	end else if (!o_wb_cyc)
+	begin
+		// {{{
+		rx_hpos  <= wb_hpos;
+		rx_vpos  <= wb_vpos;
+		rx_hlast <= wb_hlast;
+		rx_vlast <= wb_vlast;
+		// }}}
+	end else if (i_wb_ack)
+	begin
+		// {{{
+		rx_hpos  <=  rx_hpos + 1;
+		rx_hlast <= (rx_hpos + 2 >= line_step);
+		if (rx_hlast)
+		begin
+			// {{{
+			rx_hpos  <= 0;
+			rx_hlast <= 0;
+
+			rx_vpos  <=  rx_vpos + 1;
+			rx_vlast <= (rx_vpos + 2 >= i_height);
+			if (rx_vlast)
+			begin
+				rx_vpos  <= 0;
+				rx_vlast <= 0;
+			end
+			// }}}
+		end
+		// }}}
+	end
+
 	sfifo #(
-		.BW(DW), .LGFLEN(LGFIFO), .OPT_ASYNC_READ(1'b0)
+		.BW(DW+2), .LGFLEN(LGFIFO), .OPT_ASYNC_READ(1'b0)
 	) pxfifo (
 		// {{{
 		.i_clk(i_clk), .i_reset(i_reset),
-		.i_wr(i_wb_ack), .i_data(i_wb_data), .o_full(ign_fifo_full),
-			.o_fill(fifo_fill),
-		.i_rd(fifo_read), .o_data(fifo_data), .o_empty(fifo_empty)
+		.i_wr(i_wb_ack), .i_data({ rx_vlast, rx_hlast, i_wb_data }),
+			.o_full(ign_fifo_full), .o_fill(fifo_fill),
+		.i_rd(fifo_read),
+			.o_data({ fifo_vlast, fifo_hlast, fifo_data }),
+			.o_empty(fifo_empty)
 		// }}}
 	);
 
@@ -294,14 +344,17 @@ module	vid_waterfall_r #(
 			{ r_pix_reset, r_pix_reset_pipe } <= { r_pix_reset_pipe, 1'b0 };
 
 		afifo #(
-			.WIDTH(DW), .LGFIFO(3)
+			.WIDTH(DW+2), .LGFIFO(3)
 		) pxfifo (
 			// {{{
 			.i_wclk(i_clk), .i_wr_reset_n(!i_reset),
-			.i_wr(fifo_read), .i_wr_data(fifo_data),
+			.i_wr(fifo_read),
+				.i_wr_data({ fifo_vlast,fifo_hlast,fifo_data }),
 				.o_wr_full(afifo_full),
 			.i_rclk(i_pixclk), .i_rd_reset_n(!pix_reset),
-			.i_rd(afifo_read), .o_rd_data(afifo_data),
+			.i_rd(afifo_read),
+				.o_rd_data({ afifo_vlast, afifo_hlast,
+								afifo_data }),
 				.o_rd_empty(afifo_empty)
 			// }}}
 		);
@@ -316,7 +369,8 @@ module	vid_waterfall_r #(
 		assign	pix_reset   = i_reset;
 		assign	fifo_read   = afifo_read;
 		assign	afifo_empty = fifo_empty;
-		assign	afifo_data  = fifo_data;
+		assign	{ afifo_vlast, afifo_hlast, afifo_data }
+				= { fifo_vlast, fifo_hlast, fifo_data };
 		// }}}
 	end endgenerate
 
@@ -329,9 +383,20 @@ module	vid_waterfall_r #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	assign	afifo_read = (!M_VID_TVALID || M_VID_TREADY)
-			&& ((px_count <= PW) || !px_valid
+
+	// afifo_read
+	// {{{
+	always @(*)
+	begin
+		afifo_read = (px_count <= PW || !px_valid
 			|| (M_VID_TVALID && M_VID_TREADY && M_VID_HLAST));
+		if (M_VID_TVALID && !M_VID_TREADY)
+			afifo_read = 1'b0;
+
+		if (px_lost_sync && (!px_hlast || !px_vlast))
+			afifo_read = 1'b1;
+	end
+	// }}}
 
 	// px_valid
 	// {{{
@@ -354,13 +419,36 @@ module	vid_waterfall_r #(
 	always @(posedge pix_clk)
 	if (pix_reset)
 		px_count <= DW;
-	else if (!M_VID_TVALID || M_VID_TREADY)
+	else if (px_lost_sync || !M_VID_TVALID || M_VID_TREADY)
 	begin
 		if (afifo_read)
 			px_count <= (afifo_empty) ? 0 : DW;
-		else
+		else if (px_lost_sync)
+			px_count <= PW;
+		else // if (px_count >= PW)
 			px_count <= px_count - PW;
 	end
+`ifdef	FORMAL
+	always @(*)
+	if (!pix_reset)
+	begin
+		// if (px_count == 0) assert(!px_valid);
+		assert(px_count <= DW);
+		assert(0 == (px_count & ((1<<$clog2(PW))-1)));
+	end
+`endif
+	// }}}
+
+	// px_hlast, px_vlast
+	// {{{
+	initial	{ px_vlast, px_hlast } = 0;
+	always @(posedge pix_clk)
+	if (pix_reset)
+	begin
+		px_vlast <= 0;
+		px_hlast <= 0;
+	end else if (afifo_read && !afifo_empty)
+		{ px_vlast, px_hlast } <= { afifo_vlast, afifo_hlast };
 	// }}}
 
 	// px_data
@@ -368,16 +456,43 @@ module	vid_waterfall_r #(
 	initial	px_data = 0;
 	always @(posedge pix_clk)
 	if (pix_reset)
-		px_data <= 0;
-	else if (!M_VID_TVALID || M_VID_TREADY)
 	begin
-		if (afifo_read && !afifo_empty)
+		px_data  <= 0;
+	end else if (!M_VID_TVALID || M_VID_TREADY)
+	begin
+		if (afifo_read && !afifo_empty && !px_lost_sync)
 			px_data <= afifo_data;
 		else if (OPT_MSB_FIRST)
 			px_data <= { px_data[DW-PW-1:0], {(PW){1'b0}} };
 		else
 			px_data <= { {(PW){1'b0}}, px_data[DW-1:PW] };
 	end
+	// }}}
+
+	// px_lost_sync
+	// {{{
+	initial	px_lost_sync = 0;
+	always @(posedge pix_clk)
+	if (pix_reset)
+		px_lost_sync <= 0;
+	else if (M_VID_TVALID && M_VID_TREADY && M_VID_HLAST)
+	begin
+		if (!px_hlast || (M_VID_VLAST && !px_vlast))
+		begin
+`ifdef	VERILATOR
+			if (!px_lost_sync) $display("Waterfall-R: Lost sync!");
+`endif
+			px_lost_sync <= 1'b1;
+		end else if (px_lost_sync && M_VID_VLAST && px_vlast)
+		begin
+`ifdef	VERILATOR
+			$display("Waterfall-R: Re-sync\'d");
+`endif
+			px_lost_sync <= 1'b0;
+		end
+	end
+
+	assign	o_err = px_lost_sync;
 	// }}}
 
 	// M_VID_TVALID, M_VID_TDATA
@@ -387,7 +502,7 @@ module	vid_waterfall_r #(
 	generate if (OPT_MSB_FIRST)
 	begin : MSB
 		assign M_VID_TDATA = px_data[DW-PW +: PW];
-	end else begin
+	end else begin : LSB
 		assign M_VID_TDATA = px_data[0 +: PW];
 	end endgenerate
 	// }}}
@@ -408,14 +523,18 @@ module	vid_waterfall_r #(
 	end else if (M_VID_TVALID && M_VID_TREADY)
 	begin
 		m_hpos <= m_hpos + 1;
-		M_VID_HLAST <= (i_width <= 1) || (m_hpos == i_width-2);
+		M_VID_HLAST <= (m_hpos >= px_width-2);
 		if (M_VID_HLAST)
 		begin
 			m_hpos <= 0;
 			m_vpos <= m_vpos + 1;
-			M_VID_VLAST <= (i_height <= 1) || (m_vpos == i_height-2);
+			M_VID_HLAST <= (px_width <= 1);
+			M_VID_VLAST <= (m_vpos >= px_height-2);
 			if (M_VID_VLAST)
+			begin
 				m_vpos <= 0;
+				M_VID_VLAST <= (px_height <= 1);
+			end
 		end
 	end
 	// }}}
@@ -427,7 +546,7 @@ module	vid_waterfall_r #(
 		reg	sof;
 
 		always @(posedge pix_clk)
-		if (i_reset)
+		if (pix_reset)
 			sof <= 1;
 		else if (M_VID_TVALID && M_VID_TREADY)
 		begin
@@ -442,6 +561,8 @@ module	vid_waterfall_r #(
 	end endgenerate
 	// }}}
 	// }}}
+
+	assign	o_dbg = { afifo_read, afifo_empty, px_vlast, px_hlast };
 
 	// Keep Verilator happy
 	// {{{
@@ -521,10 +642,21 @@ module	vid_waterfall_r #(
 		assert(fwb_outstanding <= (1<<LGBURST));
 		assert(f_committed + (o_wb_stb ? 1:0)
 			+ (last_request ? 0:1) <= (1<<LGFIFO));
+
+		if (i_wb_ack)
+			assert(!ign_fifo_full);
 	end
 
-	// always @(*)
-	// if (!i_reset && o_wb_cyc) assert(last_ack == (fwb_outstanding == 0));
+	always @(*)
+		assert(zero_outstanding == (wb_outstanding == 0));
+
+	// Make sure we don't close the WB bus cycle early
+	always @(posedge i_clk)
+	if (!f_past_valid || $past(i_reset) || $past(o_wb_cyc && i_wb_err))
+	begin
+		assert(wb_outstanding == 0 && !o_wb_cyc);
+	end else if ($past(o_wb_cyc) && !o_wb_cyc)
+		assert(wb_outstanding == 0);
 
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -649,6 +781,11 @@ module	vid_waterfall_r #(
 		end
 	end
 	// }}}
+
+	always @(*)
+		assume(i_en);
+	always @(*)
+		assume(!i_wb_err);
 
 	always @(*)
 		this_line = o_wb_addr - wb_hpos;

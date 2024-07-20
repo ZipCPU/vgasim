@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_waterfall.v
+// Filename:	rtl/gfx/vid_waterfall.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -19,8 +19,8 @@
 //		in the top level IP, although it should be.  (i.e., height,
 //		width, or video address changes should trigger a reset of the
 //		whole chain.
-//	3. The data is assumed to be synchronous with the bus, even though
-//		this may not be the case.
+//	3. The input data is assumed to be synchronous with the bus, even
+//		though this may not be the case.
 //	4. There should be an external enable switch, to keep the IP from
 //		trying to access memory prior to the configuration being set.
 //
@@ -30,7 +30,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -63,7 +63,7 @@ module	vid_waterfall #(
 		parameter	LGFIFO  = 7,
 		parameter	PW  = 8,	// Pixel width
 		localparam [0:0]	OPT_ASYNC_CLOCKS = 1'b1,
-		localparam [0:0]	OPT_TUSER_IS_SOF = 1'b1,
+		parameter [0:0]	OPT_TUSER_IS_SOF = 1'b1,
 `ifdef	WISHBONE
 		parameter	AW = 32,
 		parameter	DW = 32
@@ -81,6 +81,7 @@ module	vid_waterfall #(
 		// {{{
 		input	wire	[AW-1:0]	i_baseaddr, i_lastaddr,
 		input	wire [LGFRAME-1:0]	i_width, i_height,
+		input	wire			i_en,
 		// }}}
 		// Incoming data stream
 		// {{{
@@ -140,8 +141,9 @@ module	vid_waterfall #(
 		input	wire		M_VID_TREADY,
 		output	wire [PW-1:0]	M_VID_TDATA,
 		output	wire		M_VID_TLAST,
-		output	wire		M_VID_TUSER
+		output	wire		M_VID_TUSER,
 		// }}}
+		output	reg	[31:0]	o_debug
 		// }}}
 	);
 
@@ -164,6 +166,16 @@ module	vid_waterfall #(
 	wire			rd_ack, rd_stall, rd_err;
 
 	wire	[AW-1:0]	w_first_addr;
+	wire			read_err;
+
+	wire	px_hlast, px_vlast, px_read, px_empty;
+	wire	m_bus_pxread, m_bus_pxvlast, m_bus_pxhlast, m_bus_pxempty;
+	reg		dbg_pix_reset, dbg_pix_reset_pipe;
+	wire		m_bus_err, m_bus_valid, m_bus_ready, m_bus_tlast,
+			m_bus_tuser;
+	wire		ign_dbgafull, dbga_empty;
+
+
 	// }}}
 
 	vid_waterfall_w #(
@@ -184,6 +196,7 @@ module	vid_waterfall #(
 		.i_height(i_height), .i_width(i_width),
 		.i_baseaddr(i_baseaddr), .o_first_line(w_first_addr),
 			.i_lastaddr(i_lastaddr),
+		.i_en(i_en),
 		//
 		.o_wb_cyc(wr_cyc), .o_wb_stb(wr_stb), .o_wb_we(wr_we),
 			.o_wb_addr(wr_addr), .o_wb_data(wr_data),
@@ -208,6 +221,7 @@ module	vid_waterfall #(
 		.i_height(i_height), .i_width(i_width),
 		.i_baseaddr(i_baseaddr), .i_first_line(w_first_addr),
 			.i_lastaddr(i_lastaddr),
+		.i_en(i_en), .o_err(read_err),
 		//
 		.o_wb_cyc(rd_cyc), .o_wb_stb(rd_stb), .o_wb_we(rd_we),
 			.o_wb_addr(rd_addr), .o_wb_data(rd_data),
@@ -217,7 +231,9 @@ module	vid_waterfall #(
 		//
 		.M_VID_TVALID(M_VID_TVALID), .M_VID_TREADY(M_VID_TREADY),
 		.M_VID_TDATA( M_VID_TDATA), .M_VID_TLAST( M_VID_TLAST),
-		.M_VID_TUSER( M_VID_TUSER)
+		.M_VID_TUSER( M_VID_TUSER),
+		//
+		.o_dbg({ px_read, px_empty, px_vlast, px_hlast })
 		// }}}
 	);
 
@@ -241,4 +257,84 @@ module	vid_waterfall #(
 		// }}}
 	);
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Generate some debugging symbols--if needed
+	// {{{
+	always @(posedge i_pixclk or posedge bus_reset)
+	if (bus_reset)
+		{ dbg_pix_reset, dbg_pix_reset_pipe } <= -1;
+	else
+		{ dbg_pix_reset, dbg_pix_reset_pipe } <= { dbg_pix_reset_pipe, 1'b0 };
+
+	afifo #(
+		.LGFIFO(3), .WIDTH(9)
+	) u_dbgafifo (
+		// {{{
+		.i_wclk(i_pixclk),
+		.i_wr(1'b1),
+		.i_wr_reset_n(!dbg_pix_reset),
+		.i_wr_data({ px_empty, px_read, px_vlast, px_hlast,
+				read_err, M_VID_TVALID, M_VID_TREADY,
+					M_VID_TLAST, M_VID_TUSER }),
+		.o_wr_full(ign_dbgafull),
+		.i_rclk(bus_clk), .i_rd_reset_n(!bus_reset),
+		.i_rd(1'b1), .o_rd_data(
+			{ m_bus_pxempty, m_bus_pxread, m_bus_pxvlast, m_bus_pxhlast,
+				m_bus_err, m_bus_valid, m_bus_ready,
+					m_bus_tlast, m_bus_tuser }),
+		.o_rd_empty(dbga_empty)
+		// }}}
+	);
+
+	always @(posedge i_clk)
+	begin
+		o_debug <= 0;
+
+		if (!dbga_empty)
+		begin
+			o_debug[7:3] <= { m_bus_err, m_bus_valid, m_bus_ready,
+						m_bus_tlast, m_bus_tuser };
+			o_debug[27:24] <= { m_bus_pxempty, m_bus_pxread,
+						m_bus_pxhlast, m_bus_pxvlast };
+		end else begin
+			o_debug[7:3] <= o_debug[7:3];
+			o_debug[27:24] <= o_debug[27:24];
+
+			// If ready *was* high, drop valid
+			if (o_debug[5])
+				o_debug[6] <= 1'b0;
+			// Since nothing is in the FIFO, ready must be low
+			o_debug[5] <= 1'b0;
+			// Everything else must either stay the same, or becomes
+			// a don't care, so ... we'll keep it the same.
+		end
+
+		o_debug[2:0] <= {
+			S_AXIS_TVALID,
+			S_AXIS_TREADY,
+			S_AXIS_TLAST };
+
+		o_debug[12:8] <= { wr_cyc, wr_stb, wr_stall,
+					wr_cyc && wr_ack, wr_cyc && wr_err };
+		o_debug[17:13] <= { rd_cyc, rd_stb, rd_stall,
+					rd_cyc && rd_ack, rd_cyc && rd_err };
+		o_debug[23:18] <= { o_wb_cyc, o_wb_stb, o_wb_we, i_wb_stall,
+					o_wb_cyc && i_wb_ack,
+					o_wb_cyc && i_wb_err };
+		o_debug[28] <= dbga_empty;
+		o_debug[29] <= read_mem.last_ack;
+		o_debug[30] <= (read_mem.wb_outstanding == 0);
+
+		o_debug[31] <= m_bus_err && !o_debug[7];
+	end
+	// }}}
+
+	// Keep Verilator happy
+	// {{{
+	// Verilator lint_off UNUSED
+	wire	unused;
+	assign	unused = &{ 1'b0, ign_dbgafull };
+	// Verilator lint_on  UNUSED
+	// }}}
 endmodule

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vid_waterfall_w.v
+// Filename:	rtl/gfx/vid_waterfall_w.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -17,7 +17,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2022, Gisselquist Technology, LLC
+// Copyright (C) 2022-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -97,6 +97,7 @@ module	vid_waterfall_w #(
 	reg	[DW-1:0]		pix_buffer, pix_data;
 
 	reg			clear_fifo;
+	wire			fifo_rd;
 	wire	[DW-1:0]	fifo_data;
 	wire			fifo_full, fifo_empty;
 	wire	[LGFIFO:0]	fifo_fill;
@@ -248,9 +249,18 @@ module	vid_waterfall_w #(
 		clear_fifo <= 0;
 	else if ((o_wb_cyc && i_wb_err)
 			|| (pix_valid && !clear_fifo && fifo_full))
+	begin
 		clear_fifo <= 1;
-	else if (S_AXI_TVALID && S_AXI_TREADY && S_AXI_TLAST)
+`ifdef	VERILATOR
+		$display("WATERFALL-W: Lost sync!");
+`endif
+	end else if (S_AXI_TVALID && S_AXI_TREADY && S_AXI_TLAST)
+	begin
 		clear_fifo <= 0;
+`ifdef	VERILATOR
+		if (clear_fifo) $display("WATERFALL-W: Resync\'d");
+`endif
+	end
 	// }}}
 
 	sfifo #(
@@ -260,11 +270,12 @@ module	vid_waterfall_w #(
 		.i_clk(i_clk), .i_reset(i_reset || clear_fifo),
 		.i_wr(pix_valid), .i_data(pix_data), .o_full(fifo_full),
 			.o_fill(fifo_fill),
-		.i_rd(!staging_valid || (o_wb_stb && !i_wb_stall)),
+		.i_rd(fifo_rd),
 			.o_data(fifo_data), .o_empty(fifo_empty)
 		// }}}
 	);
 
+	assign	fifo_rd = !staging_valid || (o_wb_stb && !i_wb_stall);
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -279,7 +290,7 @@ module	vid_waterfall_w #(
 		staging_valid <= 0;
 	else if (clear_fifo)
 		staging_valid <= 0;
-	else if (!staging_valid || (o_wb_stb && !i_wb_stall))
+	else if (fifo_rd)
 		staging_valid <= !fifo_empty;
 
 	always @(posedge i_clk)
@@ -287,7 +298,7 @@ module	vid_waterfall_w #(
 		staging_data <= 0;
 	else if (clear_fifo)
 		staging_data <= 0;
-	else if (!staging_valid || (o_wb_stb && !i_wb_stall))
+	else if (fifo_rd)
 		staging_data <= fifo_data;
 
 	// }}}
@@ -320,6 +331,10 @@ module	vid_waterfall_w #(
 	always @(*)
 	if (wb_outstanding == 0 && !o_wb_stb)
 		assert(!o_wb_cyc);
+
+	always @(*)
+	if (o_wb_stb || fifo_fill > 1)
+		assert(staging_valid);
 `endif
 	// }}}
 
@@ -350,7 +365,7 @@ module	vid_waterfall_w #(
 		last_request <= 1;
 	else if (fifo_fill <= 2)
 		last_request <= 1;
-	// Once we starta  burst, we don't restart it.  We go until done
+	// Once we start a burst, we don't restart it.  We go until done
 	// else last_request <= 0;
 	// }}}
 
