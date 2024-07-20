@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	memdev.v
+// Filename:	bench/rtl/memdev.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -18,10 +18,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2022, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -48,7 +48,7 @@ module	memdev #(
 		parameter	LGMEMSZ=15, DW=32, EXTRACLOCK= 1,
 		parameter	HEXFILE="",
 		parameter [0:0]	OPT_ROM = 1'b0,
-		localparam	AW = LGMEMSZ - 2
+		localparam	AW = LGMEMSZ - $clog2(DW/8)
 		// }}}
 	) (
 		// {{{
@@ -70,6 +70,7 @@ module	memdev #(
 	wire	[(AW-1):0]	w_addr;
 	wire	[(DW/8-1):0]	w_sel;
 
+	// Declare the memory itself
 	reg	[(DW-1):0]	mem	[0:((1<<AW)-1)];
 	// }}}
 	////////////////////////////////////////////////////////////////////////
@@ -88,15 +89,14 @@ module	memdev #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Add a cycle of timing delay (if necessary)
+	// Add a clock cycle to memory accesses (if required)
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	generate
-	if (EXTRACLOCK == 0)
-	begin
-		// No timing delay
+
+	generate if (EXTRACLOCK == 0)
+	begin : NO_EXTRA_CLOCK
 		// {{{
 		assign	w_wstb = (i_wb_stb)&&(i_wb_we);
 		assign	w_stb  = i_wb_stb;
@@ -104,8 +104,7 @@ module	memdev #(
 		assign	w_data = i_wb_data;
 		assign	w_sel  = i_wb_sel;
 		// }}}
-	end else begin
-		// Add a cycle
+	end else begin : EXTRA_MEM_CLOCK_CYCLE
 		// {{{
 		// This is easier than a normal Wishbone delay, since we never
 		// stall and there are never any stalls on the output (like
@@ -116,7 +115,11 @@ module	memdev #(
 		reg	[(DW-1):0]	last_data;
 		reg	[(DW/8-1):0]	last_sel;
 
+		initial	last_wstb = 0;
 		always @(posedge i_clk)
+		if (i_reset)
+			last_wstb <= 0;
+		else
 			last_wstb <= (i_wb_stb)&&(i_wb_we);
 
 		initial	last_stb = 1'b0;
@@ -153,24 +156,23 @@ module	memdev #(
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Writes to memory
+	// (Optionally) Write to memory
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
 	generate if (!OPT_ROM)
 	begin : WRITE_TO_MEMORY
+		// {{{
+		integer	ik;
 
 		always @(posedge i_clk)
+		if (w_wstb)
 		begin
-			if ((w_wstb)&&(w_sel[3]))
-				mem[w_addr][31:24] <= w_data[31:24];
-			if ((w_wstb)&&(w_sel[2]))
-				mem[w_addr][23:16] <= w_data[23:16];
-			if ((w_wstb)&&(w_sel[1]))
-				mem[w_addr][15: 8] <= w_data[15:8];
-			if ((w_wstb)&&(w_sel[0]))
-				mem[w_addr][ 7: 0] <= w_data[7:0];
+			for(ik=0; ik<DW/8; ik=ik+1)
+			if (w_sel[ik])
+				mem[w_addr][ik*8 +: 8] <= w_data[ik*8 +: 8];
 		end
 `ifdef	VERILATOR
 	end else begin : VERILATOR_ROM
@@ -181,15 +183,17 @@ module	memdev #(
 		assign	rom_unused = &{ 1'b0, w_wstb, w_data, w_sel };
 		// Verilator lint_on  UNUSED
 `endif
+		// }}}
 	end endgenerate
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Wishbone bus returns
+	// Wishbone return signaling
 	// {{{
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+
 	initial	o_wb_ack = 1'b0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -199,11 +203,12 @@ module	memdev #(
 
 	assign	o_wb_stall = 1'b0;
 	// }}}
+
 	// Make verilator happy
 	// {{{
 	// verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = i_wb_cyc;
+	assign	unused = { 1'b0 };
 	// verilator lint_on UNUSED
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
