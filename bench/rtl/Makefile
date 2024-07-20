@@ -12,10 +12,10 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2017-2022, Gisselquist Technology, LLC
+## Copyright (C) 2017-2024, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
-## modify it under the terms of  the GNU General Public License as published
+## modify it under the terms of the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
 ## your option) any later version.
 ##
@@ -40,15 +40,19 @@ all:	test
 FBDIR := .
 VDIRFB:= $(FBDIR)/obj_dir
 RTL   := ../../rtl
-DEMOS := demo axidemo axihdmi
+DEMOS := demo axidemo axihdmi axirepeater spritedemo histdemo tracedemo
 .PHONY: $(DEMOS)
 
 .DELETE_ON_ERROR:
 
-test: demo axidemo axihdmi
+test: demo axidemo axihdmi axirepeater spritedemo histdemo tracedemo
 demo:        $(VDIRFB)/Vdemo__ALL.a
 axidemo:     $(VDIRFB)/Vaxidemo__ALL.a
 axihdmi:     $(VDIRFB)/Vaxihdmi__ALL.a
+axirepeater: $(VDIRFB)/Vaxirepeater__ALL.a
+spritedemo:  $(VDIRFB)/Vspritedemo__ALL.a
+histdemo:    $(VDIRFB)/Vhistdemo__ALL.a
+tracedemo:   $(VDIRFB)/Vtracedemo__ALL.a
 
 VOBJ := obj_dir
 SUBMAKE := $(MAKE) --no-print-directory --directory=$(VOBJ) -f
@@ -97,6 +101,32 @@ $(VDIRFB)/Vaxihdmi.cpp $(VDIRFB)/Vaxihdmi.mk: axidemo.v demofull.v $(RTL)/axivdi
 	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi --prefix Vaxihdmi -cc axidemo.v
 ## }}}
 
+## axirepeater
+## {{{
+$(VDIRFB)/Vaxirepeater.cpp $(VDIRFB)/Vaxirepeater.mk: axirepeater.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
+	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc axirepeater.v
+## }}}
+
+## spritedemo
+## {{{
+$(VDIRFB)/Vspritedemo.cpp $(VDIRFB)/Vspritedemo.mk: spritedemo.v demofull.v $(RTL)/axivcamera.v $(RTL)/hdmi2vga.v
+	$(VERILATOR) $(VFLAGS) -DHDMI -y $(RTL)/ -y $(RTL)/hdmi -cc spritedemo.v
+## }}}
+
+## histdemo
+## {{{
+$(VDIRFB)/Vhistdemo.cpp $(VDIRFB)/Vhistdemo.mk: histdemo.v sintable.v $(RTL)/axishdmi.v $(RTL)/sfifo.v $(RTL)/gfx/vid_histogram.v $(RTL)/hdmi/tmdsencode.v
+	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/gfx -y $(RTL)/hdmi -cc histdemo.v
+## }}}
+
+## tracedemo
+## {{{
+$(VDIRFB)/Vtracedemo.cpp $(VDIRFB)/Vtracedemo.mk: tracedemo.v sintable.v $(RTL)/axishdmi.v $(RTL)/sfifo.v $(RTL)/gfx/vid_trace.v $(RTL)/hdmi/tmdsencode.v
+	$(VERILATOR) $(VFLAGS) -y $(RTL)/ -y $(RTL)/gfx -y $(RTL)/hdmi -cc tracedemo.v
+## }}}
+
+## CLEAN
+## {{{
 .PHONY: clean
 clean:
 	rm -rf $(VDIRFB)/

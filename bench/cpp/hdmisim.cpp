@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	hdmisim.cpp
+// Filename:	bench/cpp/hdmisim.cpp
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -18,7 +18,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2018-2022, Gisselquist Technology, LLC
+// Copyright (C) 2018-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -49,13 +49,6 @@
 
 #include "hdmisim.h"
 #include "image.cpp"
-
-const int VIDEO_GUARD = 0,
-	VIDEO_DATA  = 1,
-	CTL_PERIOD  = 2,
-	DATA_GUARD  = 3,
-	DATA_ISLAND = 4,
-	HDMI_LOST   = 5;
 
 int	gbl_nframes = 0;
 const	int	HDMISIM::CLOCKS_PER_PIXEL = 1,
@@ -321,7 +314,7 @@ void	HDMISIM::operator()(const int blu, const int grn, const int red) {
 					m_vsync_count,
 					m_mode.raw_width() * m_mode.sync_lines()-1);
 			} else if (m_debug)
-				printf("\nVGA-FRAME\n");
+				printf("\nHDMI-FRAME\n");
 
 			gbl_nframes++;
 
@@ -481,8 +474,6 @@ bool	HDMISIM::on_draw(CONTEXT &gc) {
 	// {{{
 	// printf("ON-DRAW\n");
 	gc->save();
-	// gc->rectangle(0,0,VGA_WIDTH, VGA_HEIGHT);
-	// gc->clip();
 	gc->set_source(m_pix, 0, 0);
 	gc->paint();
 	gc->restore();

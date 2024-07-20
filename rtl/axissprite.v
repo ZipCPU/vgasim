@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axissprite.v
+// Filename:	rtl/axissprite.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -30,7 +30,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -46,10 +46,10 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -136,8 +136,8 @@ module	axissprite #(
 		output	reg		M_AXIS_TVALID,
 		input	wire		M_AXIS_TREADY,
 		output	reg	[BPP-1:0]	M_AXIS_TDATA,
-		output	reg		M_AXIS_TLAST,	// HLAST && VLAST
-		output	reg		M_AXIS_TUSER	// HLAST
+		output	wire		M_AXIS_TLAST,	// HLAST && VLAST
+		output	wire		M_AXIS_TUSER	// HLAST
 		// }}}
 		// }}}
 	);
@@ -166,6 +166,7 @@ module	axissprite #(
 						axil_read_reg;
 
 	reg	[3*SBPC+ALPHA_BITS-1:0]	spritemem	[0:MEMSZ-1];
+	reg	[15:0]			new_top, new_left;
 	reg	[LGFRAME-1:0]		bus_top, bus_left,
 					staged_top, staged_left,
 					this_top, this_left,
@@ -413,10 +414,16 @@ module	axissprite #(
 		last_bus_pos[0  +: LGFRAME] = bus_left;
 	end
 
+	always @(*)
+		{ new_top, new_left } = apply_wstrb(last_bus_pos, wskd_data,
+					wskd_strb);
+
 	always @(posedge S_AXI_ACLK)
 	if (axil_write_ready && !awskd_addr[LGMEMSZ-ADDRLSB])
-		{ bus_top, bus_left } <= apply_wstrb(last_bus_pos, wskd_data,
-					wskd_strb);
+	begin
+		bus_top  <= new_top[ 0 +: LGFRAME];
+		bus_left <= new_left[0 +: LGFRAME];
+	end
 	// }}}
 
 	// axil_read_mem: Read from memory
@@ -450,7 +457,7 @@ module	axissprite #(
 
 		assign	alpha_byte = r_alpha_byte;
 		// }}}
-	end else begin
+	end else begin : NO_ALPHA
 		assign	alpha_byte = 0;
 	end endgenerate
 	// }}}
@@ -487,7 +494,7 @@ module	axissprite #(
 
 	// apply_wstrb
 	// {{{
-	function [C_AXI_DATA_WIDTH-1:0]	apply_wstrb;
+	function automatic [C_AXI_DATA_WIDTH-1:0]	apply_wstrb;
 		input	[C_AXI_DATA_WIDTH-1:0]		prior_data;
 		input	[C_AXI_DATA_WIDTH-1:0]		new_data;
 		input	[C_AXI_DATA_WIDTH/8-1:0]	wstrb;
@@ -917,6 +924,8 @@ module	axissprite #(
 
 		// M_AXIS_TVALID, M_AXIS_TLAST, M_AXIS_TUSER
 		// {{{
+		reg	a3_tlast, a3_tuser;
+
 		initial	M_AXIS_TVALID = 1'b0;
 		always @(posedge S_VID_ACLK)
 		if (!S_VID_ARESETN)
@@ -926,7 +935,9 @@ module	axissprite #(
 
 		always @(posedge S_VID_ACLK)
 		if (a3_step)
-			{ M_AXIS_TLAST, M_AXIS_TUSER } <= { a2_tlast, a2_tuser };
+			{ a3_tlast, a3_tuser } <= { a2_tlast, a2_tuser };
+		assign	M_AXIS_TLAST = a3_tlast;
+		assign	M_AXIS_TUSER = a3_tuser;
 		// }}}
 
 		assign	vskd_ready = p_step  || !p_valid;
@@ -1162,22 +1173,28 @@ module	axissprite #(
 		// }}}
 
 		if (OPT_TUSER_IS_SOF)
-		begin
-			always @(*)
-				M_AXIS_TUSER = M_AXIS_SOF;
-			always @(*)
-				M_AXIS_TLAST = M_AXIS_HLAST;
-		end else begin
-			always @(*)
-				M_AXIS_TUSER = M_AXIS_HLAST;
-			always @(*)
-				M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
+		begin : OPT_SOF
+			assign	M_AXIS_TUSER = M_AXIS_SOF;
+			assign	M_AXIS_TLAST = M_AXIS_HLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_VLAST };
+			// Verilator lint_on  UNUSED
+		end else begin : OPT_VLAST
+			assign	M_AXIS_TUSER = M_AXIS_HLAST;
+			assign	M_AXIS_TLAST = M_AXIS_HLAST && M_AXIS_VLAST;
+
+			// Verilator lint_off UNUSED
+			wire	unused_tuser;
+			assign	unused_tuser = &{ 1'b0, M_AXIS_SOF };
+			// Verilator lint_on  UNUSED
 		end
 
 		// M_AXIS_TDATA
 		// {{{
 		if (ALPHA_BITS == 0)
-		begin
+		begin : GEN_NO_ALPHABITS
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
@@ -1187,12 +1204,12 @@ module	axissprite #(
 					M_AXIS_TDATA <= p_data;
 			end
 		end else // if (ALPHA_BITS == 1)
-		begin
+		begin : GEN_ONOFF_ALPHA
 			always @(posedge S_VID_ACLK)
 			if (p_step)
 			begin
-				if (in_sprite && spritepix[3*BPP])
-					M_AXIS_TDATA <= spritepix[3*BPP-1:0];
+				if (in_sprite && spritepix[BPP])
+					M_AXIS_TDATA <= spritepix[BPP-1:0];
 				else
 					M_AXIS_TDATA <= p_data;
 			end
@@ -1776,7 +1793,7 @@ module	axissprite #(
 		end
 		// }}}
 		// }}}
-	end else begin
+	end else begin : NO_SKIDBUFFER
 		assign	f_vskd_xpos = S_AXIS_XPOS;
 		assign	f_vskd_ypos = S_AXIS_YPOS;
 		assign	fvskd_known = fs_known;
@@ -1926,7 +1943,7 @@ module	axissprite #(
 		if (fM_known)
 		begin
 			assert(fp_known);
-		else if (fp_known)
+		end else if (fp_known)
 		begin
 			assert(M_AXIS_TVALID
 				&& (M_AXIS_XPOS == f_pixels_per_line-1)

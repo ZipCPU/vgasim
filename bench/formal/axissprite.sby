@@ -1,10 +1,18 @@
 [tasks]
-prf opt_skidbuffer
-prfns prf
+prf          opt_skidbuffer
+prfns    prf
+prfsof   prf opt_skidbuffer opt_sof
+prfsofns prf                opt_sof
+cvr
+# cvr opt_sof
 
 [options]
 prf: mode  prove
-depth 4
+cvr: mode  cover
+# depth 4
+depth 13
+cvr: depth 90
+multiclock on
 
 [engines]
 smtbmc
@@ -13,10 +21,18 @@ smtbmc
 read -formal skidbuffer.v
 read -formal axissprite.v
 read -formal faxil_slave.v
-opt_skidbuffer: hierarchy -top axissprite -chparam OPT_SKIDBUFFER 1
+read -formal faxivideo.v
+--pycode-begin--
+cmd = "hierarchy -top axissprite"
+cmd += " -chparam OPT_SKIDBUFFER   %d" % (1 if "opt_skidbuffer" in tags else 0)
+cmd += " -chparam OPT_TUSER_IS_SOF %d" % (1 if "opt_sof" in tags else 0)
+output(cmd)
+--pycode-end--
+proc -norom
 prep -top axissprite
 
 [files]
 ../../rtl/skidbuffer.v
 ../../rtl/axissprite.v
 faxil_slave.v
+faxivideo.v

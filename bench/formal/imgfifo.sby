@@ -22,6 +22,7 @@ read_verilog -D IMGFIFO            -formal transferstb.v
 read_verilog -D IMGFIFO            -formal imgfifo.v
 read_verilog -D IMGFIFO -DABSTRACT -formal atxfifo.v
 read_verilog -D IMGFIFO -formal fwb_master.v
+proc -norom
 prep -top imgfifo
 
 [files]

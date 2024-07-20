@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	afifo.v
+// Filename:	rtl/afifo.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -15,10 +15,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2022, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -31,10 +31,10 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -65,6 +65,16 @@ module afifo #(
 		// not burdened by any logic.  You can spare a clock of latency
 		// by clearing this register.
 		parameter [0:0]	OPT_REGISTER_READS = 1'b1
+`ifdef	FORMAL
+		// F_OPT_DATA_STB
+		// {{{
+		// In the formal proof, F_OPT_DATA_STB includes a series of
+		// assumptions associated with a data strobe I/O pin--things
+		// like a discontinuous clock--just to make sure the core still
+		// works in those circumstances
+		, parameter [0:0]	F_OPT_DATA_STB = 1'b1
+		// }}}
+`endif
 		// }}}
 	) (
 		// {{{
@@ -105,11 +115,11 @@ module afifo #(
 	// wclk - Write clock generation
 	// {{{
 	generate if (WRITE_ON_POSEDGE)
-	begin
+	begin : GEN_POSEDGECLK
 
 		assign	wclk = i_wclk;
 
-	end else begin
+	end else begin : GEN_NEGEDGECLK
 
 		assign	wclk = !i_wclk;
 
@@ -211,7 +221,7 @@ module afifo #(
 	// o_rd_empty, o_rd_data
 	// {{{
 	generate if (OPT_REGISTER_READS)
-	begin
+	begin : GEN_REGISTERED_READ
 		// {{{
 		always @(*)
 			lcl_read = (o_rd_empty || i_rd);
@@ -226,7 +236,7 @@ module afifo #(
 		if (lcl_read)
 			o_rd_data <= lcl_rd_data;
 		// }}}
-	end else begin
+	end else begin : GEN_COMBINATORIAL_FLAGS
 		// {{{
 		always @(*)
 			lcl_read = i_rd;
@@ -259,6 +269,11 @@ module afifo #(
 `define	ASSERT	assert
 `define	ASSUME	assert
 `endif
+	//
+	// In the formal proof, F_OPT_DATA_STB includes a series of assumptions
+	// associated with a data strobe I/O pin--things like a discontinuous
+	// clock--just to make sure the core still works in those circumstances
+	parameter [0:0]	F_OPT_DATA_STB = 1'b1;
 
 	(* gclk *)	reg	gbl_clk;
 	reg			f_past_valid_gbl, f_past_valid_rd,
@@ -359,6 +374,25 @@ module afifo #(
 		`ASSERT(lcl_rd_empty == past_rd_empty);
 	end
 
+
+	generate if (F_OPT_DATA_STB)
+	begin
+
+		always @(posedge gbl_clk)
+			`ASSUME(!o_wr_full);
+
+		always @(posedge gbl_clk)
+		if (!i_wr_reset_n)
+			`ASSUME(!i_wclk);
+
+		always @(posedge gbl_clk)
+			`ASSUME(i_wr == i_wr_reset_n);
+
+		always @(posedge gbl_clk)
+		if ($changed(i_wr_reset_n))
+			`ASSUME($stable(wclk));
+
+	end endgenerate
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -651,7 +685,7 @@ module afifo #(
 		f_state <= 2'b00;
 	endcase
 	// }}}
-		
+
 	// f_state invariants
 	// {{{
 	always @(*)
@@ -729,8 +763,29 @@ module afifo #(
 	end
 	// }}}
 
-	generate
-	begin : COVER_NEARLY_FULL
+`ifdef	AFIFO
+	generate if (!F_OPT_DATA_STB)
+	begin : COVER_FULL
+		// {{{
+		reg	cvr_full;
+
+		initial	cvr_full = 1'b0;
+		always @(posedge gbl_clk)
+		if (!i_wr_reset_n)
+			cvr_full <= 1'b0;
+		else if (o_wr_full)
+			cvr_full <= 1'b1;
+
+
+		always @(*)
+		if (f_past_valid_gbl && i_wr_reset_n)
+		begin
+			cover(o_wr_full);
+			cover(o_rd_empty && cvr_full);
+			cover(o_rd_empty && f_fill == 0 && cvr_full);
+		end
+		// }}}
+	end else begin : COVER_NEARLY_FULL
 		// {{{
 		reg	cvr_nearly_full;
 
@@ -752,6 +807,7 @@ module afifo #(
 		end
 		// }}}
 	end endgenerate
+`endif
 	// }}}
 `endif
 // }}}

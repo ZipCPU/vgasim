@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axishdmi
+// Filename:	rtl/axishdmi.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -13,10 +13,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2018-2022, Gisselquist Technology, LLC
+// Copyright (C) 2018-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -71,11 +71,13 @@ module	axishdmi #(
 		input	wire [HW-1:0]	i_hm_porch,
 		input	wire [HW-1:0]	i_hm_synch,
 		input	wire [HW-1:0]	i_hm_raw,
+		input	wire 		i_hm_syncpol,
 		//
 		input	wire [VW-1:0]	i_vm_height,
 		input	wire [VW-1:0]	i_vm_porch,
 		input	wire [VW-1:0]	i_vm_synch,
 		input	wire [VW-1:0]	i_vm_raw,
+		input	wire 		i_vm_syncpol,
 		// }}}
 		//
 		// HDMI outputs
@@ -92,7 +94,7 @@ module	axishdmi #(
 	reg		r_newline, r_newframe, lost_sync;
 	reg		vsync, hsync;
 	reg	[1:0]	hdmi_type;
-	reg	[3:0]	hdmi_ctl;
+	wire	[3:0]	hdmi_ctl;
 	reg	[11:0]	hdmi_data;
 	reg	[7:0]	red_pixel, grn_pixel, blu_pixel;
 	reg		pre_line;
@@ -154,7 +156,7 @@ module	axishdmi #(
 		// }}}
 	end else if (w_external_sync)
 	begin
-		hpos      <= i_hm_width;
+		hpos      <= i_hm_width-1;
 		r_newline <= 0;
 		hrd       <= 0;
 		hsync <= 1'b0;
@@ -368,15 +370,17 @@ module	axishdmi #(
 	end else
 		hdmi_type <= CTL_PERIOD;
 
-	always @(*)
-		hdmi_ctl = 4'h1;
+	assign	hdmi_ctl = 4'h1;
 	// }}}
 
 	// hdmi_data
 	// {{{
+	wire	[1:0]	sync_data;
+	assign		sync_data = { vsync ^ i_vm_syncpol,
+					hsync ^ i_hm_syncpol };
 	always @(*)
 	begin
-		hdmi_data[1:0]	= { vsync, hsync };
+		hdmi_data[1:0]	= sync_data;
 		hdmi_data[11:2] = 0;
 	end
 	// }}}
@@ -398,7 +402,7 @@ module	axishdmi #(
 `else
 	// Channel 0 = blue
 	tmdsencode #(.CHANNEL(2'b00)) hdmi_encoder_ch0(i_pixclk,
-			hdmi_type, { vsync, hsync },
+			hdmi_type, sync_data,
 			hdmi_data[3:0], blu_pixel, o_blu);
 
 	// Channel 1 = green

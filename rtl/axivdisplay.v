@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axivdisplay
+// Filename:	rtl/axivdisplay.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -94,10 +94,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -472,13 +472,13 @@ module	axivdisplay #(
 			wskd_data, wskd_strb);
 
 	generate if (C_AXI_ADDR_WIDTH > 32)
-	begin
+	begin : GEN_WIDE_ADDRESS
 
 		assign	new_cmdaddrhi = apply_wstrb(
 			wide_address[2*C_AXIL_DATA_WIDTH-1:C_AXIL_DATA_WIDTH],
 			wskd_data, wskd_strb);
 
-	end else begin
+	end else begin : ONEWORD_ADDR
 
 		assign	new_cmdaddrhi = 0;
 

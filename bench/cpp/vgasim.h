@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	vgasim.h
-//
+// Filename:	bench/cpp/vgasim.h
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	
@@ -10,11 +10,11 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -27,20 +27,21 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #ifndef	VGASIM_H
 #define	VGASIM_H
 
 #include <gtkmm.h>
 #include "image.h"
 #include "videomode.h"
+#include "simwin.h"
 
 class	VGASIM : public Gtk::DrawingArea {
 public:
@@ -141,7 +142,7 @@ public:
 	void	operator()(const int vsync, const int hsync,
 			const int r, const int g, const int b);
 	virtual	bool	on_draw(CONTEXT &gc);
-	bool	syncd(void) { return !m_out_of_sync; }
+	bool	syncd(void) const { return !m_out_of_sync; }
 
 
 	int	width(void) {
@@ -175,9 +176,13 @@ public:
 	int	vporch(void) {
 		return m_mode.vporch();
 	}
+
+	int	clocks_per_frame(void) const {
+		return m_mode.pixels_per_frame();
+	}
 };
 
-class	VGAWIN	: public Gtk::Window {
+class	VGAWIN	: public SIMWIN {
 private:
 	VGASIM	*m_vgasim;
 
@@ -190,7 +195,7 @@ public:
 	void	operator()(const int vsync, const int hsync, const int r, const int g, const int b) {
 		(*m_vgasim)(vsync, hsync, r, g, b);
 	}
-	bool	syncd(void) { return m_vgasim->syncd(); }
+	bool	syncd(void) const { return m_vgasim->syncd(); }
 
 
 	int	width(void) {

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	axisvga.v
+// Filename:	rtl/axisvga.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -12,10 +12,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -88,6 +88,7 @@ module	axisvga #(
 	// Local declarations
 	// {{{
 	reg	pix_reset, pix_reset_pipe;
+
 	reg	r_newline, r_newframe, lost_sync;
 
 	wire	[BPC-1:0]	i_red, i_grn, i_blu;
@@ -109,7 +110,6 @@ module	axisvga #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-
 	initial	{ pix_reset, pix_reset_pipe } = -1;
 	always @(posedge i_pixclk, posedge i_reset)
 	if (i_reset)

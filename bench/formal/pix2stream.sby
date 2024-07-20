@@ -1,0 +1,23 @@
+[tasks]
+prf
+prf64 prf bus64
+cvr
+
+[options]
+prf: mode prove
+prf: depth 3
+cvr: mode cover
+cvr: depth 80
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -formal skidbuffer.v
+read_verilog -formal pix2stream.v
+bus64: hierarchy -top pix2stream -chparam BUS_DATA_WIDTH 64
+prep -top pix2stream
+
+[files]
+../../rtl/skidbuffer.v
+../../rtl/pix2stream.v

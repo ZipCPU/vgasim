@@ -1,0 +1,24 @@
+[tasks]
+prf
+cvr
+
+[options]
+prf: mode prove
+prf: depth 5
+cvr: mode cover
+
+[engines]
+smtbmc
+
+[script]
+read -formal vid_empty.v
+read -formal faxivideo.v
+--pycode-begin--
+cmd = "hierarchy -top vid_empty"
+output(cmd)
+--pycode-end--
+prep -top vid_empty
+
+[files]
+faxivideo.v
+../../rtl/gfx/vid_empty.v

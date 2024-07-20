@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	vgatestsrc.v
-//
+// Filename:	rtl/vgatestsrc.v
+// {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	To create a series of colorbars, as a testing pattern.
@@ -10,11 +10,11 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -27,44 +27,58 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
-//
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
 `default_nettype	none
-//
-module	vgatestsrc(i_pixclk, i_reset,
+// }}}
+module	vgatestsrc #(
+		// {{{
+		parameter	BITS_PER_COLOR = 4,
+				HW=12, VW=12,
+		localparam	BPC = BITS_PER_COLOR,
+				BITS_PER_PIXEL = 3 * BPC,
+				BPP = BITS_PER_PIXEL
+		// }}}
+	) (
+		// {{{
+		input	wire			i_pixclk, i_reset,
 		// External connections
-		i_width, i_height,
-		i_rd, i_newline, i_newframe,
+		input	wire	[HW-1:0]	i_width,
+		input	wire	[VW-1:0]	i_height,
+		//
+		input	wire		i_rd, i_newline, i_newframe,
 		// VGA connections
-		o_pixel);
-	parameter	BITS_PER_COLOR = 4,
-			HW=12, VW=12;
-		//HW=13,VW=11;
-	localparam	BPC = BITS_PER_COLOR,
-			BITS_PER_PIXEL = 3 * BPC,
-			BPP = BITS_PER_PIXEL;
-	//
-	input	wire			i_pixclk, i_reset;
-	input	wire	[HW-1:0]	i_width;
-	input	wire	[VW-1:0]	i_height;
-	//
-	input	wire		i_rd, i_newline, i_newframe;
-	//
-	output	reg	[(BPP-1):0]	o_pixel;
+		output	reg	[(BPP-1):0]	o_pixel
+		// }}}
+	);
 
-
+	// Local declarations
+	// {{{
+	localparam	FRACB=16;
 
 	wire	[BPP-1:0]	white, black, purplish_blue, purple, dark_gray,
 				darkest_gray, mid_white, mid_cyan, mid_magenta,
 				mid_red, mid_green, mid_blue, mid_yellow;
 	wire	[BPC-1:0]	midv, mid_off;
 
+	reg	[HW-1:0]	hpos, hedge;
+	reg	[VW-1:0]	ypos, yedge;
+	reg	[3:0]		yline, hbar;
+
+	reg	dline;
+	reg	[BPP-1:0]	topbar, midbar, fatbar, gradient, pattern;
+	reg	[(HW-1):0]	last_width;
+	//
+	reg	[(FRACB-1):0]	hfrac, h_step;
+	// }}}
+
+	// Color declarations
+	// {{{
 	assign	midv    = { 2'b11, {(BPC-2){1'b0}} };
 	assign	mid_off = { (BPC){1'b0} };
 
@@ -87,10 +101,7 @@ module	vgatestsrc(i_pixclk, i_reset,
 	assign	mid_blue    = { mid_off, mid_off, midv    };
 	assign	mid_cyan    = { mid_off, midv,    midv    };
 	assign	mid_magenta = { midv,    mid_off, midv    };
-
-	reg	[HW-1:0]	hpos, hedge;
-	reg	[VW-1:0]	ypos, yedge;
-	reg	[3:0]		yline, hbar;
+	// }}}
 	//
 	//
 	// 1 Border
@@ -101,13 +112,18 @@ module	vgatestsrc(i_pixclk, i_reset,
 	// 1 gradient bar
 	// 1 border
 	//
-	reg	dline;
+
+	// dline
+	// {{{
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_newframe)||(i_newline))
 		dline <= 1'b0;
 	else if (i_rd)
 		dline <= 1'b1;
-	
+	// }}}	
+
+	// ypos, yline, yedge
+	// {{{
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_newframe))
 	begin
@@ -123,7 +139,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 			yedge <= yedge + { 4'h0, i_height[(VW-1):4] };
 		end
 	end
+	// }}}
 
+	// hpos, hbar, hedge
+	// {{{
 	initial	hpos  = 0;
 	initial	hbar  = 0;
 	initial	hedge = 0; // { 4'h0, i_width[(HW-1):4] };
@@ -142,8 +161,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 			hedge <= hedge + { 4'h0, i_width[(HW-1):4] };
 		end
 	end
+	// }}}
 
-	reg	[BPP-1:0]	topbar, midbar, fatbar, gradient, pattern;
+	// topbar (color)
+	// {{{
 	always @(posedge i_pixclk)
 	case(hbar[3:0])
 	4'h0: topbar <= black;
@@ -163,7 +184,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 	4'he: topbar <= mid_blue;
 	4'hf: topbar <= black;
 	endcase
+	// }}}
 
+	// midbar
+	// {{{
 	always @(posedge i_pixclk)
 	case(hbar[3:0])
 	4'h0: midbar <= black;
@@ -183,7 +207,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 	4'he: midbar <= mid_white;
 	4'hf: midbar <= black;
 	endcase
+	// }}}
 
+	// fatbar
+	// {{{
 	always @(posedge i_pixclk)
 	case(hbar[3:0])
 	4'h0: fatbar <= black;
@@ -203,21 +230,26 @@ module	vgatestsrc(i_pixclk, i_reset,
 	4'he: fatbar <= black;
 	4'hf: fatbar <= black;
 	endcase
+	// }}}
 
-	reg	[(HW-1):0]	last_width;
+	// last_width
+	// {{{
 	always @(posedge i_pixclk)
 		last_width <= i_width;
+	// }}}
 
+	// hfrac
+	// {{{
 	// Attempt to discover 1/i_width in h_step
-	localparam	FRACB=16;
-	//
-	reg	[(FRACB-1):0]	hfrac, h_step;
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_newline))
 		hfrac <= 0;
 	else if (i_rd)
 		hfrac <= hfrac + h_step;
+	// }}}
 
+	// h_step
+	// {{{
 	always @(posedge i_pixclk)
 	if ((i_reset)||(i_width != last_width))
 		h_step <= 1;
@@ -228,7 +260,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 		else if (hfrac < { {(FRACB-HW){1'b0}}, i_width })
 			h_step <= h_step - 1'b1;
 	end
+	// }}}
 
+	// gradient
+	// {{{
 	always @(posedge i_pixclk)
 	case(hfrac[FRACB-1:FRACB-4])
 	4'h0: gradient <= black;
@@ -253,7 +288,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 	//
 	4'hf: gradient <= black;
 	endcase
+	// }}}
 
+	// pattern
+	// {{{
 	always @(posedge i_pixclk)
 	case(yline)
 	4'h0: pattern <= black;
@@ -273,7 +311,10 @@ module	vgatestsrc(i_pixclk, i_reset,
 	4'he: pattern <= gradient;
 	4'hf: pattern <= black;
 	endcase
+	// }}}
 
+	// o_pixel
+	// {{{
 	always @(posedge i_pixclk)
 	if (i_newline)
 		o_pixel <= white;
@@ -286,6 +327,6 @@ module	vgatestsrc(i_pixclk, i_reset,
 		else
 			o_pixel <= pattern;
 	end
-
+	// }}}
 endmodule
 

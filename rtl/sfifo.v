@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	sfifo.v
+// Filename:	rtl/sfifo.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -10,11 +10,11 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2018-2022, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2018-2024, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -27,13 +27,12 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
-//
 //
 `default_nettype	none
 // }}}
@@ -106,7 +105,7 @@ module sfifo #(
 	else
 		o_full = r_full;
 	// }}}
-
+		
 	// wr_addr, the write address pointer
 	// {{{
 	initial	wr_addr = 0;
@@ -322,18 +321,17 @@ module sfifo #(
 	//
 
 	// Verilator lint_off UNDRIVEN
-	(* anyconst *)	reg	[LGFLEN:0]	fw_first_addr;
+	(* anyconst *)	reg	[LGFLEN:0]	f_first_addr;
 	// Verilator lint_on  UNDRIVEN
-			wire	[LGFLEN:0]	f_first_addr;
-			wire	[LGFLEN:0]	f_second_addr;
+			reg	[LGFLEN:0]	f_second_addr;
 			reg	[BW-1:0]	f_first_data, f_second_data;
 
-	reg	f_first_in_fifo, f_second_in_fifo;
+	reg	f_first_addr_in_fifo,  f_first_in_fifo;
+	reg	f_second_addr_in_fifo, f_second_in_fifo;
 	reg	[LGFLEN:0]	f_distance_to_first, f_distance_to_second;
-	reg	f_first_addr_in_fifo, f_second_addr_in_fifo;
 
-	assign f_first_addr  = fw_first_addr;
-	assign f_second_addr = f_first_addr + 1;
+	always @(*)
+		f_second_addr = f_first_addr + 1;
 
 	always @(*)
 	begin

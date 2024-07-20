@@ -1,11 +1,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	skidbuffer.v
+// Filename:	rtl/skidbuffer.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	A basic SKID buffer.
-// {{{
+//
 //	Skid buffers are required for high throughput AXI code, since the AXI
 //	specification requires that all outputs be registered.  This means
 //	that, if there are any stall conditions calculated, it will take a clock
@@ -28,9 +28,8 @@
 //	the incoming data is placed into a buffer.  Internally, that buffer
 //	is held in r_data with the r_valid flag used to indicate that valid
 //	data is within it.
-// }}}
+//
 // Parameters:
-// {{{
 //	DW or data width
 //		In order to make this core generic, the width of the data in the
 //		skid buffer is parameterized
@@ -51,16 +50,16 @@
 //	OPT_PASSTHROUGH
 //		Turns the skid buffer into a passthrough.  Used for formal
 //		verification only.
-// }}}
+//
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2019-2022, Gisselquist Technology, LLC
+// Copyright (C) 2019-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -73,13 +72,12 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
-//
 ////////////////////////////////////////////////////////////////////////////////
-//
 //
 `default_nettype none
 // }}}

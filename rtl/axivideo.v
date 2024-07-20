@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	AXIVIDEO
+// Filename:	rtl/axivideo.v
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -38,10 +38,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2022, Gisselquist Technology, LLC
+// Copyright (C) 2020-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -240,7 +240,9 @@ module	axivideo #(
 	// Local declarations
 	// {{{
 	wire	i_clk   =  S_AXI_ACLK;
+	// Verilator lint_off SYNCASYNCNET
 	wire	i_reset = !S_AXI_ARESETN;
+	// Verilator lint_on  SYNCASYNCNET
 
 	wire	arskd_valid;
 	wire	awskd_valid, wskd_valid;
@@ -917,9 +919,11 @@ module	axivideo #(
 		// {{{
 		.i_hm_width(hm_width), .i_hm_porch(hm_porch),
 			.i_hm_synch(hm_synch), .i_hm_raw(hm_raw),
+			.i_hm_syncpol(1'b0),
 		//
 		.i_vm_height(vm_height), .i_vm_porch(vm_porch),
 			.i_vm_synch(vm_synch), .i_vm_raw(vm_raw),
+			.i_vm_syncpol(1'b0),
 		// }}}
 		// HDMI outputs
 		.o_red(o_hdmi_red), .o_grn(o_hdmi_grn), .o_blu(o_hdmi_blu)

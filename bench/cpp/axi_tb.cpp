@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	axi_tb.cpp
+// Filename:	bench/cpp/axi_tb.cpp
 // {{{
 // Project:	vgasim, a Verilator based VGA simulator demonstration
 //
@@ -13,10 +13,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2022, Gisselquist Technology, LLC
+// Copyright (C) 2017-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
-// modify it under the terms of  the GNU General Public License as published
+// modify it under the terms of the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
 // your option) any later version.
 //
@@ -46,14 +46,18 @@
 #include <verilated_vcd_c.h>
 
 #include "verilated.h"
-#ifdef	HDMI
+#ifdef	SPRITETB
+  #include "Vspritedemo.h"
+  #define	VCORE	Vspritedemo
+  #ifndef	HDMI
+    #define	HDMI
+  #endif
+#elif	defined(HDMI)
   #include "Vaxihdmi.h"
   #define	VCORE	Vaxihdmi
-  #define	VMAIN	axihdmi
 #else
   #include "Vaxidemo.h"
   #define	VCORE	Vaxidemo
-  #define	VMAIN	axidemo
 #endif
 
 
@@ -272,15 +276,7 @@ public:
 #include "vgasim.h"
 #endif
 
-#ifdef	ROOT_VERILATOR
-#ifdef	HDMI
-  #include "Vaxihdmi___024root.h"
-#else
-  #include "Vaxidemo___024root.h"
-#endif
-
-#define	VVAR(A)	VMAIN ## __DOT_ ## A
-#elif defined(NEW_VERILATOR)
+#ifdef	NEW_VERILATOR
 #define	VVAR(A)	busmaster__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
@@ -295,6 +291,9 @@ private:
 	unsigned long	m_tx_busy_count;
 	bool		m_done, m_test;
 	int		m_state;
+#ifdef	SPRITETB
+	unsigned	m_frame_timer;
+#endif
 public:
 #ifdef	HDMI
 	HDMIWIN		m_win;
@@ -500,11 +499,42 @@ public:
 			issue_write(0x43c, 0xffffff);
 			m_state++;
 			} break;
+#ifndef	SPRITETB
 		default:
 			if (m_core->S_AXI_BVALID) {
 				printf("INIT SEQUENCE COMPLETE\n");
 			}
 			m_changed = false;
+#else
+		case 32: if (m_core->S_AXI_BVALID) {
+			issue_write(0x8000, 0);
+			m_state++;
+			m_frame_timer = 0;
+			} break;
+		case 33: if (m_core->S_AXI_BVALID)
+				m_state++;
+			m_frame_timer = 0;
+			break;
+		case 34:
+			m_frame_timer++;
+			if (m_frame_timer >= 1000 * 1000) {
+				static int m_xpos = 0, m_ypos = 0;
+				const	int	m_dx = 5;
+				const	int	m_dy = 12;
+				m_xpos = m_xpos + m_dx;
+				m_xpos &= 1023;
+				m_ypos = m_ypos + m_dy;
+				m_xpos &= 1023;
+				issue_write(0x8000, (m_ypos << 16) | m_xpos);
+				m_frame_timer = 0;
+				m_state = 33;
+			} break;
+		default:
+			if (m_core->S_AXI_BVALID) {
+				printf("INIT SEQUENCE COMPLETE\n");
+			}
+			m_changed = false;
+#endif
 		} m_changed = true;
 	}
 	// }}}
