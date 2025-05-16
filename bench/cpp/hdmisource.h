@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2020-2024, Gisselquist Technology, LLC
+// Copyright (C) 2020-2025, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -68,10 +68,10 @@ public:
 		m_count = 0;
 
 		switch(channel) {
-		case 0: m_guard = 0x2cc;	break;
-		case 1: m_guard = 0x133;	break;
+		case 0: m_guard = 0x2cc;	break;	// = 0x00 1100 1101/0CD
+		case 1: m_guard = 0x133;	break;	// = 0x11 0011 0010/332
 		default:
-			m_guard = 0x2cc;
+			m_guard = 0x2cc;		// = 0x00 1100 1101/0CD
 		}
 	}
 
@@ -91,7 +91,6 @@ class	HDMISOURCE {
 	GdkWindow	*m_root_window;
 	gint		m_root_width, m_root_height;
 	gint		m_xoffset, m_yoffset;
-	int		m_xpos, m_ypos;
 	const int	SYNC_ACTIVE = 1, SYNC_INACTIVE = 0;
 	VIDEOMODE	m_mode;
 	int		m_bytes_per_pixel;
@@ -101,6 +100,8 @@ class	HDMISOURCE {
 	void	init(void);
 
 public:
+	int		m_xpos, m_ypos;
+	int		m_hsync, m_vsync;
 
 	HDMISOURCE(VIDEOMODE m) : m_mode(m), tmdsblu(0), tmdsgrn(1), tmdsred(2) {
 		init();

@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2017-2024, Gisselquist Technology, LLC
+// Copyright (C) 2017-2025, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as published
@@ -45,7 +45,7 @@ template<class PIXEL> void IMAGE<PIXEL>::allocbuf(int h, int w) {
 	sz = h*w*sizeof(PIXEL)+sizeof(PIXEL *)*h;
 	m_buf = new unsigned char[sz];
 	assert(m_buf);
-				
+
 	m_img  = (PIXEL **)m_buf;
 	m_data = (PIXEL *)&m_buf[sizeof(PIXEL *)*h];
 	for(i=0; i<h; i++)

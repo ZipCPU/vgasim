@@ -15,10 +15,10 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2017-2022, Gisselquist Technology, LLC
+## Copyright (C) 2017-2025, Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
-## modify it under the terms of  the GNU General Public License as published
+## modify it under the terms of the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
 ## your option) any later version.
 ##
@@ -162,7 +162,7 @@ $(VID2PIX)_cvr/PASS: $(VID2PIX).sby $(RTL)/$(VID2PIX).v $(RTL)/skidbuffer.v
 .PHONY: $(WFALLW) waterfall
 ## {{{
 waterfall: $(WFALLW) $(WFALLR)
-$(WFALLW): $(WFALLW)_prf/PASS $(WFALLW)_cvr/PASS
+$(WFALLW): $(WFALLW)_prf/PASS # $(WFALLW)_cvr/PASS
 $(WFALLW)_prf/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
 	sby -f $(WFALLW).sby prf
 $(WFALLW)_cvr/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
