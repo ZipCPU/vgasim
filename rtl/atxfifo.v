@@ -1,8 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	atxfifo.v
+// Filename: 	rtl/atxfifo.v
 // {{{
-// Project:	afifo, A formal proof of Cliff Cummings' asynchronous FIFO
+// Project:	vgasim, a Verilator based VGA simulator demonstration
 //
 // Purpose:	This file defines the behaviour of an asynchronous FIFO.
 //		It was originally copied from a paper by Clifford E. Cummings
@@ -31,7 +31,7 @@
 // Technology, LLC, and Copyrighted as such.  Hence, the following copyright
 // statement regarding these properties:
 // }}}
-// Copyright (C) 2018-2024, Gisselquist Technology, LLC
+// Copyright (C) 2018-2025, Gisselquist Technology, LLC
 // {{{
 // These properties are free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
