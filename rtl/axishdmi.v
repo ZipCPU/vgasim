@@ -402,17 +402,17 @@ module	axishdmi #(
 `else
 	// Channel 0 = blue
 	tmdsencode #(.CHANNEL(2'b00)) hdmi_encoder_ch0(i_pixclk,
-			hdmi_type, sync_data,
+			1'b0, hdmi_type, sync_data,
 			hdmi_data[3:0], blu_pixel, o_blu);
 
 	// Channel 1 = green
 	tmdsencode #(.CHANNEL(2'b01)) hdmi_encoder_ch1(i_pixclk,
-			hdmi_type, hdmi_ctl[1:0],
+			1'b0, hdmi_type, hdmi_ctl[1:0],
 			hdmi_data[7:4], grn_pixel, o_grn);
 
 	// Channel 2 = red
 	tmdsencode #(.CHANNEL(2'b10)) hdmi_encoder_ch2(i_pixclk,
-			hdmi_type, hdmi_ctl[3:2],
+			1'b0, hdmi_type, hdmi_ctl[3:2],
 			hdmi_data[11:8], red_pixel, o_red);
 `endif
 	// }}}
