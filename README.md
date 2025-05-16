@@ -67,4 +67,3 @@ The project depends upon having both Verilator and gtkmm-3.0 installed.
 All of the source code in this repository is released under the
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html).  If these conditions
 are not sufficient for your needs, other licenses terms may be purchased.
-

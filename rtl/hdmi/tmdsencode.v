@@ -42,6 +42,7 @@ module	tmdsencode #(
 	) (
 		// {{{
 		input	wire		i_clk,
+		input	wire		i_gtype, // = 0 for video, 1 for data
 		input	wire	[1:0]	i_dtype,
 		input	wire	[1:0]	i_ctl,
 		input	wire	[3:0]	i_aux,
@@ -52,65 +53,63 @@ module	tmdsencode #(
 
 	// Local declarations
 	// {{{
-	reg	[9:0]	guard_word;
-	reg	[1:0]	r_dtype;
-	reg	[9:0]	ctrl_word;
-	reg	[1:0]	r_ctl;
-	reg	[9:0]	aux_word;
-	reg	[3:0]	r_aux;
-	reg	[3:0]	ones, ones_counter;
-	reg	[3:0]	qm_ones, qm_ones_counter;
-	reg	[8:0]	q_m;
-	reg	[9:0]	pix_word;
-
 	integer	k;
 
-	reg	[8:0]	q_mp;
-
+	reg			r_gtype;
+	reg		[9:0]	guard_word;
+	reg		[1:0]	r_dtype;
+	reg		[9:0]	ctrl_word;
+	reg		[1:0]	r_ctl;
+	reg		[9:0]	aux_word;
+	reg		[3:0]	r_aux;
+	reg		[3:0]	ones, ones_counter;
+	reg		[3:0]	qm_ones, qm_ones_counter;
+	reg		[8:0]	q_m;
+	reg	[9:0]	pix_word;
+	reg		[8:0]	q_mp;
 	reg	signed	[4:0]	count;
+	reg		[1:0]	s_dtype;
+	reg		[9:0]	brv_word;
+	wire		[3:0]	qm_zeros;
 
-	reg	[1:0]	s_dtype;
-	reg	[9:0]	brv_word;
 
-	wire	[3:0]	qm_zeros;
 
-	// Data Types in i_dtype:
+
+	// Data Types:
 	//	2'b00	Guard band
 	//	2'b01	Control period
 	//	2'b10	Data Island
 	//	2'b11	Pixel Data
 	//
 	// }}}
-
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Guard word
+	// Guard band
 	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
-	always @(*)
-	case(CHANNEL)
-	2'b00:   guard_word = 10'b1011001100;
-	2'b01:   guard_word = 10'b0100110011;
-	default: guard_word = 10'b1011001100;
-	endcase
-	// }}}
 
 	always @(posedge i_clk)
-		r_dtype <= i_dtype[1:0];
+		r_gtype <= i_gtype;
 
+	initial if (CHANNEL == 2'b01)
+		guard_word = 10'b0100110011;	// GREEN Video guard channel
+	else
+		guard_word = 10'b1011001100;
+	always @(posedge i_clk)
+	if (r_gtype)
+	begin
+		guard_word <= 10'b0100110011;
+	end else case(CHANNEL)
+	2'b00:   guard_word <= 10'b1011001100;
+	2'b01:   guard_word <= 10'b0100110011;
+	default: guard_word <= 10'b1011001100;
+	endcase
+	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Control signal encoding
 	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
-
 	always @(posedge i_clk)
 		r_ctl <= i_ctl;
-
 
 	always @(posedge i_clk)
 	case(r_ctl[1:0])
@@ -124,9 +123,6 @@ module	tmdsencode #(
 	//
 	// Auxilliary encoding
 	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
 	always @(posedge i_clk)
 		r_aux <= i_aux;
 
@@ -157,9 +153,6 @@ module	tmdsencode #(
 	//
 	// Pixel data encoding
 	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
 	always @(*)
 	begin
 		ones_counter = 0;
@@ -175,7 +168,7 @@ module	tmdsencode #(
 		for(k=0; k<8; k=k+1)
 		if (q_m[k])
 			qm_ones_counter = qm_ones_counter + 1;
-		qm_ones = ones_counter;
+		qm_ones = qm_ones_counter;
 	end
 
 	// assign	zeros    = 4'h8-ones;
@@ -185,7 +178,7 @@ module	tmdsencode #(
 	// This is q_m(pre)
 	always @(*)
 	// 8-bit pixel data
-	if ((ones > 4)||((ones == 4)&&(i_data[7])))
+	if ((ones > 4)||((ones == 4)&&(!i_data[0])))
 	begin
 		q_mp[0] = i_data[0];
 		q_mp[1] = !(q_mp[0] ^ i_data[1]);
@@ -212,7 +205,6 @@ module	tmdsencode #(
 		q_m <= q_mp;
 
 	initial	count = 0;
-
 	always @(posedge i_clk)
 	if ((count == 0)||(qm_ones == qm_zeros))
 	begin
@@ -239,17 +231,13 @@ module	tmdsencode #(
 			+ (qm_ones - qm_zeros);
 	end
 	// }}}
-
-	always @(posedge i_clk)
-		s_dtype <= r_dtype;
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Outgoing TMDS word
+	// Select output encoding
 	// {{{
-	////////////////////////////////////////////////////////////////////////
-	//
-	//
-	
+	always @(posedge i_clk)
+		{ s_dtype, r_dtype } <= { r_dtype, i_dtype[1:0] };
+
 	//	2'b00	Guard band
 	//	2'b01	Control period
 	//	2'b10	Data Island
@@ -262,11 +250,13 @@ module	tmdsencode #(
 	2'b10: brv_word <=   aux_word;
 	2'b11: brv_word <=   pix_word;
 	endcase
+	// }}}
 
 	genvar	gk;
 	generate for(gk=0; gk<10; gk=gk+1)
+	begin : GEN_BIT_REVERSE
 		assign	o_word[gk] = brv_word[9-gk];
-	endgenerate
+	end endgenerate
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////

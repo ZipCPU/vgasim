@@ -1,0 +1,123 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Mon Feb 21 16:42:33 2022
+[*]
+[dumpfile_mtime] "Mon Feb 21 16:42:08 2022"
+[dumpfile_size] 9088
+[timestart] 0
+[size] 1637 758
+[pos] -1 -1
+*-4.413176 80 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 343
+[signals_width] 174
+[sst_expanded] 1
+[sst_vpaned_height] 203
+@28
+vid_waterfall_w.i_clk
+vid_waterfall_w.i_reset
+@200
+-
+@c00200
+-AXIS Source
+@28
+vid_waterfall_w.S_AXI_TVALID
+vid_waterfall_w.S_AXI_TREADY
+@22
+vid_waterfall_w.S_AXI_TDATA[7:0]
+@28
+vid_waterfall_w.S_AXI_TLAST
+@1401200
+-AXIS Source
+@c00200
+-FIFO
+@28
+vid_waterfall_w.clear_fifo
+vid_waterfall_w.f_past_valid
+@22
+vid_waterfall_w.fifo_data[31:0]
+@28
+vid_waterfall_w.fifo_empty
+@22
+vid_waterfall_w.fifo_fill[9:0]
+@28
+vid_waterfall_w.fifo_full
+@200
+-
+@28
+vid_waterfall_w.staging_valid
+@22
+vid_waterfall_w.staging_data[31:0]
+@1401200
+-FIFO
+@c00200
+-Mode addressing
+@22
+vid_waterfall_w.i_height[10:0]
+vid_waterfall_w.i_width[10:0]
+vid_waterfall_w.i_baseaddr[27:0]
+vid_waterfall_w.o_first_line[27:0]
+vid_waterfall_w.this_line[27:0]
+vid_waterfall_w.this_line_wide[28:0]
+vid_waterfall_w.next_line_addr[27:0]
+vid_waterfall_w.next_line_wide[28:0]
+[color] 3
+vid_waterfall_w.i_lastaddr[27:0]
+vid_waterfall_w.line_pos[10:0]
+[color] 2
+vid_waterfall_w.line_step[10:0]
+@200
+-
+@1401200
+-Mode addressing
+@c00200
+-Wishbone
+@28
+vid_waterfall_w.o_wb_cyc
+vid_waterfall_w.o_wb_stb
+vid_waterfall_w.o_wb_we
+@22
+vid_waterfall_w.o_wb_addr[27:0]
+vid_waterfall_w.o_wb_data[31:0]
+vid_waterfall_w.o_wb_sel[3:0]
+@28
+vid_waterfall_w.i_wb_stall
+vid_waterfall_w.i_wb_ack
+@22
+vid_waterfall_w.i_wb_data[31:0]
+@28
+vid_waterfall_w.i_wb_err
+vid_waterfall_w.last_ack
+vid_waterfall_w.last_request
+@22
+vid_waterfall_w.fwb_nacks[9:0]
+vid_waterfall_w.fwb_nreqs[9:0]
+vid_waterfall_w.fwb_outstanding[9:0]
+vid_waterfall_w.wb_outstanding[8:0]
+@1401200
+-Wishbone
+@c00201
+-WB Tracking
+@29
+vid_waterfall_w.hlast
+[color] 2
+vid_waterfall_w.vlast
+vid_waterfall_w.fwb_hlast
+vid_waterfall_w.fwb_vlast
+vid_waterfall_w.fwb_known_height
+vid_waterfall_w.fwb_sof
+@23
+vid_waterfall_w.fwb_xpos[10:0]
+vid_waterfall_w.fwb_ypos[10:0]
+@1401201
+-WB Tracking
+@200
+-
+@22
+vid_waterfall_w.pix_buffer[31:0]
+vid_waterfall_w.pix_count[4:0]
+vid_waterfall_w.pix_data[31:0]
+@28
+vid_waterfall_w.pix_last
+vid_waterfall_w.pix_valid
+[pattern_trace] 1
+[pattern_trace] 0

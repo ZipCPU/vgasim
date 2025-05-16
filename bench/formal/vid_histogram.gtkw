@@ -1,0 +1,188 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Mon Feb 21 22:39:40 2022
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/dan/work/rnd/opencores/vgasim/trunk/bench/formal/vid_histogram.gtkw"
+[timestart] 0
+[size] 1691 900
+[pos] -1 -1
+*-5.711296 170 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 343
+[signals_width] 214
+[sst_expanded] 1
+[sst_vpaned_height] 250
+@28
+vid_histogram.f_past_valid
+vid_histogram.S_AXI_ACLK
+vid_histogram.S_AXI_ARESETN
+@c00200
+-I-Stream
+@28
+vid_histogram.S_AXIS_TVALID
+vid_histogram.S_AXIS_TREADY
+@22
+vid_histogram.S_AXIS_TDATA[7:0]
+@1401200
+-I-Stream
+@22
+vid_histogram.i_width[10:0]
+vid_histogram.i_height[10:0]
+@c00201
+-Video
+@28
+vid_histogram.M_VID_VALID
+vid_histogram.M_VID_READY
+vid_histogram.M_VID_DATA
+vid_histogram.M_VID_USER
+vid_histogram.M_VID_LAST
+@200
+-
+@28
+vid_histogram.M_VID_VLAST
+vid_histogram.M_VID_HLAST
+vid_histogram.px_eof
+@22
+vid_histogram.px_vpos[10:0]
+@28
+vid_histogram.px_pixel
+@1401201
+-Video
+@22
+vid_histogram.new_mem_addr[8:0]
+@28
+vid_histogram.write_bank
+@c00200
+-VIDCHK
+@22
+vid_histogram.f_xpos[10:0]
+vid_histogram.f_ypos[10:0]
+@28
+vid_histogram.f_known_height
+vid_histogram.f_hlast
+vid_histogram.f_vlast
+vid_histogram.f_sof
+@1401200
+-VIDCHK
+@28
+vid_histogram.f_sof
+vid_histogram.fh_sof
+vid_histogram.fth_sof
+vid_histogram.fvs_sof
+vid_histogram.m_vid_sof
+@800200
+-Contract
+@22
+vid_histogram.fc_addr[8:0]
+vid_histogram.f_counts[10:0]
+vid_histogram.f_data[10:0]
+@1000200
+-Contract
+@28
+vid_histogram.swap_banks
+vid_histogram.swap_pipe
+vid_histogram.initial_clearing
+[color] 3
+vid_histogram.clearing_bank
+@22
+vid_histogram.total_counts[10:0]
+@28
+vid_histogram.wr_mem
+vid_histogram.write_bank
+@22
+vid_histogram.new_mem_addr[8:0]
+vid_histogram.new_mem_counts[10:0]
+@200
+-
+@28
+vid_histogram.rd_mem_valid
+@22
+vid_histogram.rd_mem_addr[8:0]
+vid_histogram.rd_mem_counts[10:0]
+vid_histogram.rd_mem_counts_raw[10:0]
+@28
+vid_histogram.bypass_active
+@c00022
+vid_histogram.bypass_value[10:0]
+@28
+(0)vid_histogram.bypass_value[10:0]
+(1)vid_histogram.bypass_value[10:0]
+(2)vid_histogram.bypass_value[10:0]
+(3)vid_histogram.bypass_value[10:0]
+(4)vid_histogram.bypass_value[10:0]
+(5)vid_histogram.bypass_value[10:0]
+(6)vid_histogram.bypass_value[10:0]
+(7)vid_histogram.bypass_value[10:0]
+(8)vid_histogram.bypass_value[10:0]
+(9)vid_histogram.bypass_value[10:0]
+(10)vid_histogram.bypass_value[10:0]
+@1401200
+-group_end
+@c00200
+-H Stage
+@28
+vid_histogram.h_valid
+vid_histogram.h_ready
+@22
+vid_histogram.hpos[10:0]
+@28
+vid_histogram.heol
+@200
+-
+@28
+vid_histogram.fh_hlast
+vid_histogram.fh_known_height
+vid_histogram.fh_sof
+vid_histogram.fh_vlast
+@22
+vid_histogram.fh_xpos[10:0]
+vid_histogram.fh_ypos[10:0]
+@1401200
+-H Stage
+@c00200
+-VS Stage
+@28
+vid_histogram.vs_valid
+vid_histogram.vs_ready
+@22
+vid_histogram.vs_product[20:0]
+vid_histogram.vs_value[10:0]
+@28
+vid_histogram.vs_eol
+@200
+-
+@22
+vid_histogram.fvs_xpos[10:0]
+vid_histogram.fvs_ypos[10:0]
+@28
+vid_histogram.fvs_hlast
+vid_histogram.fvs_vlast
+vid_histogram.fvs_sof
+vid_histogram.fvs_known_height
+@1401200
+-VS Stage
+@c00200
+-TH Stage
+@28
+vid_histogram.th_valid
+vid_histogram.th_ready
+@22
+vid_histogram.th_value[10:0]
+@28
+vid_histogram.th_eol
+@200
+-
+@22
+vid_histogram.fth_xpos[10:0]
+vid_histogram.fth_ypos[10:0]
+@28
+vid_histogram.fth_hlast
+vid_histogram.fth_vlast
+vid_histogram.fth_sof
+vid_histogram.fth_known_height
+@22
+vid_histogram.px_vpos[10:0]
+@1401200
+-TH Stage
+[pattern_trace] 1
+[pattern_trace] 0

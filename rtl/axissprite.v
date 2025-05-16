@@ -818,6 +818,7 @@ module	axissprite #(
 		reg		a1_valid, a1_tlast, a1_tuser, a1_insprite;
 		reg		a2_valid, a2_tlast, a2_tuser;
 		wire	[ALPHA_BITS-1:0]	alpha, alphan;
+		reg		a3_tlast, a3_tuser;
 
 		// alpha_data
 		wire	[SBPC-1:0]	sr, sg, sb;
@@ -924,7 +925,6 @@ module	axissprite #(
 
 		// M_AXIS_TVALID, M_AXIS_TLAST, M_AXIS_TUSER
 		// {{{
-		reg	a3_tlast, a3_tuser;
 
 		initial	M_AXIS_TVALID = 1'b0;
 		always @(posedge S_VID_ACLK)

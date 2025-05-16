@@ -79,49 +79,58 @@ int	TMDSENCODER::ctldata(int ctl) {
 	int	word = 0;
 
 	switch(ctl&3) {
-	case 0: word = bitreverse(0x354); break;
-	case 1: word = bitreverse(0x0ab); break;
-	case 2: word = bitreverse(0x154); break;
-	case 3: word = bitreverse(0x2ab); break;
+	case 0: word = bitreverse(0x354); break;	// = 0x00 1010 1011/0AB
+	case 1: word = bitreverse(0x0ab); break;	// = 0x11 0101 0100/354
+	case 2: word = bitreverse(0x154); break;	// = 0x00 1010 1010/0AA
+	case 3: word = bitreverse(0x2ab); break;	// = 0x11 0101 0101/355
 	}
 
 	return word;
 }
 
 int	TMDSENCODER::pixeldata(int pix) {
-	int	word, tmp;
+	unsigned	word, pix_ones, word_ones, d;
 
-	// This isn't quite right, since it's not guaranteed
-	// to be balanced as desired
-	word = (pix & 0x01);
-	word |= (pix ^ (word << 1)) & 0x02;
-	word |= (pix ^ (word << 1)) & 0x04;
-	word |= (pix ^ (word << 1)) & 0x08;
-	word |= (pix ^ (word << 1)) & 0x10;
-	word |= (pix ^ (word << 1)) & 0x20;
-	word |= (pix ^ (word << 1)) & 0x40;
-	word |= (pix ^ (word << 1)) & 0x80;
+	pix_ones = countones(pix & 0x0ff);		// pix_ones == N1(D)
+	if ((pix_ones > 4)||(pix_ones == 4 && (0 == (pix & 0x001)))) {
+		word = (pix & 0x01);			// word == QM
+		word |= ((pix ^ (word << 1)) & 0x02) ^ 0x02;
+		word |= ((pix ^ (word << 1)) & 0x04) ^ 0x04;
+		word |= ((pix ^ (word << 1)) & 0x08) ^ 0x08;
+		word |= ((pix ^ (word << 1)) & 0x10) ^ 0x10;
+		word |= ((pix ^ (word << 1)) & 0x20) ^ 0x20;
+		word |= ((pix ^ (word << 1)) & 0x40) ^ 0x40;
+		word |= ((pix ^ (word << 1)) & 0x80) ^ 0x80;
+		// word |= 0x000;
+	} else {
+		word = (pix & 0x01);			// word == QM
+		word |= (pix ^ (word << 1)) & 0x02;
+		word |= (pix ^ (word << 1)) & 0x04;
+		word |= (pix ^ (word << 1)) & 0x08;
+		word |= (pix ^ (word << 1)) & 0x10;
+		word |= (pix ^ (word << 1)) & 0x20;
+		word |= (pix ^ (word << 1)) & 0x40;
+		word |= (pix ^ (word << 1)) & 0x80;
+		word |= 0x100;
+	}
 
-	tmp = countones(pix & 0x0ff);
-	if ((tmp > 4)||(tmp == 4 && (pix & 0x080)))
-		word ^= 0x0aa;
-	else
-		word ^= 0x100;
-	if ((m_count ==0)||(countones(word & 0x0ff) == 4)) {
+	word_ones = countones(word & 0x0ff);
+	d = 2*word_ones - 8;
+	if ((m_count ==0)||(word_ones == 4)) {
+				// word_ones - word_zeros
+				// word_ones - (8 - word_ones)
 		if (word & 0x0100) {
-			m_count = m_count - (2*countones(word & 0x0ff) - 8);
+			m_count = m_count - d;
 		} else {
 			word ^= 0x02ff;
-			m_count = m_count + 2*countones(word & 0x0ff) - 8;
+			m_count = m_count + d;
 		}
-	} else if ((m_count > 0 && (tmp > 4))
-			||(m_count < 0 && (tmp < 4))) {
-		m_count = m_count + ((word & 0x100) ? 2 : 0)
-			- 2*countones(word & 0x0ff)+8;
+	} else if ((m_count > 0 && (word_ones > 4))
+			||(m_count < 0 && (word_ones < 4))) {
+		m_count = m_count + ((word & 0x100) ? 2 : 0) - d;
 		word ^= 0x2ff;
 	} else {
-		m_count = m_count - ((word & 0x100) ? 0 : 2)
-			+ 2*countones(word & 0x0ff)-8;
+		m_count = m_count - ((word & 0x100) ? 0 : 2) + d;
 	}
 
 	return bitreverse(word);
@@ -146,7 +155,7 @@ int	TMDSENCODER::apply(int dtype, int ctl, int aux, int data) {
 		//
 		case 0x4: word = 0x171; break;
 		case 0x5: word = 0x11e; break;
-		case 0x6: word = 0x14e; break;
+		case 0x6: word = 0x18e; break;
 		case 0x7: word = 0x13c; break;
 		//
 		case 0x8: word = 0x2cc; break;
@@ -189,12 +198,6 @@ void	HDMISOURCE::init(void) {
 }
 
 void	HDMISOURCE::get_screenshot(void) {
-	// Glib::RefPtr<Gdk::Pixbuf> image = Gdk::Pixbuf::... ??
-	// Gdk::Cairo::set_source_pixbuf(cr, image, ?, ?);
-	//
-
-	// m_image = new Gdk::Pixbuf(m_root_window, m_xoffset, m_yoffset, m_mode.width(), m_mode.height());
-
 	m_image = gdk_pixbuf_get_from_window(m_root_window,
 			m_xoffset, m_yoffset, m_mode.width(), m_mode.height());
 	g_assert( gdk_pixbuf_get_n_channels(m_image) == 3);
@@ -209,6 +212,9 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 	m_xpos++;
 	if (m_xpos >= m_mode.raw_width()) {
 		m_xpos = 0;
+	}
+
+	if (m_xpos == m_mode.hporch()) {
 		m_ypos++;
 		if (m_ypos >= m_mode.raw_height()) {
 			m_ypos = 0;
@@ -249,8 +255,7 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 			hsync = SYNC_ACTIVE;
 		}
 
-		if ((m_ypos >= m_mode.vporch())
-			  &&(m_ypos < m_mode.vporch() + m_mode.sync_lines())) {
+		if ((m_ypos >= m_mode.vporch())&&(m_ypos < m_mode.vsync())) {
 			vsync = SYNC_ACTIVE;
 		}
 
@@ -265,24 +270,27 @@ void	HDMISOURCE::operator()(int &blu, int &grn, int &red) {
 
 
 		if ((m_xpos >= m_mode.raw_width()-PREPIXEL_GUARD)
-			&&((m_ypos < m_mode.height()-1)
-				||(m_ypos == m_mode.raw_height() - 1))) {
+				&& (m_ypos < m_mode.height())) {
 			blu = tmdsblu.guard();
 			grn = tmdsgrn.guard();
 			red = tmdsred.guard();
 		} else if ((m_xpos >= m_mode.raw_width()-PREPIXEL_PREAMBLE)
-			&&((m_ypos < m_mode.height()-1)
-				||(m_ypos == m_mode.raw_height() - 1))) {
+				&& (m_ypos < m_mode.height())) {
+			int	control = (vsync ? 2:0) | (hsync ? 1:0);
+
 			// Video data preamble
-			blu = tmdsblu.ctldata(0);
-			grn = tmdsgrn.ctldata(2);
+			blu = tmdsblu.ctldata(control);
+			grn = tmdsgrn.ctldata(1);
 			red = tmdsred.ctldata(0);
 		} else {
-			int	control = (vsync << 1) | hsync;
+			int	control = (vsync ? 2:0) | (hsync ? 1:0);
 
 			blu = tmdsblu.ctldata(control);
 			grn = tmdsgrn.ctldata(1);
 			red = tmdsred.ctldata(0);
 		}
 	}
+
+	m_hsync = hsync;
+	m_vsync = vsync;
 }

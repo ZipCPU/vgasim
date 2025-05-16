@@ -313,7 +313,6 @@ module	axivideo #(
 	wire		vin_valid, vin_ready, vin_hsync, vin_vsync;
 	wire	[23:0]	vin_data;
 
-
 	// }}}
 	////////////////////////////////////////////////////////////////////////
 	//

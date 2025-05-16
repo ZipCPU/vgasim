@@ -1,0 +1,118 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Mon Aug 24 19:31:38 2020
+[*]
+[dumpfile] "(null)"
+[timestart] 0
+[size] 1816 905
+[pos] -1 -1
+*-5.696020 53 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 196
+[signals_width] 238
+[sst_expanded] 1
+[sst_vpaned_height] 261
+@28
+vidstream2pix.i_reset
+vidstream2pix.i_clk
+@c00200
+-Color map control
+@28
+vidstream2pix.i_cmap_we
+vidstream2pix.i_cmap_wstrb[2:0]
+@22
+vidstream2pix.i_cmap_waddr[7:0]
+vidstream2pix.i_cmap_wdata[23:0]
+@28
+vidstream2pix.i_cmap_rd
+@22
+vidstream2pix.i_cmap_raddr[7:0]
+vidstream2pix.o_cmap_rdata[23:0]
+@1401200
+-Color map control
+@28
+vidstream2pix.i_mode[2:0]
+@22
+vidstream2pix.i_pixels_per_line[11:0]
+vidstream2pix.f_bus_words_per_line[11:0]
+vidstream2pix.f_lines_per_frame[15:0]
+@c00200
+-Bus data in
+@28
+vidstream2pix.S_AXIS_TVALID
+vidstream2pix.S_AXIS_TREADY
+@22
+vidstream2pix.S_AXIS_TDATA[31:0]
+@28
+vidstream2pix.S_AXIS_FRAME
+vidstream2pix.S_AXIS_HLAST
+vidstream2pix.S_AXIS_TLAST
+vidstream2pix.S_AXIS_TUSER
+@1401200
+-Bus data in
+@800200
+-VALID
+@28
+vidstream2pix.skd_valid
+vidstream2pix.s_valid
+vidstream2pix.c_valid
+vidstream2pix.pix_valid
+@1000200
+-VALID
+@800200
+-HLAST
+@28
+vidstream2pix.skd_hlast
+[color] 2
+vidstream2pix.s_hlast
+vidstream2pix.c_hlast
+vidstream2pix.pix_hlast
+@1000200
+-HLAST
+@28
+vidstream2pix.s_last_in_word
+vidstream2pix.s_last_word_in_packet
+vidstream2pix.s_step
+vidstream2pix.c_step
+@22
+vidstream2pix.scount[4:0]
+vidstream2pix.s_remaining[11:0]
+@800200
+-FRAME
+@28
+vidstream2pix.skd_frame
+vidstream2pix.s_frame
+vidstream2pix.c_frame
+vidstream2pix.pix_frame
+@1000200
+-FRAME
+@c00200
+-Pixel data out
+@28
+vidstream2pix.M_AXIS_TVALID
+vidstream2pix.M_AXIS_TREADY
+@22
+vidstream2pix.M_AXIS_TDATA[23:0]
+@28
+vidstream2pix.M_AXIS_FRAME
+vidstream2pix.M_AXIS_HLAST
+vidstream2pix.M_AXIS_TLAST
+vidstream2pix.M_AXIS_TUSER
+@1401200
+-Pixel data out
+@22
+[color] 2
+vidstream2pix.f_bus_x[11:0]
+[color] 2
+vidstream2pix.f_bus_y[15:0]
+@23
+vidstream2pix.f_s_x[11:0]
+@22
+vidstream2pix.f_s_y[15:0]
+[color] 3
+vidstream2pix.f_c_x[11:0]
+[color] 3
+vidstream2pix.f_c_y[15:0]
+vidstream2pix.f_pixel_x[11:0]
+vidstream2pix.f_pixel_y[15:0]
+[pattern_trace] 1
+[pattern_trace] 0

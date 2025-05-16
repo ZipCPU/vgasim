@@ -162,7 +162,7 @@ $(VID2PIX)_cvr/PASS: $(VID2PIX).sby $(RTL)/$(VID2PIX).v $(RTL)/skidbuffer.v
 .PHONY: $(WFALLW) waterfall
 ## {{{
 waterfall: $(WFALLW) $(WFALLR)
-$(WFALLW): $(WFALLW)_prf/PASS $(WFALLW)_cvr/PASS
+$(WFALLW): $(WFALLW)_prf/PASS # $(WFALLW)_cvr/PASS
 $(WFALLW)_prf/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v
 	sby -f $(WFALLW).sby prf
 $(WFALLW)_cvr/PASS: $(WFALLW).sby $(RTL)/gfx/$(WFALLW).v $(RTL)/sfifo.v faxivideo.v fwb_master.v

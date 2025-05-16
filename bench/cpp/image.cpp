@@ -45,7 +45,7 @@ template<class PIXEL> void IMAGE<PIXEL>::allocbuf(int h, int w) {
 	sz = h*w*sizeof(PIXEL)+sizeof(PIXEL *)*h;
 	m_buf = new unsigned char[sz];
 	assert(m_buf);
-				
+
 	m_img  = (PIXEL **)m_buf;
 	m_data = (PIXEL *)&m_buf[sizeof(PIXEL *)*h];
 	for(i=0; i<h; i++)

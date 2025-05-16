@@ -98,14 +98,12 @@ module	hdmi2vga // #()	// No parameters (yet)
 		.i_r(i_hdmi_red), .i_g(i_hdmi_grn), .i_b(i_hdmi_blu),
 		.o_r(red_word), .o_g(grn_word), .o_b(blu_word),
 		.o_sync_word(o_sync_word)
-		// , .o_debug(dbg_bitsync)
 	);
 `else
 	assign	red_word = i_hdmi_red;
 	assign	grn_word = i_hdmi_grn;
 	assign	blu_word = i_hdmi_blu;
 	assign	o_sync_word = 32'h0;
-	// assign	dbg_bitsync = 32'h0;
 `endif
 	// }}}
 	////////////////////////////////////////////////////////////////////////

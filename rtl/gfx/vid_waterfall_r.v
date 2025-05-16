@@ -345,7 +345,6 @@ module	vid_waterfall_r #(
 	//
 	//
 
-
 	generate if (OPT_ASYNC_CLOCKS)
 	begin : GEN_ASYNC_FIFO
 		// {{{
@@ -353,7 +352,6 @@ module	vid_waterfall_r #(
 		reg	[2:0]	r_pix_reset_pipe;
 		wire		afifo_full;
 		wire		ign_a_ready, ign_b_valid;
-
 
 		initial	{ r_pix_reset, r_pix_reset_pipe } = -1;
 		always @(posedge i_pixclk or posedge i_reset)

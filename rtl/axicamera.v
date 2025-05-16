@@ -500,7 +500,8 @@ module	axicamera #(
 
 	// _locked, _imwidth, _imheight
 	// {{{
-	tfrvalue #( .NB(2+1+32)
+	tfrvalue #(
+		.NB(2+1+32)
 	) tfrsz (.i_aclk(i_pix_clk), .i_value({ pix_locked,
 				pix_imhpol, pix_imvpol,
 				pix_imwidth, pix_imheight }),
@@ -522,7 +523,8 @@ module	axicamera #(
 
 	// _imhfront, _imvfront
 	// {{{
-	tfrvalue #( .NB(32)
+	tfrvalue #(
+		.NB(32)
 	) tfrporch (
 		.i_aclk(i_pix_clk),
 			.i_value({ pix_imhfront, pix_imvfront }),
